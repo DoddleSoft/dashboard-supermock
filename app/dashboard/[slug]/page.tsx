@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { Users, FileText, TrendingUp, ArrowRight } from "lucide-react";
 
 const stats = [
@@ -28,6 +29,9 @@ const stats = [
 ];
 
 export default function DashboardPage() {
+  const params = useParams();
+  const slug = params.slug as string;
+
   return (
     <div className="max-w-7xl flex flex-col gap-8 mx-auto">
       {/* Stats Grid */}
@@ -60,7 +64,7 @@ export default function DashboardPage() {
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Link
-          href="/dashboard/students"
+          href={`/dashboard/${slug}/students`}
           className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white hover:shadow-lg transition-all duration-200 group"
         >
           <div className="flex items-center gap-4">
@@ -77,7 +81,7 @@ export default function DashboardPage() {
         </Link>
 
         <Link
-          href="/dashboard/tests"
+          href={`/dashboard/${slug}/tests`}
           className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white hover:shadow-lg transition-all duration-200 group"
         >
           <div className="flex items-center gap-4">
@@ -94,7 +98,7 @@ export default function DashboardPage() {
         </Link>
 
         <Link
-          href="/dashboard/results"
+          href={`/dashboard/${slug}/results`}
           className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white hover:shadow-lg transition-all duration-200 group"
         >
           <div className="flex items-center gap-4">

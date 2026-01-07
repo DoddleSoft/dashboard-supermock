@@ -2,10 +2,10 @@
 
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import QuestionModal from "../../../../components/dashboard/QuestionModal";
-import ReadingModule from "../../../../components/create/ReadingModule";
-import WritingModule from "../../../../components/create/WritingModule";
-import ListeningModule from "../../../../components/create/ListeningModule";
+import QuestionModal from "../../../../../components/dashboard/QuestionModal";
+import ReadingModule from "../../../../../components/create/ReadingModule";
+import WritingModule from "../../../../../components/create/WritingModule";
+import ListeningModule from "../../../../../components/create/ListeningModule";
 
 interface Question {
   id: string;
@@ -327,7 +327,11 @@ function CreateModuleContent() {
 
 export default function CreateModulePage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-slate-500">Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="p-8 text-center text-slate-500">Loading...</div>
+      }
+    >
       <CreateModuleContent />
     </Suspense>
   );
