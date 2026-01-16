@@ -94,7 +94,7 @@ export default function Onboarding() {
           name: formData.name,
           slug: formData.slug,
           is_active: formData.isActive,
-          user_id: user.id, // Set the center owner
+          user_id: user.id,
         })
         .select()
         .single();

@@ -1,144 +1,109 @@
 "use client";
 
-import { useState, useRef, Suspense } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useMemo, useState, Suspense } from "react";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import QuestionModal from "../../../../../components/dashboard/QuestionModal";
 import ReadingModule from "../../../../../components/create/ReadingModule";
 import WritingModule from "../../../../../components/create/WritingModule";
 import ListeningModule from "../../../../../components/create/ListeningModule";
-
-interface Question {
-  id: string;
-  text: string;
-  type: "fill-blank" | "mcq" | "true-false-not-given" | "yes-no-not-given";
-  blankPosition?: "first" | "middle" | "end";
-  mcqVariant?: "3-options-1-correct" | "5-options-2-correct";
-  options?: string[];
-  correctAnswers?: string[];
-  answer?: string;
-  explanation?: string;
-}
-
-interface Section {
-  id: string;
-  name: string;
-  heading?: string;
-  questions: Question[];
-  paragraphContent?: string;
-  audioFile?: File | null;
-}
-
-interface WritingTask {
-  id: number;
-  heading: string;
-  preHeading: string;
-  subHeading: string;
-  contentType: "text" | "image";
-  textContent: string;
-  imageFile: File | null;
-}
+import {
+  ModuleProvider,
+  useModuleContext,
+  QuestionDefinition,
+  RenderBlock,
+} from "../../../../../context/ModuleContext";
 
 function CreateModuleContent() {
   const searchParams = useSearchParams();
   const params = useParams();
+  const router = useRouter();
   const slug = params.slug as string;
   const type = searchParams.get("type") || "reading";
-  const idCounterRef = useRef(2); // Start from 2 since initial section has id "1"
 
-  // Generate unique ID without causing hydration errors
-  const generateId = () => {
-    const id = idCounterRef.current.toString();
-    idCounterRef.current += 1;
-    return id;
-  };
+  // Get context methods and data
+  const {
+    paperTitle,
+    setPaperTitle,
+    readingSections,
+    readingExpandedSections,
+    addReadingSection,
+    updateReadingSectionTitle,
+    updateReadingSectionHeading,
+    updateReadingSectionInstruction,
+    updateReadingSectionPassageText,
+    addReadingRenderBlock,
+    updateReadingRenderBlock,
+    deleteReadingRenderBlock,
+    updateReadingQuestion,
+    deleteReadingQuestion,
+    toggleReadingSection,
+    listeningSections,
+    listeningExpandedSections,
+    addListeningSection,
+    updateListeningSectionTitle,
+    updateListeningSectionInstruction,
+    updateListeningSectionAudioPath,
+    updateListeningSectionAudio,
+    addListeningRenderBlock,
+    updateListeningRenderBlock,
+    deleteListeningRenderBlock,
+    updateListeningQuestion,
+    deleteListeningQuestion,
+    toggleListeningSection,
+    writingTasks,
+    updateWritingTaskField,
+    addWritingRenderBlock,
+    updateWritingRenderBlock,
+    deleteWritingRenderBlock,
+  } = useModuleContext();
 
-  // State management
-  const [sections, setSections] = useState<Section[]>([
-    {
-      id: "1",
-      name: "SECTION 1",
-      heading: "",
-      questions: [],
-      paragraphContent: "",
-      audioFile: null,
-    },
-  ]);
-  const [paragraphContent, setParagraphContent] = useState("");
-  const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [writingTasks, setWritingTasks] = useState<WritingTask[]>([
-    {
-      id: 1,
-      heading: "",
-      preHeading: "",
-      subHeading: "",
-      contentType: "text",
-      textContent: "",
-      imageFile: null,
-    },
-    {
-      id: 2,
-      heading: "",
-      preHeading: "",
-      subHeading: "",
-      contentType: "text",
-      textContent: "",
-      imageFile: null,
-    },
-  ]);
   const [showQuestionModal, setShowQuestionModal] = useState(false);
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
-  const [expandedSections, setExpandedSections] = useState<string[]>(["1"]);
-  const [paperTitle, setPaperTitle] = useState("Untitled Module");
+  const [currentModuleType, setCurrentModuleType] = useState<
+    "reading" | "listening"
+  >("reading");
 
-  const addSection = () => {
-    const newSection: Section = {
-      id: generateId(),
-      name: `SECTION ${sections.length + 1}`,
-      heading: "",
-      questions: [],
-      paragraphContent: "",
-      audioFile: null,
-    };
-    setSections([...sections, newSection]);
-    setExpandedSections([...expandedSections, newSection.id]);
+  const sectionById = useMemo(
+    () => ({
+      reading: (id: string) => readingSections.find((s) => s.id === id),
+      listening: (id: string) => listeningSections.find((s) => s.id === id),
+    }),
+    [readingSections, listeningSections]
+  );
+
+  const getNextQuestionRef = (
+    questions: Record<string, QuestionDefinition>
+  ) => {
+    const numbers = Object.keys(questions)
+      .map((key) => Number(key))
+      .filter((num) => !Number.isNaN(num));
+    const max = numbers.length ? Math.max(...numbers) : 0;
+    return String(max + 1);
   };
 
-  const updateSectionTitle = (sectionId: string, newTitle: string) => {
-    setSections(
-      sections.map((section) =>
-        section.id === sectionId ? { ...section, name: newTitle } : section
-      )
-    );
-  };
-
-  const updateSectionHeading = (sectionId: string, heading: string) => {
-    setSections(
-      sections.map((section) =>
-        section.id === sectionId ? { ...section, heading } : section
-      )
-    );
-  };
-
-  const updateSectionParagraph = (sectionId: string, content: string) => {
-    setSections(
-      sections.map((section) =>
-        section.id === sectionId
-          ? { ...section, paragraphContent: content }
-          : section
-      )
-    );
-  };
-
-  const updateSectionAudio = (sectionId: string, file: File | null) => {
-    setSections(
-      sections.map((section) =>
-        section.id === sectionId ? { ...section, audioFile: file } : section
-      )
-    );
+  const questionTypeToPlaceholder = (
+    questionType:
+      | "fill-blank"
+      | "mcq"
+      | "true-false-not-given"
+      | "yes-no-not-given"
+  ) => {
+    switch (questionType) {
+      case "fill-blank":
+        return "blanks";
+      case "mcq":
+        return "dropdown";
+      case "true-false-not-given":
+      case "yes-no-not-given":
+        return "boolean";
+      default:
+        return "blanks";
+    }
   };
 
   const addQuestion = (sectionId: string) => {
     setCurrentSectionId(sectionId);
+    setCurrentModuleType(type === "listening" ? "listening" : "reading");
     setShowQuestionModal(true);
   };
 
@@ -154,67 +119,54 @@ function CreateModuleContent() {
   }) => {
     if (!currentSectionId) return;
 
-    const newQuestion: Question = {
-      id: generateId(),
-      text: questionData.text,
-      type: questionData.type,
-      blankPosition: questionData.blankPosition,
-      mcqVariant: questionData.mcqVariant,
-      options: questionData.options,
-      correctAnswers: questionData.correctAnswers,
+    const targetSection = sectionById[currentModuleType](currentSectionId);
+    if (!targetSection) return;
+
+    const questionRef = getNextQuestionRef(targetSection.questions);
+    const placeholderType = questionTypeToPlaceholder(questionData.type);
+
+    const renderBlock: RenderBlock = {
+      type: "text",
+      content: `${questionRef}. {{${questionRef}}${placeholderType}} ${questionData.text}`,
+    };
+
+    const optionsFromType =
+      questionData.type === "true-false-not-given"
+        ? ["TRUE", "FALSE", "NOT GIVEN"]
+        : questionData.type === "yes-no-not-given"
+        ? ["YES", "NO", "NOT GIVEN"]
+        : questionData.options;
+
+    const questionDefinition: QuestionDefinition = {
       answer: questionData.answer,
+      options: optionsFromType?.filter((opt) => opt && opt.trim()),
       explanation: questionData.explanation,
     };
 
-    setSections(
-      sections.map((section) =>
-        section.id === currentSectionId
-          ? { ...section, questions: [...section.questions, newQuestion] }
-          : section
-      )
-    );
+    if (currentModuleType === "reading") {
+      addReadingRenderBlock(currentSectionId, renderBlock);
+      updateReadingQuestion(currentSectionId, questionRef, questionDefinition);
+    } else {
+      addListeningRenderBlock(currentSectionId, renderBlock);
+      updateListeningQuestion(
+        currentSectionId,
+        questionRef,
+        questionDefinition
+      );
+    }
 
     setShowQuestionModal(false);
     setCurrentSectionId(null);
   };
 
-  const deleteQuestion = (sectionId: string, questionId: string) => {
-    setSections(
-      sections.map((section) =>
-        section.id === sectionId
-          ? {
-              ...section,
-              questions: section.questions.filter((q) => q.id !== questionId),
-            }
-          : section
-      )
-    );
-  };
-
-  const toggleSection = (sectionId: string) => {
-    setExpandedSections((prev) =>
-      prev.includes(sectionId)
-        ? prev.filter((id) => id !== sectionId)
-        : [...prev, sectionId]
-    );
-  };
-
-  const updateWritingTask = (
-    taskId: number,
-    field: keyof WritingTask,
-    value: any
-  ) => {
-    setWritingTasks(
-      writingTasks.map((task) =>
-        task.id === taskId ? { ...task, [field]: value } : task
-      )
-    );
+  const handleTabChange = (moduleType: string) => {
+    router.push(`/dashboard/${slug}/create/modules?type=${moduleType}`);
   };
 
   const renderModuleTabs = () => (
     <div className="flex items-center gap-6 mb-4 border-b border-slate-200">
-      <a
-        href={`/dashboard/${slug}/create/modules?type=reading`}
+      <button
+        onClick={() => handleTabChange("reading")}
         className={`pb-2 px-2 text-sm font-medium transition-colors ${
           type === "reading"
             ? "text-red-600 border-b-2 border-red-600"
@@ -222,9 +174,9 @@ function CreateModuleContent() {
         }`}
       >
         READING
-      </a>
-      <a
-        href={`/dashboard/${slug}/create/modules?type=writing`}
+      </button>
+      <button
+        onClick={() => handleTabChange("writing")}
         className={`pb-2 px-2 text-sm font-medium transition-colors ${
           type === "writing"
             ? "text-red-600 border-b-2 border-red-600"
@@ -232,9 +184,9 @@ function CreateModuleContent() {
         }`}
       >
         WRITING
-      </a>
-      <a
-        href={`/dashboard/${slug}/create/modules?type=listening`}
+      </button>
+      <button
+        onClick={() => handleTabChange("listening")}
         className={`pb-2 px-2 text-sm font-medium transition-colors ${
           type === "listening"
             ? "text-red-600 border-b-2 border-red-600"
@@ -242,9 +194,9 @@ function CreateModuleContent() {
         }`}
       >
         LISTENING
-      </a>
-      <a
-        href={`/dashboard/${slug}/create/modules?type=speaking`}
+      </button>
+      <button
+        onClick={() => handleTabChange("speaking")}
         className={`pb-2 px-2 text-sm font-medium transition-colors ${
           type === "speaking"
             ? "text-red-600 border-b-2 border-red-600"
@@ -252,7 +204,7 @@ function CreateModuleContent() {
         }`}
       >
         SPEAKING
-      </a>
+      </button>
     </div>
   );
 
@@ -261,35 +213,55 @@ function CreateModuleContent() {
       case "reading":
         return (
           <ReadingModule
-            sections={sections}
-            expandedSections={expandedSections}
-            onToggleSection={toggleSection}
-            onAddSection={addSection}
+            sections={readingSections}
+            expandedSections={readingExpandedSections}
+            onToggleSection={toggleReadingSection}
+            onAddSection={addReadingSection}
             onAddQuestion={addQuestion}
-            onDeleteQuestion={deleteQuestion}
-            onUpdateSectionTitle={updateSectionTitle}
-            onUpdateSectionHeading={updateSectionHeading}
-            onUpdateSectionParagraph={updateSectionParagraph}
+            onUpdateSectionTitle={updateReadingSectionTitle}
+            onUpdateSectionHeading={updateReadingSectionHeading}
+            onUpdateSectionInstruction={updateReadingSectionInstruction}
+            onUpdateSectionPassage={updateReadingSectionPassageText}
+            onAddRenderBlock={(sectionId) =>
+              addReadingRenderBlock(sectionId, { type: "text", content: "" })
+            }
+            onUpdateRenderBlock={updateReadingRenderBlock}
+            onDeleteRenderBlock={deleteReadingRenderBlock}
+            onUpdateQuestionKey={updateReadingQuestion}
+            onDeleteQuestionKey={deleteReadingQuestion}
           />
         );
       case "writing":
         return (
           <WritingModule
             tasks={writingTasks}
-            onUpdateTask={updateWritingTask}
+            onUpdateTaskField={updateWritingTaskField}
+            onAddRenderBlock={(taskId) =>
+              addWritingRenderBlock(taskId, { type: "text", content: "" })
+            }
+            onUpdateRenderBlock={updateWritingRenderBlock}
+            onDeleteRenderBlock={deleteWritingRenderBlock}
           />
         );
       case "listening":
         return (
           <ListeningModule
-            sections={sections}
-            expandedSections={expandedSections}
-            onToggleSection={toggleSection}
-            onAddSection={addSection}
+            sections={listeningSections}
+            expandedSections={listeningExpandedSections}
+            onToggleSection={toggleListeningSection}
+            onAddSection={addListeningSection}
             onAddQuestion={addQuestion}
-            onDeleteQuestion={deleteQuestion}
-            onUpdateSectionTitle={updateSectionTitle}
-            onUpdateSectionAudio={updateSectionAudio}
+            onUpdateSectionTitle={updateListeningSectionTitle}
+            onUpdateSectionInstruction={updateListeningSectionInstruction}
+            onUpdateSectionAudioPath={updateListeningSectionAudioPath}
+            onUpdateSectionAudio={updateListeningSectionAudio}
+            onAddRenderBlock={(sectionId) =>
+              addListeningRenderBlock(sectionId, { type: "text", content: "" })
+            }
+            onUpdateRenderBlock={updateListeningRenderBlock}
+            onDeleteRenderBlock={deleteListeningRenderBlock}
+            onUpdateQuestionKey={updateListeningQuestion}
+            onDeleteQuestionKey={deleteListeningQuestion}
           />
         );
       case "speaking":
@@ -309,13 +281,16 @@ function CreateModuleContent() {
     <>
       <div className="max-w-7xl mx-auto">
         {/* Paper Title */}
-        <div className="mb-4">
+        <div className="mb-6 flex bg-gray-200 pl-4 rounded-lg items-center gap-4">
+          <div className="w-12 text-lg font-semibold text-slate-500 tracking-wide">
+            Title:
+          </div>
           <input
             type="text"
             value={paperTitle}
             onChange={(e) => setPaperTitle(e.target.value)}
-            className="text-lg px-2 py-1 font-bold text-slate-900 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-gray-300 rounded-lg w-full placeholder:text-slate-400"
-            placeholder="Enter module title..."
+            className="text-lg px-4 py-2 my-1 font-bold text-slate-900 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-gray-300 rounded-lg w-full placeholder:text-slate-400"
+            placeholder="Enter title for the paper..."
           />
         </div>
 
@@ -349,12 +324,14 @@ function CreateModuleContent() {
 
 export default function CreateModulePage() {
   return (
-    <Suspense
-      fallback={
-        <div className="p-8 text-center text-slate-500">Loading...</div>
-      }
-    >
-      <CreateModuleContent />
-    </Suspense>
+    <ModuleProvider>
+      <Suspense
+        fallback={
+          <div className="p-8 text-center text-slate-500">Loading...</div>
+        }
+      >
+        <CreateModuleContent />
+      </Suspense>
+    </ModuleProvider>
   );
 }

@@ -10,6 +10,8 @@ import {
   LogOut,
   Layers,
   Building2,
+  ArrowBigDown,
+  ChevronDown,
 } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
 import { CentreProvider, useCentre } from "../../../context/CentreContext";
@@ -129,17 +131,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               </h2>
             </div>
 
-            {/* CENTER: Center Name */}
-            <div className="flex items-center gap-2 bg-gray-100 px-6 py-1 rounded-lg inset-shadow-sm">
-              <Building2 className="w-6 h-6 text-gray-500" />
-              <p className="text-md uppercase font-medium text-slate-700">
-                {currentCenter?.name}
-              </p>
-            </div>
-
             {/* RIGHT: Profile */}
-            <div className="flex-1 flex justify-end">
-              <div className="flex items-center gap-3 pl-6 border-l border-slate-200">
+            <div className="flex gap-4 justify-end">
+              {/* CENTER: Center Name */}
+
+              <div className="flex items-center gap-3 pr-4 border-r border-slate-400">
                 <div className="text-right">
                   <p className="text-sm font-medium text-slate-900">
                     {userProfile?.full_name ||
@@ -150,11 +146,13 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                     {user?.email || "N/A"}
                   </p>
                 </div>
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center font-semibold text-sm shadow-sm">
-                  {userProfile?.full_name?.charAt(0).toUpperCase() ||
-                    user?.email?.charAt(0).toUpperCase() ||
-                    "U"}
-                </div>
+              </div>
+
+              <div className="flex items-center gap-2 bg-gray-100 px-5 py-2 rounded-md inset-shadow-sm">
+                <Building2 className="w-6 h-6 text-gray-500" />
+                <p className="text-md uppercase font-medium text-slate-700">
+                  {currentCenter?.name}
+                </p>
               </div>
             </div>
           </div>

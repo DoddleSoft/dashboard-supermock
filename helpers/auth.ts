@@ -173,7 +173,6 @@ class AuthService {
               "Your account was created successfully! However, we couldn't send the confirmation email. Please contact support to verify your account, or try signing in.";
             break;
           default:
-            // Check for common patterns in error messages
             if (
               authError.message.includes("Error sending confirmation email") ||
               authError.message.includes("SMTP") ||
@@ -193,7 +192,6 @@ class AuthService {
               errorMessage =
                 "Our server is experiencing issues. Please try again in a few moments.";
             } else {
-              // For unknown errors, provide a generic message
               errorMessage =
                 "Unable to create account. Please try again or contact support if the issue persists.";
             }
@@ -203,9 +201,7 @@ class AuthService {
         return { success: false, error: errorMessage };
       }
 
-      // If user is created but needs email verification
       if (authData.user && !authData.session) {
-        // Don't create profile yet - will be created during onboarding with center_id
         const verificationMessage =
           "Please check your email for a verification link to complete your sign-up.";
 
@@ -216,9 +212,7 @@ class AuthService {
         };
       }
 
-      // If user is created and has immediate session (email verification disabled)
       if (authData.user && authData.session) {
-        // Don't create profile yet - will be created during onboarding with center_id
         return {
           success: true,
           session: authData.session,
@@ -226,7 +220,6 @@ class AuthService {
         };
       }
 
-      // Edge case: user created but no user object returned
       if (!authData.user) {
         return {
           success: false,
