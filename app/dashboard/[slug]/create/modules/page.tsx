@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useRef, Suspense } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import QuestionModal from "../../../../../components/dashboard/QuestionModal";
 import ReadingModule from "../../../../../components/create/ReadingModule";
 import WritingModule from "../../../../../components/create/WritingModule";
@@ -22,6 +22,7 @@ interface Question {
 interface Section {
   id: string;
   name: string;
+  heading?: string;
   questions: Question[];
   paragraphContent?: string;
   audioFile?: File | null;
@@ -39,13 +40,24 @@ interface WritingTask {
 
 function CreateModuleContent() {
   const searchParams = useSearchParams();
+  const params = useParams();
+  const slug = params.slug as string;
   const type = searchParams.get("type") || "reading";
+  const idCounterRef = useRef(2); // Start from 2 since initial section has id "1"
+
+  // Generate unique ID without causing hydration errors
+  const generateId = () => {
+    const id = idCounterRef.current.toString();
+    idCounterRef.current += 1;
+    return id;
+  };
 
   // State management
   const [sections, setSections] = useState<Section[]>([
     {
       id: "1",
       name: "SECTION 1",
+      heading: "",
       questions: [],
       paragraphContent: "",
       audioFile: null,
@@ -80,8 +92,9 @@ function CreateModuleContent() {
 
   const addSection = () => {
     const newSection: Section = {
-      id: Date.now().toString(),
+      id: generateId(),
       name: `SECTION ${sections.length + 1}`,
+      heading: "",
       questions: [],
       paragraphContent: "",
       audioFile: null,
@@ -94,6 +107,14 @@ function CreateModuleContent() {
     setSections(
       sections.map((section) =>
         section.id === sectionId ? { ...section, name: newTitle } : section
+      )
+    );
+  };
+
+  const updateSectionHeading = (sectionId: string, heading: string) => {
+    setSections(
+      sections.map((section) =>
+        section.id === sectionId ? { ...section, heading } : section
       )
     );
   };
@@ -134,7 +155,7 @@ function CreateModuleContent() {
     if (!currentSectionId) return;
 
     const newQuestion: Question = {
-      id: Date.now().toString(),
+      id: generateId(),
       text: questionData.text,
       type: questionData.type,
       blankPosition: questionData.blankPosition,
@@ -193,7 +214,7 @@ function CreateModuleContent() {
   const renderModuleTabs = () => (
     <div className="flex items-center gap-6 mb-4 border-b border-slate-200">
       <a
-        href="/dashboard/create/modules?type=reading"
+        href={`/dashboard/${slug}/create/modules?type=reading`}
         className={`pb-2 px-2 text-sm font-medium transition-colors ${
           type === "reading"
             ? "text-red-600 border-b-2 border-red-600"
@@ -203,7 +224,7 @@ function CreateModuleContent() {
         READING
       </a>
       <a
-        href="/dashboard/create/modules?type=writing"
+        href={`/dashboard/${slug}/create/modules?type=writing`}
         className={`pb-2 px-2 text-sm font-medium transition-colors ${
           type === "writing"
             ? "text-red-600 border-b-2 border-red-600"
@@ -213,7 +234,7 @@ function CreateModuleContent() {
         WRITING
       </a>
       <a
-        href="/dashboard/create/modules?type=listening"
+        href={`/dashboard/${slug}/create/modules?type=listening`}
         className={`pb-2 px-2 text-sm font-medium transition-colors ${
           type === "listening"
             ? "text-red-600 border-b-2 border-red-600"
@@ -223,7 +244,7 @@ function CreateModuleContent() {
         LISTENING
       </a>
       <a
-        href="/dashboard/create/modules?type=speaking"
+        href={`/dashboard/${slug}/create/modules?type=speaking`}
         className={`pb-2 px-2 text-sm font-medium transition-colors ${
           type === "speaking"
             ? "text-red-600 border-b-2 border-red-600"
@@ -247,6 +268,7 @@ function CreateModuleContent() {
             onAddQuestion={addQuestion}
             onDeleteQuestion={deleteQuestion}
             onUpdateSectionTitle={updateSectionTitle}
+            onUpdateSectionHeading={updateSectionHeading}
             onUpdateSectionParagraph={updateSectionParagraph}
           />
         );

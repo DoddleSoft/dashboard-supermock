@@ -1,4 +1,5 @@
 import { Plus, Upload, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { useRef, useEffect } from "react";
 
 interface Question {
   id: string;
@@ -40,6 +41,10 @@ export default function ListeningModule({
   onUpdateSectionTitle,
   onUpdateSectionAudio,
 }: ListeningModuleProps) {
+  const audioRefs = useRef<{ [key: string]: HTMLAudioElement | null }>({});
+  const canvasRefs = useRef<{ [key: string]: HTMLCanvasElement | null }>({});
+  const animationRefs = useRef<{ [key: string]: number | null }>({});
+
   const handleAudioChange = (
     e: React.ChangeEvent<HTMLInputElement>,
     sectionId: string
@@ -49,6 +54,79 @@ export default function ListeningModule({
       onUpdateSectionAudio(sectionId, file);
     }
   };
+
+  const startDummyWaveform = (sectionId: string) => {
+    const canvas = canvasRefs.current[sectionId];
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return;
+
+    if (animationRefs.current[sectionId]) {
+      cancelAnimationFrame(animationRefs.current[sectionId]!);
+    }
+
+    let frame = 0;
+
+    const draw = () => {
+      const animId = requestAnimationFrame(draw);
+      animationRefs.current[sectionId] = animId;
+
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.fillStyle = "rgb(15 23 42)";
+      ctx.fillRect(0, 0, width, height);
+
+      const segments = Math.floor(width / 6);
+      const slice = width / segments;
+
+      for (let i = 0; i < segments; i++) {
+        const progress = (i + frame * 0.02) % segments;
+        const amplitude = 0.3 + Math.abs(Math.sin(progress * 0.3)) * 0.7;
+        const barHeight = amplitude * height;
+        const x = i * slice;
+        const hue = 190 - (i / segments) * 80;
+
+        ctx.fillStyle = `hsl(${hue}, 100%, 60%)`;
+        ctx.fillRect(x, height - barHeight, slice - 1, barHeight);
+      }
+
+      frame += 1;
+    };
+
+    draw();
+  };
+
+  const stopDummyWaveform = (sectionId: string) => {
+    if (animationRefs.current[sectionId]) {
+      cancelAnimationFrame(animationRefs.current[sectionId]!);
+      animationRefs.current[sectionId] = null;
+    }
+  };
+
+  useEffect(() => {
+    const audioElements = Object.entries(audioRefs.current);
+
+    audioElements.forEach(([sectionId, audio]) => {
+      if (!audio) return;
+
+      const handlePlay = () => {
+        startDummyWaveform(sectionId);
+      };
+      const handlePause = () => stopDummyWaveform(sectionId);
+      const handleEnded = () => stopDummyWaveform(sectionId);
+
+      audio.addEventListener("play", handlePlay);
+      audio.addEventListener("pause", handlePause);
+      audio.addEventListener("ended", handleEnded);
+
+      return () => {
+        audio.removeEventListener("play", handlePlay);
+        audio.removeEventListener("pause", handlePause);
+        audio.removeEventListener("ended", handleEnded);
+      };
+    });
+  }, []);
 
   return (
     <div className="space-y-6 pb-4">
@@ -87,54 +165,65 @@ export default function ListeningModule({
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
                   Section Audio
                 </label>
-                <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-purple-400 hover:bg-purple-50/50 transition-colors">
-                  <input
-                    type="file"
-                    id={`audio-upload-${section.id}`}
-                    className="hidden"
-                    accept="audio/*"
-                    onChange={(e) => handleAudioChange(e, section.id)}
-                  />
-                  <label
-                    htmlFor={`audio-upload-${section.id}`}
-                    className="cursor-pointer"
-                  >
-                    <Upload className="w-10 h-10 text-slate-400 mx-auto mb-3" />
-                    {section.audioFile ? (
-                      <div>
-                        <p className="text-slate-900 font-medium">
-                          {section.audioFile.name}
-                        </p>
-                        <p className="text-sm text-slate-500 mt-1">
-                          {(section.audioFile.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="text-slate-600 font-medium">
-                          Choose Audio File
-                        </p>
-                        <p className="text-sm text-slate-400 mt-1">
-                          Upload MP3, WAV, or other audio formats
-                        </p>
-                      </div>
-                    )}
-                  </label>
-                </div>
-                {section.audioFile && (
-                  <>
-                    <audio
-                      controls
-                      className="w-full mt-4"
-                      src={URL.createObjectURL(section.audioFile)}
+                {section.audioFile ? (
+                  <div className="border-2 border-slate-300 rounded-xl overflow-hidden">
+                    <div className="bg-slate-50 p-4 border-b border-slate-200">
+                      <p className="text-slate-900 font-medium text-sm">
+                        {section.audioFile.name}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        {(section.audioFile.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                    <canvas
+                      ref={(el) => {
+                        if (el) canvasRefs.current[section.id] = el;
+                      }}
+                      width={400}
+                      height={40}
+                      className="w-full bg-slate-900"
                     />
-                    <button
-                      onClick={() => onUpdateSectionAudio(section.id, null)}
-                      className="w-full mt-3 px-4 py-2 text-red-600 hover:bg-red-50 rounded-xl transition-colors text-sm font-medium"
+                    <div className="p-4 bg-white">
+                      <audio
+                        id={`audio-${section.id}`}
+                        ref={(el) => {
+                          if (el) audioRefs.current[section.id] = el;
+                        }}
+                        controls
+                        crossOrigin="anonymous"
+                        className="w-full"
+                        src={URL.createObjectURL(section.audioFile)}
+                      />
+                      <button
+                        onClick={() => onUpdateSectionAudio(section.id, null)}
+                        className="w-full mt-3 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors text-sm font-medium"
+                      >
+                        Remove Audio
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-purple-400 hover:bg-purple-50/50 transition-colors">
+                    <input
+                      type="file"
+                      id={`audio-upload-${section.id}`}
+                      className="hidden"
+                      accept="audio/*"
+                      onChange={(e) => handleAudioChange(e, section.id)}
+                    />
+                    <label
+                      htmlFor={`audio-upload-${section.id}`}
+                      className="cursor-pointer"
                     >
-                      Remove Audio
-                    </button>
-                  </>
+                      <Upload className="w-10 h-10 text-slate-400 mx-auto mb-3" />
+                      <p className="text-slate-600 font-medium">
+                        Choose Audio File
+                      </p>
+                      <p className="text-sm text-slate-400 mt-1">
+                        Upload MP3, WAV, or other audio formats
+                      </p>
+                    </label>
+                  </div>
                 )}
               </div>
 

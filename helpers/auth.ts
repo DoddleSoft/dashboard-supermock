@@ -28,7 +28,6 @@ export interface AuthResponse {
 
 export interface UserProfile {
   user_id: string;
-  center_id?: string;
   email: string;
   role: "student" | "examiner" | "admin";
   full_name: string;
@@ -47,7 +46,6 @@ class AuthService {
     session: Session | null,
     opts?: {
       fullName?: string;
-      centerId?: string;
       role?: "student" | "examiner" | "admin";
     }
   ) {
@@ -70,7 +68,7 @@ class AuthService {
       // First, try to check if user profile exists
       const { data: existingProfile } = await this.supabase
         .from("users")
-        .select("user_id, center_id")
+        .select("user_id")
         .eq("user_id", user.id)
         .single();
 
@@ -89,10 +87,9 @@ class AuthService {
           console.error("Error updating user profile:", error);
         }
       } else {
-        // Profile doesn't exist, create it
+        // Profile doesn't exist, create it (no center_id needed)
         const { error } = await this.supabase.from("users").insert({
           user_id: user.id,
-          center_id: opts?.centerId || null, // Allow null center_id during registration
           email: user.email!,
           role: opts?.role || "admin", // Use provided role or default to admin
           full_name,
@@ -107,7 +104,6 @@ class AuthService {
             .upsert(
               {
                 user_id: user.id,
-                center_id: opts?.centerId || null, // Allow null center_id
                 email: user.email!,
                 role: opts?.role || "admin",
                 full_name,
@@ -140,11 +136,13 @@ class AuthService {
             emailRedirectTo: `${window.location.origin}/auth/callback`,
             data: {
               full_name: data.fullName,
+              role: data.role || "admin",
             },
           },
         });
 
       if (authError) {
+        console.error("Signup error:", authError);
         let errorMessage = authError.message;
 
         switch (authError.message) {
@@ -207,12 +205,7 @@ class AuthService {
 
       // If user is created but needs email verification
       if (authData.user && !authData.session) {
-        // Create profile in public.users table
-        await this.upsertUserFromSession(authData.session, {
-          fullName: data.fullName,
-          role: data.role || "admin",
-        });
-
+        // Don't create profile yet - will be created during onboarding with center_id
         const verificationMessage =
           "Please check your email for a verification link to complete your sign-up.";
 
@@ -225,12 +218,7 @@ class AuthService {
 
       // If user is created and has immediate session (email verification disabled)
       if (authData.user && authData.session) {
-        // Create profile
-        await this.upsertUserFromSession(authData.session, {
-          fullName: data.fullName,
-          role: data.role || "admin",
-        });
-
+        // Don't create profile yet - will be created during onboarding with center_id
         return {
           success: true,
           session: authData.session,
@@ -317,6 +305,80 @@ class AuthService {
         success: false,
         error:
           "An unexpected error occurred. Please check your internet connection and try again.",
+      };
+    }
+  }
+
+  /**
+   * Get user's center and determine redirect path after login
+   */
+  async getUserRedirectPath(): Promise<{
+    success: boolean;
+    path?: string;
+    centerName?: string;
+    error?: string;
+  }> {
+    try {
+      const {
+        data: { user: authUser },
+      } = await this.supabase.auth.getUser();
+
+      if (!authUser) {
+        return {
+          success: false,
+          error: "Authentication failed. Please try again.",
+        };
+      }
+
+      // Check if user profile exists in users table
+      const { data: userProfile, error: profileError } = await this.supabase
+        .from("users")
+        .select("user_id, full_name")
+        .eq("user_id", authUser.id);
+
+      if (profileError || !userProfile || userProfile.length === 0) {
+        // No user profile found - redirect to onboarding
+        return {
+          success: true,
+          path: "/auth/onboarding",
+        };
+      }
+
+      // User has a profile - check if they have any centers
+      const { data: centers, error: centersError } = await this.supabase
+        .from("centers")
+        .select("slug, name, center_id")
+        .eq("user_id", authUser.id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (centersError) {
+        console.error("Error fetching centers:", centersError);
+        return {
+          success: true,
+          path: "/auth/onboarding",
+        };
+      }
+
+      // If user has centers, redirect to first one
+      if (centers && centers.length > 0) {
+        return {
+          success: true,
+          path: `/dashboard/${centers[0].slug}`,
+          centerName: centers[0].name,
+        };
+      }
+
+      // User has profile but no centers - redirect to onboarding
+      return {
+        success: true,
+        path: "/auth/onboarding",
+      };
+    } catch (error) {
+      console.error("Error determining redirect path:", error);
+      return {
+        success: false,
+        error: "Failed to determine redirect path",
       };
     }
   }
@@ -478,22 +540,21 @@ class AuthService {
   }
 
   /**
-   * Create user profile in public.users table (kept for backwards compatibility)
+   * Create user profile in public.users table
    */
   async createUserProfile(
     userId: string,
     email: string,
     fullName: string,
-    centerId?: string
+    role: "student" | "examiner" | "admin" = "admin"
   ): Promise<AuthResponse> {
     try {
       const { data, error } = await this.supabase
         .from("users")
         .insert({
           user_id: userId,
-          center_id: centerId || null, // Allow null center_id during registration
           email: email,
-          role: "admin", // Default role for new registrations
+          role: role,
           full_name: fullName,
           is_active: true,
         })
@@ -517,42 +578,6 @@ class AuthService {
           error instanceof Error
             ? error.message
             : "Failed to create user profile",
-      };
-    }
-  }
-
-  /**
-   * Update user profile with center_id after onboarding
-   */
-  async updateUserProfile(
-    userId: string,
-    centerId: string
-  ): Promise<AuthResponse> {
-    try {
-      const { error } = await this.supabase
-        .from("users")
-        .update({
-          center_id: centerId,
-        })
-        .eq("user_id", userId);
-
-      if (error) {
-        return {
-          success: false,
-          error: error.message,
-        };
-      }
-
-      return {
-        success: true,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to update user profile",
       };
     }
   }
@@ -588,6 +613,43 @@ class AuthService {
           error instanceof Error
             ? error.message
             : "Failed to fetch user profile",
+      };
+    }
+  }
+
+  /**
+   * Get user's centers
+   */
+  async getUserCenters(userId: string): Promise<{
+    success: boolean;
+    centers?: Array<{ slug: string; name: string; center_id: string }>;
+    error?: string;
+  }> {
+    try {
+      const { data, error } = await this.supabase
+        .from("centers")
+        .select("center_id, name, slug")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        return {
+          success: false,
+          error: error.message,
+        };
+      }
+
+      return {
+        success: true,
+        centers: data || [],
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch user centers",
       };
     }
   }

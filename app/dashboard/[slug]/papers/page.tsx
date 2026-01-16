@@ -12,8 +12,10 @@ import {
   Headphones,
   PenTool,
   Mic,
+  Plus,
 } from "lucide-react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 
 interface Paper {
   id: string;
@@ -26,6 +28,8 @@ interface Paper {
 }
 
 export default function PapersPage() {
+  const params = useParams();
+  const slug = params.slug as string;
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -107,16 +111,16 @@ export default function PapersPage() {
   return (
     <div className="max-w-7xl mx-auto flex flex-col gap-6">
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-slate-200 p-2">
-        <div className="flex items-center gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+      <div className="flex items-center gap-4">
+        <div className="flex items-center w-180 gap-3 flex-1">
+          <div className="flex-1 max-w-sm relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
               type="text"
-              placeholder="Search papers..."
+              placeholder="Search by title or module..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400"
+              className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 text-sm"
             />
           </div>
           <select
@@ -130,12 +134,14 @@ export default function PapersPage() {
             <option value="Listening">Listening</option>
             <option value="Speaking">Speaking</option>
           </select>
-          <Link href="/dashboard/create/modules?type=reading">
-            <button className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium transition-colors">
-              Create New Paper
-            </button>
-          </Link>
         </div>
+
+        <Link href={`/dashboard/${slug}/create/modules?type=reading`}>
+          <button className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium shadow-sm shadow-red-100 transition-all duration-200 flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            Create New Paper
+          </button>
+        </Link>
       </div>
 
       {/* Stats Cards */}
@@ -177,7 +183,7 @@ export default function PapersPage() {
       </div>
 
       {/* Papers Grid */}
-      <div className="grid grid-cols-1 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {filteredPapers.map((paper) => (
           <div
             key={paper.id}
@@ -209,11 +215,8 @@ export default function PapersPage() {
                       </span>{" "}
                       Questions
                     </span>
-                    <span>Created {paper.createdAt}</span>
-                  </div>
-                  <div className="mt-3">
                     <span
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                      className={`inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium ${
                         paper.status === "Published"
                           ? "bg-green-100 text-green-700"
                           : "bg-yellow-100 text-yellow-700"

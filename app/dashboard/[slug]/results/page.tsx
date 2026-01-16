@@ -27,8 +27,8 @@ interface TestResult {
 const mockResults: TestResult[] = [
   {
     id: "1",
-    studentName: "John Smith",
-    studentEmail: "john.smith@email.com",
+    studentName: "Jamil Ahmed",
+    studentEmail: "jamilahmed23@gmail.com",
     testPaper: "Academic Test Paper 01",
     module: "Listening",
     score: 32,
@@ -39,8 +39,8 @@ const mockResults: TestResult[] = [
   },
   {
     id: "2",
-    studentName: "Sarah Johnson",
-    studentEmail: "sarah.j@email.com",
+    studentName: "Sahara Begum Tuli",
+    studentEmail: "saharabegum2li@gmail.com",
     testPaper: "General Test Paper 03",
     module: "Reading",
     score: 38,
@@ -51,8 +51,8 @@ const mockResults: TestResult[] = [
   },
   {
     id: "3",
-    studentName: "Michael Chen",
-    studentEmail: "m.chen@email.com",
+    studentName: "Md. Ashraf Chy",
+    studentEmail: "mashrafchy65@gmail.com",
     testPaper: "Academic Test Paper 02",
     module: "Writing",
     score: 28,
@@ -63,8 +63,8 @@ const mockResults: TestResult[] = [
   },
   {
     id: "4",
-    studentName: "Emma Wilson",
-    studentEmail: "emma.w@email.com",
+    studentName: "Ahmed Noor Jiban",
+    studentEmail: "ahmednoor@gmail.com",
     testPaper: "Academic Test Paper 01",
     module: "Listening",
     score: 35,
@@ -75,8 +75,8 @@ const mockResults: TestResult[] = [
   },
   {
     id: "5",
-    studentName: "David Brown",
-    studentEmail: "david.brown@email.com",
+    studentName: "Dawood A Rahman",
+    studentEmail: "dawoodrahman50@gmail.com",
     testPaper: "Academic Test Paper 04",
     module: "Reading",
     score: 0,
@@ -84,37 +84,6 @@ const mockResults: TestResult[] = [
     completedAt: new Date("2026-01-03T09:00:00"),
     duration: "In Progress",
     status: "In Progress",
-  },
-];
-
-const performanceStats = [
-  {
-    label: "Average Band Score",
-    value: "7.25",
-    change: "+0.3 from last month",
-    trend: "up",
-    icon: Award,
-  },
-  {
-    label: "Tests Completed",
-    value: "1,284",
-    change: "+18% from last month",
-    trend: "up",
-    icon: TrendingUp,
-  },
-  {
-    label: "Avg. Completion Time",
-    value: "51 mins",
-    change: "-5 mins from last month",
-    trend: "up",
-    icon: Clock,
-  },
-  {
-    label: "Pass Rate",
-    value: "87%",
-    change: "+2% from last month",
-    trend: "up",
-    icon: Award,
   },
 ];
 
@@ -170,49 +139,47 @@ export default function ResultsPage() {
   return (
     <div className="max-w-7xl mx-auto">
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6">
-        <div className="flex items-center gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by student name, email, or test paper..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400"
-            />
-          </div>
+      <div className="flex items-center gap-4">
+        <div className="flex-1 max-w-sm relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search by title or module..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 text-sm"
+          />
+        </div>
 
-          <div className="flex items-center gap-2">
-            <Filter className="w-5 h-5 text-slate-400" />
-            <select
-              value={selectedModule}
-              onChange={(e) => setSelectedModule(e.target.value)}
-              className="px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 bg-white"
-            >
-              <option value="all">All Modules</option>
-              <option value="listening">Listening</option>
-              <option value="reading">Reading</option>
-              <option value="writing">Writing</option>
-              <option value="speaking">Speaking</option>
-            </select>
+        <div className="flex items-center gap-2">
+          <Filter className="w-5 h-5 text-slate-400" />
+          <select
+            value={selectedModule}
+            onChange={(e) => setSelectedModule(e.target.value)}
+            className="px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 bg-white"
+          >
+            <option value="all">All Modules</option>
+            <option value="listening">Listening</option>
+            <option value="reading">Reading</option>
+            <option value="writing">Writing</option>
+            <option value="speaking">Speaking</option>
+          </select>
 
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 bg-white"
-            >
-              <option value="all">All Status</option>
-              <option value="graded">Graded</option>
-              <option value="pending-review">Pending Review</option>
-              <option value="in-progress">In Progress</option>
-            </select>
-          </div>
+          <select
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+            className="px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 bg-white"
+          >
+            <option value="all">All Status</option>
+            <option value="graded">Graded</option>
+            <option value="pending-review">Pending Review</option>
+            <option value="in-progress">In Progress</option>
+          </select>
         </div>
       </div>
 
       {/* Results Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+      <div className="bg-white rounded-xl border mt-6 border-slate-200 overflow-x-auto">
         <table className="w-full">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
@@ -246,7 +213,7 @@ export default function ResultsPage() {
             {filteredResults.map((result) => (
               <tr
                 key={result.id}
-                className="hover:bg-slate-50 transition-colors duration-150"
+                className="hover:bg-slate-50 transition-colors duration-150 text-sm"
               >
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">

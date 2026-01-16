@@ -15,6 +15,7 @@ interface Question {
 interface Section {
   id: string;
   name: string;
+  heading?: string;
   questions: Question[];
   paragraphContent?: string;
 }
@@ -27,6 +28,7 @@ interface ReadingModuleProps {
   onAddQuestion: (sectionId: string) => void;
   onDeleteQuestion: (sectionId: string, questionId: string) => void;
   onUpdateSectionTitle: (sectionId: string, newTitle: string) => void;
+  onUpdateSectionHeading: (sectionId: string, heading: string) => void;
   onUpdateSectionParagraph: (sectionId: string, content: string) => void;
 }
 
@@ -38,6 +40,7 @@ export default function ReadingModule({
   onAddQuestion,
   onDeleteQuestion,
   onUpdateSectionTitle,
+  onUpdateSectionHeading,
   onUpdateSectionParagraph,
 }: ReadingModuleProps) {
   return (
@@ -72,6 +75,22 @@ export default function ReadingModule({
 
           {expandedSections.includes(section.id) && (
             <div className="p-6">
+              {/* Heading */}
+              <div className="mb-6">
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+                  Heading
+                </label>
+                <input
+                  type="text"
+                  value={section.heading || ""}
+                  onChange={(e) =>
+                    onUpdateSectionHeading(section.id, e.target.value)
+                  }
+                  placeholder="Enter the heading for this section..."
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 text-sm"
+                />
+              </div>
+
               {/* Paragraph Content */}
               <div className="mb-6">
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">

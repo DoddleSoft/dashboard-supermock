@@ -24,12 +24,10 @@ export interface AuthContextType {
   signIn: (
     email: string,
     password: string
-  ) => Promise<{ success: boolean; error?: string }>;
+  ) => Promise<{ success: boolean; error?: string; path?: string; centerName?: string }>;
   signOut: () => Promise<void>;
   refreshUserProfile: () => Promise<void>;
-  updateUserWithCenter: (
-    centerId: string
-  ) => Promise<{ success: boolean; error?: string }>;
+  getUserRedirect: () => Promise<{ success: boolean; path?: string; centerName?: string; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -107,7 +105,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Sign up function
-  const signUp = async (email: string, password: string, fullName: string, role?: "student" | "examiner" | "admin") => {
+  const signUp = async (
+    email: string,
+    password: string,
+    fullName: string,
+    role?: "student" | "examiner" | "admin"
+  ) => {
     try {
       setLoading(true);
 
@@ -151,7 +154,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
 
-      return { success: true };
+      // Wait briefly for auth state to update
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      // Get redirect path
+      const redirectResult = await authService.getUserRedirectPath();
+
+      if (!redirectResult.success) {
+        return {
+          success: false,
+          error: redirectResult.error || "Failed to determine redirect path",
+        };
+      }
+
+      return {
+        success: true,
+        path: redirectResult.path,
+        centerName: redirectResult.centerName,
+      };
     } catch (error) {
       return {
         success: false,
@@ -159,6 +179,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Get user redirect without signing in (for checking existing session)
+  const getUserRedirect = async () => {
+    try {
+      return await authService.getUserRedirectPath();
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to get redirect",
+      };
     }
   };
 
@@ -187,57 +219,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Update user with center ID after onboarding
-  const updateUserWithCenter = async (centerId: string) => {
-    if (!user?.id) {
-      return {
-        success: false,
-        error: "No user found",
-      };
-    }
-
-    try {
-      // First, check if user profile exists
-      const { success: profileExists, profile } =
-        await authService.getUserProfile(user.id);
-
-      if (!profileExists || !profile) {
-        // Create user profile if it doesn't exist
-        console.log("Creating user profile for center association");
-        const createResult = await authService.createUserProfile(
-          user.id,
-          user.email!,
-          user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
-          centerId
-        );
-
-        if (createResult.success) {
-          await refreshUserProfile();
-          return { success: true };
-        } else {
-          return {
-            success: false,
-            error: createResult.error || "Failed to create user profile",
-          };
-        }
-      } else {
-        // Update existing profile
-        const result = await authService.updateUserProfile(user.id, centerId);
-
-        if (result.success) {
-          await refreshUserProfile();
-        }
-
-        return result;
-      }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Update failed",
-      };
-    }
-  };
-
   const value: AuthContextType = {
     user,
     session,
@@ -247,7 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signIn,
     signOut,
     refreshUserProfile,
-    updateUserWithCenter,
+    getUserRedirect,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

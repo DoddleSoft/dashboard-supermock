@@ -65,14 +65,14 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Link
           href={`/dashboard/${slug}/students`}
-          className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white hover:shadow-lg transition-all duration-200 group"
+          className="bg-gray-100 rounded-lg p-6 text-slate-900 hover:shadow-lg transition-all duration-200 group shadow-md"
         >
           <div className="flex items-center gap-4">
             <Users className="w-8 h-8 mb-3" />
             <h3 className="text-lg font-semibold mb-2">Manage Students</h3>
           </div>
 
-          <p className="text-blue-100 text-sm mb-8">
+          <p className="text-blue-800 text-sm mb-8">
             View and manage all registered students
           </p>
           <div className="flex items-center gap-2 text-sm font-medium group-hover:gap-3 transition-all">
@@ -82,14 +82,14 @@ export default function DashboardPage() {
 
         <Link
           href={`/dashboard/${slug}/tests`}
-          className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white hover:shadow-lg transition-all duration-200 group"
+          className="bg-gray-100 rounded-lg p-6 text-slate-900 hover:shadow-lg transition-all duration-200 group shadow-md"
         >
           <div className="flex items-center gap-4">
             <FileText className="w-8 h-8 mb-3" />
             <h3 className="text-lg font-semibold mb-2">Manage Tests</h3>
           </div>
 
-          <p className="text-blue-100 text-sm mb-8">
+          <p className="text-blue-800 text-sm mb-8">
             Design new IELTS test papers and modules
           </p>
           <div className="flex items-center gap-2 text-sm font-medium group-hover:gap-3 transition-all">
@@ -99,14 +99,14 @@ export default function DashboardPage() {
 
         <Link
           href={`/dashboard/${slug}/results`}
-          className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white hover:shadow-lg transition-all duration-200 group"
+          className="bg-gray-100 rounded-lg p-6 text-slate-900 hover:shadow-lg transition-all duration-200 group shadow-md"
         >
           <div className="flex items-center gap-4">
             <TrendingUp className="w-8 h-8 mb-3" />
             <h3 className="text-lg font-semibold mb-2">View Results</h3>
           </div>
 
-          <p className="text-blue-100 text-sm mb-8">
+          <p className="text-blue-800 text-sm mb-8">
             Analyze student performance and scores
           </p>
           <div className="flex items-center gap-2 text-sm font-medium group-hover:gap-3 transition-all">

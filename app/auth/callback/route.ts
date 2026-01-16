@@ -5,78 +5,66 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
   if (code) {
     const cookieStore = await cookies();
 
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value;
-          },
-          set(name: string, value: string, options: CookieOptions) {
-            cookieStore.set({ name, value, ...options });
-          },
-          remove(name: string, options: CookieOptions) {
-            cookieStore.set({ name, value: "", ...options });
-          },
+    const supabase = createServerClient(supabaseUrl!, supabaseKey!, {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
         },
-      }
-    );
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // The `setAll` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
+          }
+        },
+      },
+    });
 
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error && data.session) {
-      // First, ensure user profile exists in public.users table
+      // Check if user profile exists in users table
       const { data: existingUser } = await supabase
         .from("users")
-        .select("user_id")
+        .select("user_id, role")
         .eq("user_id", data.session.user.id)
         .single();
 
-      // Create user profile if it doesn't exist
-      if (!existingUser) {
-        const fullName =
-          data.session.user.user_metadata?.full_name ||
-          data.session.user.email?.split("@")[0] ||
-          "User";
-
-        await supabase.from("users").insert({
-          user_id: data.session.user.id,
-          email: data.session.user.email!,
-          full_name: fullName,
-          role: "admin",
-          is_active: true,
-        });
-      }
-
-      // Check if user has a center
-      const { data: userData } = await supabase
-        .from("users")
-        .select("center_id, full_name")
-        .eq("user_id", data.session.user.id)
-        .single();
-
-      if (userData?.center_id) {
-        // User has a center, get slug and redirect to dashboard
-        const { data: center } = await supabase
+      if (existingUser) {
+        // User has a profile, check if they have any centers
+        const { data: centers } = await supabase
           .from("centers")
           .select("slug")
-          .eq("center_id", userData.center_id)
-          .single();
+          .eq("user_id", data.session.user.id)
+          .limit(1);
 
-        if (center) {
+        if (centers && centers.length > 0) {
+          // User has centers, redirect to first center's dashboard
+          const center = centers[0];
           return NextResponse.redirect(
             new URL(`/dashboard/${center.slug}`, request.url)
           );
+        } else {
+          // User profile exists but no centers - redirect to onboarding to create one
+          return NextResponse.redirect(
+            new URL("/auth/onboarding", request.url)
+          );
         }
+      } else {
+        // No user profile - redirect to onboarding
+        // User will create profile and first center in onboarding
+        return NextResponse.redirect(new URL("/auth/onboarding", request.url));
       }
-
-      // No center, redirect to onboarding
-      return NextResponse.redirect(new URL("/auth/onboarding", request.url));
     }
 
     console.error("Error exchanging code:", error);
