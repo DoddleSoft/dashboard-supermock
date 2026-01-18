@@ -14,6 +14,7 @@ import {
   Edit2,
   Trash2,
   X,
+  User,
 } from "lucide-react";
 
 interface TestPaper {
@@ -71,12 +72,9 @@ const mockTestPapers: TestPaper[] = [
 ];
 
 export default function TestsPage() {
-  const params = useParams();
-  const slug = params.slug as string;
   const [papers, setPapers] = useState(mockTestPapers);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState<string>("all");
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const filteredPapers = papers.filter((paper) => {
@@ -155,13 +153,17 @@ export default function TestsPage() {
             </select>
           </div>
 
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium shadow-sm shadow-red-100 transition-all duration-200 flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            New Test Paper
-          </button>
+          <div className="flex items-center gap-4">
+            <button className="px-4 py-2 bg-gray-300 hover:bg-gray-200 text-slate-900 rounded-xl font-medium shadow-sm shadow-red-100 transition-all duration-200 flex items-center gap-2">
+              <User className="w-4 h-4" />
+              Assign Student
+            </button>
+
+            <button className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl font-medium shadow-sm shadow-red-100 transition-all duration-200 flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              Schedule Test
+            </button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -240,7 +242,7 @@ export default function TestsPage() {
                     <div className="flex items-center gap-2">
                       <span
                         className={`inline-flex px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(
-                          paper.status
+                          paper.status,
                         )}`}
                       >
                         {paper.status}
@@ -284,7 +286,7 @@ export default function TestsPage() {
                         onClick={(e) => {
                           e.stopPropagation();
                           setOpenMenuId(
-                            openMenuId === paper.id ? null : paper.id
+                            openMenuId === paper.id ? null : paper.id,
                           );
                         }}
                         className="hover:bg-slate-100 rounded-lg transition-colors p-2"
@@ -322,111 +324,12 @@ export default function TestsPage() {
           <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
             <FileText className="w-12 h-12 text-slate-400 mx-auto mb-3" />
             <p className="text-slate-500">No test papers found</p>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="mt-4 px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium shadow-sm shadow-red-100 transition-all duration-200"
-            >
+            <button className="mt-4 px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium shadow-sm shadow-red-100 transition-all duration-200">
               Create Your First Test Paper
             </button>
           </div>
         )}
       </div>
-
-      {/* Create Test Paper Modal */}
-      {showCreateModal && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowCreateModal(false)}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-6 border-b border-slate-200">
-              <div>
-                <h3 className="text-lg font-bold text-slate-900">
-                  Create Test Paper
-                </h3>
-                <p className="text-sm text-slate-500 mt-1">
-                  Select a module type to begin
-                </p>
-              </div>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-slate-400" />
-              </button>
-            </div>
-
-            <div className="p-6 grid grid-cols-2 gap-4">
-              <Link
-                href={`/dashboard/${slug}/create/modules?type=listening`}
-                className="flex items-center gap-3 p-4 border border-slate-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all"
-                onClick={() => setShowCreateModal(false)}
-              >
-                <div className="w-12 h-12 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
-                  <Headphones className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-900">
-                    Listening Module
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    Audio-based questions
-                  </p>
-                </div>
-              </Link>
-
-              <Link
-                href={`/dashboard/${slug}/create/modules?type=reading`}
-                className="flex items-center gap-3 p-4 border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all"
-                onClick={() => setShowCreateModal(false)}
-              >
-                <div className="w-12 h-12 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-900">Reading Module</p>
-                  <p className="text-xs text-slate-500">
-                    Passage-based questions
-                  </p>
-                </div>
-              </Link>
-
-              <Link
-                href={`/dashboard/${slug}/create/modules?type=writing`}
-                className="flex items-center gap-3 p-4 border border-slate-200 rounded-xl hover:border-green-300 hover:bg-green-50 transition-all"
-                onClick={() => setShowCreateModal(false)}
-              >
-                <div className="w-12 h-12 rounded-lg bg-green-100 text-green-600 flex items-center justify-center flex-shrink-0">
-                  <PenTool className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-900">Writing Module</p>
-                  <p className="text-xs text-slate-500">Prompt-based tasks</p>
-                </div>
-              </Link>
-
-              <Link
-                href={`/dashboard/${slug}/create/test`}
-                className="flex items-center gap-3 p-4 border border-slate-200 rounded-xl hover:border-red-300 hover:bg-red-50 transition-all"
-                onClick={() => setShowCreateModal(false)}
-              >
-                <div className="w-12 h-12 rounded-lg bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
-                  <FileText className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-900">
-                    Complete Test Paper
-                  </p>
-                  <p className="text-xs text-slate-500">Full IELTS test</p>
-                </div>
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

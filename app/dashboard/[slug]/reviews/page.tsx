@@ -87,7 +87,7 @@ const mockResults: TestResult[] = [
   },
 ];
 
-export default function ResultsPage() {
+export default function ReviewPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedModule, setSelectedModule] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
@@ -253,7 +253,7 @@ export default function ResultsPage() {
                   ) : (
                     <span
                       className={`inline-flex items-center justify-center w-12 h-8 rounded-lg font-bold text-sm ${getBandColor(
-                        result.band
+                        result.band,
                       )}`}
                     >
                       {result.band.toFixed(1)}
@@ -266,7 +266,7 @@ export default function ResultsPage() {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span
                     className={`inline-flex px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(
-                      result.status
+                      result.status,
                     )}`}
                   >
                     {result.status}
@@ -282,7 +282,7 @@ export default function ResultsPage() {
 
         {filteredResults.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-slate-500">No results found</p>
+            <p className="text-slate-500">No reviews found</p>
           </div>
         )}
       </div>

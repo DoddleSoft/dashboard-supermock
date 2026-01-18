@@ -4,7 +4,6 @@ import {
   RenderBlock,
   RenderBlockType,
   ListeningSection,
-  QuestionDefinition,
 } from "../../context/ModuleContext";
 
 interface ListeningModuleProps {
@@ -21,15 +20,9 @@ interface ListeningModuleProps {
   onUpdateRenderBlock: (
     sectionId: string,
     blockIndex: number,
-    block: RenderBlock
+    block: RenderBlock,
   ) => void;
   onDeleteRenderBlock: (sectionId: string, blockIndex: number) => void;
-  onUpdateQuestionKey: (
-    sectionId: string,
-    questionRef: string,
-    data: QuestionDefinition
-  ) => void;
-  onDeleteQuestionKey: (sectionId: string, questionRef: string) => void;
 }
 
 export default function ListeningModule({
@@ -45,8 +38,6 @@ export default function ListeningModule({
   onAddRenderBlock,
   onUpdateRenderBlock,
   onDeleteRenderBlock,
-  onUpdateQuestionKey,
-  onDeleteQuestionKey,
 }: ListeningModuleProps) {
   const audioRefs = useRef<{ [key: string]: HTMLAudioElement | null }>({});
   const canvasRefs = useRef<{ [key: string]: HTMLCanvasElement | null }>({});
@@ -56,15 +47,7 @@ export default function ListeningModule({
     Record<string, { number: string; type: "blanks" | "dropdown" | "boolean" }>
   >({});
 
-  const blockTypes: RenderBlockType[] = [
-    "header",
-    "instruction",
-    "title",
-    "subtitle",
-    "text",
-    "image",
-    "box",
-  ];
+  const blockTypes: RenderBlockType[] = ["text", "image"];
 
   const getDraftKey = (sectionId: string, index: number) =>
     `${sectionId}:${index}`;
@@ -80,7 +63,7 @@ export default function ListeningModule({
     updates: Partial<{
       number: string;
       type: "blanks" | "dropdown" | "boolean";
-    }>
+    }>,
   ) => {
     const key = getDraftKey(sectionId, index);
     setPlaceholderDrafts((prev) => ({
@@ -92,7 +75,7 @@ export default function ListeningModule({
   const insertPlaceholder = (
     sectionId: string,
     index: number,
-    block: RenderBlock
+    block: RenderBlock,
   ) => {
     const draft = getDraft(sectionId, index);
     if (!draft.number) return;
@@ -101,7 +84,7 @@ export default function ListeningModule({
     onUpdateRenderBlock(sectionId, index, {
       ...block,
       content: toStorageContent(
-        `${toDisplayContent(block.content)}${separator}${placeholder}`
+        `${toDisplayContent(block.content)}${separator}${placeholder}`,
       ),
     });
   };
@@ -112,23 +95,26 @@ export default function ListeningModule({
   const toStorageContent = (value: string) =>
     value.replace(/⟦Q(\d+):(blanks|dropdown|boolean)⟧/g, "{{$1}$2}");
 
-  const updateQuestionField = (
+  const handleImageFileChange = (
     sectionId: string,
-    questionRef: string,
-    partial: Partial<QuestionDefinition>
+    index: number,
+    block: RenderBlock,
+    file?: File | null,
   ) => {
-    const section = sections.find((s) => s.id === sectionId);
-    if (!section) return;
-    const current = section.questions[questionRef] || { answer: "" };
-    onUpdateQuestionKey(sectionId, questionRef, { ...current, ...partial });
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      onUpdateRenderBlock(sectionId, index, {
+        ...block,
+        content: reader.result as string,
+      });
+    };
+    reader.readAsDataURL(file);
   };
-
-  const sortedQuestionRefs = (questions: Record<string, QuestionDefinition>) =>
-    Object.keys(questions).sort((a, b) => Number(a) - Number(b));
 
   const handleAudioChange = (
     e: React.ChangeEvent<HTMLInputElement>,
-    sectionId: string
+    sectionId: string,
   ) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -333,7 +319,7 @@ export default function ListeningModule({
               </div>
 
               {/* Render Blocks */}
-              <div>
+              <div className="mb-6">
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
                   Render Blocks
                 </label>
@@ -341,9 +327,9 @@ export default function ListeningModule({
                   {section.renderBlocks.map((block, index) => (
                     <div
                       key={`${section.id}-block-${index}`}
-                      className="border border-slate-200 rounded-xl p-4 bg-white"
+                      className="border border-slate-200 rounded-xl p-4 bg-white shadow-sm"
                     >
-                      <div className="flex items-center gap-3 mb-3">
+                      <div className="flex items-center gap-3 mb-4">
                         <select
                           value={block.type}
                           onChange={(e) =>
@@ -352,14 +338,21 @@ export default function ListeningModule({
                               type: e.target.value as RenderBlockType,
                             })
                           }
-                          className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                          className="px-3 py-2 border border-slate-200 rounded-lg text-gray-700 text-sm bg-white"
                         >
                           {blockTypes.map((type) => (
-                            <option key={type} value={type}>
-                              {type}
+                            <option
+                              className="text-gray-700"
+                              key={type}
+                              value={type}
+                            >
+                              {type === "text" ? "Text block" : "Image block"}
                             </option>
                           ))}
                         </select>
+                        <span className="text-md text-slate-900">
+                          For question placeholder use {"{{1}mcq}"} format
+                        </span>
                         <button
                           onClick={() => onDeleteRenderBlock(section.id, index)}
                           className="ml-auto p-2 text-red-600 hover:bg-red-50 rounded-lg"
@@ -368,73 +361,102 @@ export default function ListeningModule({
                         </button>
                       </div>
 
-                      <textarea
-                        value={toDisplayContent(block.content)}
-                        onChange={(e) =>
-                          onUpdateRenderBlock(section.id, index, {
-                            ...block,
-                            content: toStorageContent(e.target.value),
-                          })
-                        }
-                        placeholder="Type your content..."
-                        rows={3}
-                        className="w-full p-3 border border-slate-200 rounded-lg text-sm"
-                      />
-
-                      {block.type === "text" && (
-                        <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-[160px_1fr_auto] items-center">
-                          <input
-                            type="number"
-                            min={1}
-                            value={getDraft(section.id, index).number}
-                            onChange={(e) =>
-                              updateDraft(section.id, index, {
-                                number: e.target.value,
-                              })
-                            }
-                            placeholder="Question #"
-                            className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                          />
-                          <select
-                            value={getDraft(section.id, index).type}
-                            onChange={(e) =>
-                              updateDraft(section.id, index, {
-                                type: e.target.value as
-                                  | "blanks"
-                                  | "dropdown"
-                                  | "boolean",
-                              })
-                            }
-                            className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                          >
-                            <option value="blanks">Blanks</option>
-                            <option value="dropdown">Dropdown</option>
-                            <option value="boolean">True/False</option>
-                          </select>
-                          <button
-                            onClick={() =>
-                              insertPlaceholder(section.id, index, block)
-                            }
-                            className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm"
-                          >
-                            Insert
-                          </button>
-                        </div>
-                      )}
-
-                      {block.type === "image" && (
-                        <input
-                          type="text"
-                          value={block.alt || ""}
+                      <div className="flex flex-col gap-3 mb-4 md:flex-row md:items-center md:gap-4">
+                        <textarea
+                          value={block.questions || ""}
                           onChange={(e) =>
                             onUpdateRenderBlock(section.id, index, {
                               ...block,
-                              alt: e.target.value,
+                              questions: e.target.value,
                             })
                           }
-                          placeholder="Image alt text..."
-                          className="mt-2 w-full p-3 border border-slate-200 rounded-lg text-sm"
+                          placeholder="e.g., Questions 1-7"
+                          rows={3}
+                          className="w-full p-3 border border-slate-200 rounded-lg text-gray-700 text-sm"
                         />
+
+                        <textarea
+                          value={block.instruction || ""}
+                          onChange={(e) =>
+                            onUpdateRenderBlock(section.id, index, {
+                              ...block,
+                              instruction: e.target.value,
+                            })
+                          }
+                          placeholder="Instruction (e.g., Choose the correct option...)"
+                          rows={3}
+                          className="w-full p-3 border border-slate-200 rounded-lg text-gray-700 text-sm"
+                        />
+                      </div>
+
+                      {block.type === "text" && (
+                        <>
+                          <textarea
+                            value={toDisplayContent(block.content)}
+                            onChange={(e) =>
+                              onUpdateRenderBlock(section.id, index, {
+                                ...block,
+                                content: toStorageContent(e.target.value),
+                              })
+                            }
+                            placeholder="Write the passage text or questions here..."
+                            rows={5}
+                            className="w-full p-3 border border-slate-200 rounded-lg text-gray-700 text-sm"
+                          />
+                        </>
+                      )}
+
+                      {block.type === "image" && (
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-[200px_1fr]">
+                          <div className="border border-dashed border-slate-200 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 text-sm overflow-hidden">
+                            {block.content ? (
+                              <img
+                                src={block.content}
+                                alt={block.alt || ""}
+                                className="w-full h-36 object-cover"
+                              />
+                            ) : (
+                              <span>No image</span>
+                            )}
+                          </div>
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="file"
+                                id={`image-upload-${section.id}-${index}`}
+                                className="hidden"
+                                accept="image/*"
+                                onChange={(e) =>
+                                  handleImageFileChange(
+                                    section.id,
+                                    index,
+                                    block,
+                                    e.target.files?.[0],
+                                  )
+                                }
+                              />
+                              <label
+                                htmlFor={`image-upload-${section.id}-${index}`}
+                                className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm cursor-pointer"
+                              >
+                                Choose Image
+                              </label>
+                            </div>
+
+                            <textarea
+                              value={block.label || ""}
+                              onChange={(e) =>
+                                onUpdateRenderBlock(section.id, index, {
+                                  ...block,
+                                  label: e.target.value,
+                                })
+                              }
+                              placeholder="Caption or related text..."
+                              rows={3}
+                              className="w-full p-3 border border-slate-200 rounded-lg text-gray-700 text-sm"
+                            />
+                          </div>
+                        </div>
                       )}
                     </div>
                   ))}
@@ -444,7 +466,7 @@ export default function ListeningModule({
                     className="w-full px-4 py-3 border-2 border-dashed border-slate-300 text-blue-600 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
                   >
                     <Plus className="w-4 h-4" />
-                    Add Render Block
+                    Add Block
                   </button>
                 </div>
               </div>
@@ -454,61 +476,13 @@ export default function ListeningModule({
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
                   Answer Key
                 </label>
-                <div className="space-y-3">
-                  {sortedQuestionRefs(section.questions).map((ref) => (
-                    <div
-                      key={`${section.id}-q-${ref}`}
-                      className="grid grid-cols-1 gap-3 md:grid-cols-[120px_1fr_1fr_auto] items-start border border-slate-200 rounded-xl p-4 bg-white"
-                    >
-                      <input
-                        value={ref}
-                        readOnly
-                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50"
-                      />
-                      <input
-                        type="text"
-                        value={section.questions[ref]?.answer || ""}
-                        onChange={(e) =>
-                          updateQuestionField(section.id, ref, {
-                            answer: e.target.value,
-                          })
-                        }
-                        placeholder="Correct answer"
-                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                      />
-                      <input
-                        type="text"
-                        value={(section.questions[ref]?.options || []).join(
-                          ", "
-                        )}
-                        onChange={(e) =>
-                          updateQuestionField(section.id, ref, {
-                            options: e.target.value
-                              .split(",")
-                              .map((opt) => opt.trim())
-                              .filter(Boolean),
-                          })
-                        }
-                        placeholder="Options (comma separated)"
-                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                      />
-                      <button
-                        onClick={() => onDeleteQuestionKey(section.id, ref)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-
-                  <button
-                    onClick={() => onAddQuestion(section.id)}
-                    className="w-full px-4 py-3 border-2 border-dashed border-slate-300 text-blue-600 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Question (Auto Block + Answer)
-                  </button>
-                </div>
+                <button
+                  onClick={() => onAddQuestion(section.id)}
+                  className="w-full px-4 py-4 border-2 border-dashed border-slate-300 text-slate-600 rounded-xl hover:border-red-300 hover:bg-red-50 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Question
+                </button>
               </div>
             </div>
           )}

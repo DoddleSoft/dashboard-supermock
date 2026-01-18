@@ -15,10 +15,12 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
 import { CentreProvider, useCentre } from "../../../context/CentreContext";
+import { ModuleProvider } from "../../../context/ModuleContext";
 import {
   SidebarItem,
   type NavItem,
 } from "../../../components/dashboard/SidebarItem";
+import { Loader } from "../../../components/ui/Loader";
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -32,14 +34,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const slug = params.slug as string;
   const navigationItems: NavItem[] = [
     { label: "Overview", href: `/dashboard/${slug}`, icon: LayoutDashboard },
-    { label: "Students", href: `/dashboard/${slug}/students`, icon: Users },
-    { label: "Create Test", href: `/dashboard/${slug}/tests`, icon: FileText },
-    { label: "View Papers", href: `/dashboard/${slug}/papers`, icon: Layers },
+    { label: "Tests", href: `/dashboard/${slug}/tests`, icon: FileText },
+    { label: "Questions", href: `/dashboard/${slug}/questions`, icon: Layers },
     {
-      label: "View Results",
-      href: `/dashboard/${slug}/results`,
+      label: "Reviews",
+      href: `/dashboard/${slug}/reviews`,
       icon: BarChart3,
     },
+    { label: "Students", href: `/dashboard/${slug}/students`, icon: Users },
   ];
 
   // Set mounted after initial render
@@ -53,14 +55,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
   // Show loading only for first 2 seconds or until user state is determined
   if (!mounted || (loading && !user)) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-white">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-600">Loading...</p>
-        </div>
-      </div>
-    );
+    return <Loader />;
   }
   return (
     <div className="flex h-screen bg-white">
@@ -84,10 +79,19 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
         <nav className="flex-1 p-3 space-y-1">
           {navigationItems.map((item) => {
+            const isCreateModuleRoute = pathname.startsWith(
+              `/dashboard/${slug}/create/modules`,
+            );
+            const isQuestionsRoute = pathname.startsWith(
+              `/dashboard/${slug}/questions`,
+            );
+
             const isActive =
               pathname === item.href ||
               (item.href !== `/dashboard/${slug}` &&
-                pathname.startsWith(item.href));
+                pathname.startsWith(item.href)) ||
+              (item.label === "Questions" &&
+                (isQuestionsRoute || isCreateModuleRoute));
 
             return (
               <SidebarItem
@@ -126,7 +130,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                   (item) =>
                     pathname === item.href ||
                     (item.href !== `/dashboard/${slug}` &&
-                      pathname.startsWith(item.href))
+                      pathname.startsWith(item.href)),
                 )?.label || "Dashboard"}
               </h2>
             </div>
@@ -174,7 +178,9 @@ export default function DashboardLayout({
 }) {
   return (
     <CentreProvider>
-      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+      <ModuleProvider>
+        <DashboardLayoutContent>{children}</DashboardLayoutContent>
+      </ModuleProvider>
     </CentreProvider>
   );
 }

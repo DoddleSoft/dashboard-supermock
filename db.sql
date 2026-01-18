@@ -121,7 +121,9 @@ create table public.modules (
   instruction text null,
   created_at timestamp with time zone null default now(),
   updated_at timestamp with time zone null default now(),
+  center_id uuid not null,
   constraint modules_pkey primary key (id),
+  constraint modules_center_id_fkey foreign KEY (center_id) references centers (center_id),
   constraint modules_paper_id_fkey foreign KEY (paper_id) references papers (id) on delete CASCADE,
   constraint modules_module_type_check check (
     (
@@ -138,8 +140,6 @@ create table public.modules (
 ) TABLESPACE pg_default;
 
 create index IF not exists idx_modules_paper_id on public.modules using btree (paper_id) TABLESPACE pg_default;
-
-
 
 
 

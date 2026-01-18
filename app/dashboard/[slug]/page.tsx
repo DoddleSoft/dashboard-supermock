@@ -2,35 +2,58 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useEffect } from "react";
 import { Users, FileText, TrendingUp, ArrowRight } from "lucide-react";
-
-const stats = [
-  {
-    label: "Total Registered Students",
-    value: "142",
-    change: "+12% from last month",
-    trend: "up",
-    color: "bg-blue-100 text-blue-600",
-  },
-  {
-    label: "Completed Tests",
-    value: "1,284",
-    change: "+18% from last month",
-    trend: "up",
-    color: "bg-green-100 text-green-600",
-  },
-  {
-    label: "Test Papers",
-    value: "47",
-    change: "4 drafts pending",
-    trend: "neutral",
-    color: "bg-purple-100 text-purple-600",
-  },
-];
+import { useCentre } from "@/context/CentreContext";
+import { notFound } from "next/navigation";
+import { Loader } from "@/components/ui/Loader";
 
 export default function DashboardPage() {
   const params = useParams();
   const slug = params.slug as string;
+  const { currentCenter, dashboardStats, loading, isValidCenter, isOwner } =
+    useCentre();
+
+  // If validation fails or center doesn't exist, show 404
+  useEffect(() => {
+    if (!loading && (!isValidCenter || !isOwner)) {
+      notFound();
+    }
+  }, [loading, isValidCenter, isOwner]);
+
+  // Show loading state
+  if (loading) {
+    return <Loader />;
+  }
+
+  // Safety check - should not reach here if notFound() was called
+  if (!isValidCenter || !isOwner) {
+    return null;
+  }
+
+  const stats = [
+    {
+      label: "Total Registered Students",
+      value: dashboardStats?.totalStudents ?? 0,
+      change: `${dashboardStats?.totalStudents ?? 0} active students`,
+      trend: "up" as const,
+      color: "bg-blue-100 text-blue-600",
+    },
+    {
+      label: "Completed Tests",
+      value: dashboardStats?.completedTests ?? 0,
+      change: `Total attempts completed`,
+      trend: "up" as const,
+      color: "bg-green-100 text-green-600",
+    },
+    {
+      label: "Test Papers",
+      value: dashboardStats?.totalPapers ?? 0,
+      change: `${dashboardStats?.totalPapers ?? 0} papers available`,
+      trend: "neutral" as const,
+      color: "bg-purple-100 text-purple-600",
+    },
+  ];
 
   return (
     <div className="max-w-7xl flex flex-col gap-8 mx-auto">
@@ -98,19 +121,20 @@ export default function DashboardPage() {
         </Link>
 
         <Link
-          href={`/dashboard/${slug}/results`}
+          href={`/dashboard/${slug}/reviews`}
           className="bg-gray-100 rounded-lg p-6 text-slate-900 hover:shadow-lg transition-all duration-200 group shadow-md"
         >
           <div className="flex items-center gap-4">
             <TrendingUp className="w-8 h-8 mb-3" />
-            <h3 className="text-lg font-semibold mb-2">View Results</h3>
+            <h3 className="text-lg font-semibold mb-2">View Reviews</h3>
           </div>
 
           <p className="text-blue-800 text-sm mb-8">
             Analyze student performance and scores
           </p>
           <div className="flex items-center gap-2 text-sm font-medium group-hover:gap-3 transition-all">
-            View Results <ArrowRight className="w-4 h-4" />
+            View Reviews
+            <ArrowRight className="w-4 h-4" />
           </div>
         </Link>
       </div>

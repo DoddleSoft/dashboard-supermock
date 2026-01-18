@@ -8,7 +8,7 @@ interface QuestionModalProps {
   onClose: () => void;
   onSave: (question: {
     text: string;
-    type: "fill-blank" | "mcq" | "true-false-not-given" | "yes-no-not-given";
+    type: "fill-blank" | "mcq" | "true-false-not-given";
     blankPosition?: "first" | "middle" | "end";
     mcqVariant?: "3-options-1-correct" | "5-options-2-correct";
     options?: string[];
@@ -25,7 +25,7 @@ export default function QuestionModal({
 }: QuestionModalProps) {
   const [questionText, setQuestionText] = React.useState("");
   const [questionType, setQuestionType] = React.useState<
-    "fill-blank" | "mcq" | "true-false-not-given" | "yes-no-not-given"
+    "fill-blank" | "mcq" | "true-false-not-given"
   >("mcq");
   const [blankPosition, setBlankPosition] = React.useState<
     "first" | "middle" | "end"
@@ -39,11 +39,11 @@ export default function QuestionModal({
   const [explanation, setExplanation] = React.useState("");
 
   const handleMcqVariantChange = (
-    variant: "3-options-1-correct" | "5-options-2-correct"
+    variant: "3-options-1-correct" | "5-options-2-correct",
   ) => {
     setMcqVariant(variant);
     setOptions(
-      variant === "3-options-1-correct" ? ["", "", ""] : ["", "", "", "", ""]
+      variant === "3-options-1-correct" ? ["", "", ""] : ["", "", "", "", ""],
     );
     setCorrectAnswers([]);
   };
@@ -161,8 +161,7 @@ export default function QuestionModal({
                   e.target.value as
                     | "fill-blank"
                     | "mcq"
-                    | "true-false-not-given"
-                    | "yes-no-not-given"
+                    | "true-false-not-given",
                 )
               }
               className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 bg-white"
@@ -170,61 +169,23 @@ export default function QuestionModal({
               <option value="mcq">Multiple Choice Question (MCQ)</option>
               <option value="fill-blank">Fill in the Blanks</option>
               <option value="true-false-not-given">True/False/Not Given</option>
-              <option value="yes-no-not-given">Yes/No/Not Given</option>
             </select>
           </div>
 
           {/* Fill in the Blanks */}
           {questionType === "fill-blank" && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Blank Position
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(["first", "middle", "end"] as const).map((pos) => (
-                    <button
-                      key={pos}
-                      type="button"
-                      onClick={() => setBlankPosition(pos)}
-                      className={`px-4 py-2 rounded-xl font-medium transition-all ${
-                        blankPosition === pos
-                          ? "bg-red-600 text-white"
-                          : "border border-slate-200 text-slate-600 hover:border-red-300"
-                      }`}
-                    >
-                      {pos.charAt(0).toUpperCase() + pos.slice(1)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Sentence (use _____ for blank)
-                </label>
-                <textarea
-                  value={questionText}
-                  onChange={(e) => setQuestionText(e.target.value)}
-                  placeholder="Example: The _____ is the capital of France."
-                  rows={3}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Correct Answer
-                </label>
-                <input
-                  type="text"
-                  value={correctAnswer}
-                  onChange={(e) => setCorrectAnswer(e.target.value)}
-                  placeholder="Enter the word(s) that fill the blank..."
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400"
-                />
-              </div>
-            </>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Correct Answer
+              </label>
+              <input
+                type="text"
+                value={correctAnswer}
+                onChange={(e) => setCorrectAnswer(e.target.value)}
+                placeholder="Enter the word(s) that fill the blank..."
+                className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400"
+              />
+            </div>
           )}
 
           {/* MCQ */}
@@ -266,19 +227,6 @@ export default function QuestionModal({
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Question Text
-                </label>
-                <textarea
-                  value={questionText}
-                  onChange={(e) => setQuestionText(e.target.value)}
-                  placeholder="Enter your question..."
-                  rows={3}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Options (Select{" "}
                   {mcqVariant === "3-options-1-correct" ? "1" : "2"} correct
                   answer{mcqVariant === "5-options-2-correct" ? "s" : ""})
@@ -306,13 +254,13 @@ export default function QuestionModal({
                           if (correctAnswers.includes(oldValue)) {
                             setCorrectAnswers(
                               correctAnswers.map((ans) =>
-                                ans === oldValue ? e.target.value : ans
-                              )
+                                ans === oldValue ? e.target.value : ans,
+                              ),
                             );
                           }
                         }}
                         placeholder={`Option ${String.fromCharCode(
-                          65 + index
+                          65 + index,
                         )}`}
                         className="flex-1 px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400"
                       />
@@ -332,63 +280,10 @@ export default function QuestionModal({
             <>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Statement
-                </label>
-                <textarea
-                  value={questionText}
-                  onChange={(e) => setQuestionText(e.target.value)}
-                  placeholder="Enter the statement to evaluate..."
-                  rows={3}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Correct Answer
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {["True", "False", "Not Given"].map((ans) => (
-                    <button
-                      key={ans}
-                      type="button"
-                      onClick={() => setCorrectAnswer(ans)}
-                      className={`px-4 py-2 rounded-xl font-medium transition-all ${
-                        correctAnswer === ans
-                          ? "bg-red-600 text-white"
-                          : "border border-slate-200 text-slate-600 hover:border-red-300"
-                      }`}
-                    >
-                      {ans}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* Yes/No/Not Given */}
-          {questionType === "yes-no-not-given" && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Statement
-                </label>
-                <textarea
-                  value={questionText}
-                  onChange={(e) => setQuestionText(e.target.value)}
-                  placeholder="Enter the statement to evaluate..."
-                  rows={3}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Correct Answer
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {["Yes", "No", "Not Given"].map((ans) => (
                     <button
                       key={ans}
                       type="button"

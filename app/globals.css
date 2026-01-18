@@ -36,22 +36,22 @@ body {
 }
 
 .loader-ring-a {
-  stroke: #9708f4;
+  stroke: #dc2626;
 }
 
 .loader-ring-b {
   animation-name: ringB;
-  stroke: #5e14e4;
+  stroke: #b91c1c;
 }
 
 .loader-ring-c {
   animation-name: ringC;
-  stroke: #9708f4;
+  stroke: #dc2626;
 }
 
 .loader-ring-d {
   animation-name: ringD;
-  stroke: #5e14e4;
+  stroke: #b91c1c;
 }
 
 /* Animations */

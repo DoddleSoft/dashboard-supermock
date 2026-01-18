@@ -19,11 +19,14 @@ function CreateModuleContent() {
   const router = useRouter();
   const slug = params.slug as string;
   const type = searchParams.get("type") || "reading";
+  const typeKey = ["reading", "writing", "listening", "speaking"].includes(type)
+    ? (type as "reading" | "writing" | "listening" | "speaking")
+    : "reading";
 
   // Get context methods and data
   const {
-    paperTitle,
-    setPaperTitle,
+    moduleTitles,
+    setModuleTitle,
     readingSections,
     readingExpandedSections,
     addReadingSection,
@@ -35,7 +38,6 @@ function CreateModuleContent() {
     updateReadingRenderBlock,
     deleteReadingRenderBlock,
     updateReadingQuestion,
-    deleteReadingQuestion,
     toggleReadingSection,
     listeningSections,
     listeningExpandedSections,
@@ -48,7 +50,6 @@ function CreateModuleContent() {
     updateListeningRenderBlock,
     deleteListeningRenderBlock,
     updateListeningQuestion,
-    deleteListeningQuestion,
     toggleListeningSection,
     writingTasks,
     updateWritingTaskField,
@@ -68,11 +69,11 @@ function CreateModuleContent() {
       reading: (id: string) => readingSections.find((s) => s.id === id),
       listening: (id: string) => listeningSections.find((s) => s.id === id),
     }),
-    [readingSections, listeningSections]
+    [readingSections, listeningSections],
   );
 
   const getNextQuestionRef = (
-    questions: Record<string, QuestionDefinition>
+    questions: Record<string, QuestionDefinition>,
   ) => {
     const numbers = Object.keys(questions)
       .map((key) => Number(key))
@@ -86,7 +87,7 @@ function CreateModuleContent() {
       | "fill-blank"
       | "mcq"
       | "true-false-not-given"
-      | "yes-no-not-given"
+      | "yes-no-not-given",
   ) => {
     switch (questionType) {
       case "fill-blank":
@@ -134,8 +135,8 @@ function CreateModuleContent() {
       questionData.type === "true-false-not-given"
         ? ["TRUE", "FALSE", "NOT GIVEN"]
         : questionData.type === "yes-no-not-given"
-        ? ["YES", "NO", "NOT GIVEN"]
-        : questionData.options;
+          ? ["YES", "NO", "NOT GIVEN"]
+          : questionData.options;
 
     const questionDefinition: QuestionDefinition = {
       answer: questionData.answer,
@@ -151,7 +152,7 @@ function CreateModuleContent() {
       updateListeningQuestion(
         currentSectionId,
         questionRef,
-        questionDefinition
+        questionDefinition,
       );
     }
 
@@ -167,40 +168,40 @@ function CreateModuleContent() {
     <div className="flex items-center gap-6 mb-4 border-b border-slate-200">
       <button
         onClick={() => handleTabChange("reading")}
-        className={`pb-2 px-2 text-sm font-medium transition-colors ${
+        className={`pb-2 px-3 text-sm font-medium transition-colors rounded-t-lg ${
           type === "reading"
             ? "text-red-600 border-b-2 border-red-600"
-            : "text-slate-500 hover:text-slate-700"
+            : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
         }`}
       >
         READING
       </button>
       <button
         onClick={() => handleTabChange("writing")}
-        className={`pb-2 px-2 text-sm font-medium transition-colors ${
+        className={`pb-2 px-3 text-sm font-medium transition-colors rounded-t-lg ${
           type === "writing"
             ? "text-red-600 border-b-2 border-red-600"
-            : "text-slate-500 hover:text-slate-700"
+            : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
         }`}
       >
         WRITING
       </button>
       <button
         onClick={() => handleTabChange("listening")}
-        className={`pb-2 px-2 text-sm font-medium transition-colors ${
+        className={`pb-2 px-3 text-sm font-medium transition-colors rounded-t-lg ${
           type === "listening"
             ? "text-red-600 border-b-2 border-red-600"
-            : "text-slate-500 hover:text-slate-700"
+            : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
         }`}
       >
         LISTENING
       </button>
       <button
         onClick={() => handleTabChange("speaking")}
-        className={`pb-2 px-2 text-sm font-medium transition-colors ${
+        className={`pb-2 px-3 text-sm font-medium transition-colors rounded-t-lg ${
           type === "speaking"
             ? "text-red-600 border-b-2 border-red-600"
-            : "text-slate-500 hover:text-slate-700"
+            : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
         }`}
       >
         SPEAKING
@@ -227,8 +228,6 @@ function CreateModuleContent() {
             }
             onUpdateRenderBlock={updateReadingRenderBlock}
             onDeleteRenderBlock={deleteReadingRenderBlock}
-            onUpdateQuestionKey={updateReadingQuestion}
-            onDeleteQuestionKey={deleteReadingQuestion}
           />
         );
       case "writing":
@@ -260,8 +259,6 @@ function CreateModuleContent() {
             }
             onUpdateRenderBlock={updateListeningRenderBlock}
             onDeleteRenderBlock={deleteListeningRenderBlock}
-            onUpdateQuestionKey={updateListeningQuestion}
-            onDeleteQuestionKey={deleteListeningQuestion}
           />
         );
       case "speaking":
@@ -287,10 +284,10 @@ function CreateModuleContent() {
           </div>
           <input
             type="text"
-            value={paperTitle}
-            onChange={(e) => setPaperTitle(e.target.value)}
+            value={moduleTitles[typeKey]}
+            onChange={(e) => setModuleTitle(typeKey, e.target.value)}
             className="text-lg px-4 py-2 my-1 font-bold text-slate-900 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-gray-300 rounded-lg w-full placeholder:text-slate-400"
-            placeholder="Enter title for the paper..."
+            placeholder={`Enter title for the ${typeKey} module...`}
           />
         </div>
 

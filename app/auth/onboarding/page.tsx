@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Building2, Globe } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
 import { createClient } from "@/lib/supabase/client";
+import { Loader } from "@/components/ui/Loader";
 import { toast } from "sonner";
 
 export default function Onboarding() {
@@ -17,14 +18,7 @@ export default function Onboarding() {
   // Redirect to login if not authenticated (only after loading completes)
   if (!authLoading && !user) {
     router.push("/auth/login");
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-red-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Redirecting...</p>
-        </div>
-      </div>
-    );
+    return <Loader subtitle="Redirecting..." />;
   }
 
   const [formData, setFormData] = useState({

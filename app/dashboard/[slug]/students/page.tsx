@@ -30,7 +30,7 @@ export default function StudentsPage() {
   const [deleting, setDeleting] = useState(false);
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [actionMenuStudent, setActionMenuStudent] = useState<Student | null>(
-    null
+    null,
   );
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -44,6 +44,7 @@ export default function StudentsPage() {
     guardian_phone: "",
     date_of_birth: "",
     address: "",
+    enrollment_type: "regular",
   });
 
   const [editData, setEditData] = useState({
@@ -56,6 +57,7 @@ export default function StudentsPage() {
     address: "",
     grade: "",
     status: "active" as "active" | "cancelled" | "archived" | "passed",
+    enrollment_type: "regular",
   });
 
   // Fetch students for the current center
@@ -123,6 +125,7 @@ export default function StudentsPage() {
       address: student.address || "",
       grade: student.grade || "",
       status: student.status,
+      enrollment_type: "regular",
     });
     setShowEditDrawer(true);
   };
@@ -140,6 +143,7 @@ export default function StudentsPage() {
       address: "",
       grade: "",
       status: "active",
+      enrollment_type: "regular",
     });
   };
 
@@ -212,6 +216,7 @@ export default function StudentsPage() {
       guardian_phone: "",
       date_of_birth: "",
       address: "",
+      enrollment_type: "regular",
     });
   };
 
@@ -319,7 +324,6 @@ export default function StudentsPage() {
         formatLocalTime={formatLocalTime}
       />
 
-      {/* Create Student Modal */}
       <CreateStudentModal
         isOpen={showCreateModal}
         formData={formData}

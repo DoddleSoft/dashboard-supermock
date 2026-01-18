@@ -3,10 +3,13 @@
 import React, {
   createContext,
   useContext,
-  useState,
+  useEffect,
   useRef,
+  useState,
   ReactNode,
 } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { useCentre } from "./CentreContext";
 
 export type RenderBlockType =
   | "header"
@@ -23,11 +26,14 @@ export interface RenderBlock {
   content: string;
   alt?: string;
   label?: string;
+  instruction?: string;
+  questions?: string;
   placeholder?: string;
   min_words?: number;
 }
 
 export interface QuestionDefinition {
+  type?: "blanks" | "mcq-3" | "mcq-5";
   answer: string;
   options?: string[];
   explanation?: string;
@@ -61,6 +67,23 @@ export interface WritingTask {
   renderBlocks: RenderBlock[];
 }
 
+export interface PaperSummary {
+  id: string;
+  title: string;
+  paperType: string | null;
+  isActive: boolean;
+  createdAt: string;
+  modulesCount: number;
+  moduleTypes: string[];
+}
+
+export interface ModuleOverviewStats {
+  totalPapers: number;
+  totalModules: number;
+  publishedPapers: number;
+  draftPapers: number;
+}
+
 // Module Data interface
 interface ModuleData {
   reading: {
@@ -74,14 +97,29 @@ interface ModuleData {
   writing: {
     tasks: WritingTask[];
   };
-  paperTitle: string;
+  moduleTitles: {
+    reading: string;
+    writing: string;
+    listening: string;
+    speaking: string;
+  };
 }
 
 // Context interface
 interface ModuleContextType {
   moduleData: ModuleData;
-  paperTitle: string;
-  setPaperTitle: (title: string) => void;
+  moduleTitles: ModuleData["moduleTitles"];
+  setModuleTitle: (
+    type: keyof ModuleData["moduleTitles"],
+    title: string,
+  ) => void;
+
+  // Center module overview
+  centerPapers: PaperSummary[];
+  centerModuleStats: ModuleOverviewStats | null;
+  centerModulesLoading: boolean;
+  centerModulesError: string | null;
+  refreshCenterModules: () => Promise<void>;
 
   // Reading module methods
   readingSections: ReadingSection[];
@@ -91,20 +129,25 @@ interface ModuleContextType {
   updateReadingSectionHeading: (sectionId: string, heading: string) => void;
   updateReadingSectionInstruction: (
     sectionId: string,
-    instruction: string
+    instruction: string,
   ) => void;
   updateReadingSectionPassageText: (sectionId: string, content: string) => void;
   addReadingRenderBlock: (sectionId: string, block: RenderBlock) => void;
   updateReadingRenderBlock: (
     sectionId: string,
     blockIndex: number,
-    block: RenderBlock
+    block: RenderBlock,
   ) => void;
   deleteReadingRenderBlock: (sectionId: string, blockIndex: number) => void;
   updateReadingQuestion: (
     sectionId: string,
     questionRef: string,
-    data: QuestionDefinition
+    data: QuestionDefinition,
+  ) => void;
+  updateReadingQuestionRef: (
+    sectionId: string,
+    fromRef: string,
+    toRef: string,
   ) => void;
   deleteReadingQuestion: (sectionId: string, questionRef: string) => void;
   toggleReadingSection: (sectionId: string) => void;
@@ -116,7 +159,7 @@ interface ModuleContextType {
   updateListeningSectionTitle: (sectionId: string, title: string) => void;
   updateListeningSectionInstruction: (
     sectionId: string,
-    instruction: string
+    instruction: string,
   ) => void;
   updateListeningSectionAudioPath: (sectionId: string, path: string) => void;
   updateListeningSectionAudio: (sectionId: string, file: File | null) => void;
@@ -124,13 +167,18 @@ interface ModuleContextType {
   updateListeningRenderBlock: (
     sectionId: string,
     blockIndex: number,
-    block: RenderBlock
+    block: RenderBlock,
   ) => void;
   deleteListeningRenderBlock: (sectionId: string, blockIndex: number) => void;
   updateListeningQuestion: (
     sectionId: string,
     questionRef: string,
-    data: QuestionDefinition
+    data: QuestionDefinition,
+  ) => void;
+  updateListeningQuestionRef: (
+    sectionId: string,
+    fromRef: string,
+    toRef: string,
   ) => void;
   deleteListeningQuestion: (sectionId: string, questionRef: string) => void;
   toggleListeningSection: (sectionId: string) => void;
@@ -140,13 +188,13 @@ interface ModuleContextType {
   updateWritingTaskField: (
     taskId: number,
     field: keyof WritingTask,
-    value: any
+    value: any,
   ) => void;
   addWritingRenderBlock: (taskId: number, block: RenderBlock) => void;
   updateWritingRenderBlock: (
     taskId: number,
     blockIndex: number,
-    block: RenderBlock
+    block: RenderBlock,
   ) => void;
   deleteWritingRenderBlock: (taskId: number, blockIndex: number) => void;
 
@@ -160,6 +208,16 @@ const ModuleContext = createContext<ModuleContextType | undefined>(undefined);
 // Provider component
 export function ModuleProvider({ children }: { children: ReactNode }) {
   const idCounterRef = useRef(2);
+  const { currentCenter } = useCentre();
+  const supabase = createClient();
+
+  const [centerPapers, setCenterPapers] = useState<PaperSummary[]>([]);
+  const [centerModuleStats, setCenterModuleStats] =
+    useState<ModuleOverviewStats | null>(null);
+  const [centerModulesLoading, setCenterModulesLoading] = useState(false);
+  const [centerModulesError, setCenterModulesError] = useState<string | null>(
+    null,
+  );
 
   const generateId = () => {
     const id = idCounterRef.current.toString();
@@ -215,13 +273,114 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
         },
       ],
     },
-    paperTitle: "",
+    moduleTitles: {
+      reading: "",
+      writing: "",
+      listening: "",
+      speaking: "",
+    },
   });
 
-  // Paper Title
-  const setPaperTitle = (title: string) => {
-    setModuleData((prev) => ({ ...prev, paperTitle: title }));
+  // Module Titles
+  const setModuleTitle = (
+    type: keyof ModuleData["moduleTitles"],
+    title: string,
+  ) => {
+    setModuleData((prev) => ({
+      ...prev,
+      moduleTitles: {
+        ...prev.moduleTitles,
+        [type]: title,
+      },
+    }));
   };
+
+  const fetchCenterModules = async (centerId: string) => {
+    try {
+      setCenterModulesLoading(true);
+      setCenterModulesError(null);
+
+      const { data: papers, error: papersError } = await supabase
+        .from("papers")
+        .select("id,title,paper_type,is_active,created_at")
+        .eq("center_id", centerId)
+        .order("created_at", { ascending: false });
+
+      if (papersError) throw papersError;
+
+      const { data: modules, error: modulesError } = await supabase
+        .from("modules")
+        .select("id,paper_id,module_type")
+        .eq("center_id", centerId);
+
+      if (modulesError) throw modulesError;
+
+      const moduleCountsByPaper: Record<string, number> = {};
+      const moduleTypesByPaper: Record<string, Set<string>> = {};
+
+      (modules || []).forEach((mod) => {
+        if (!mod.paper_id) return;
+        moduleCountsByPaper[mod.paper_id] =
+          (moduleCountsByPaper[mod.paper_id] || 0) + 1;
+        if (!moduleTypesByPaper[mod.paper_id]) {
+          moduleTypesByPaper[mod.paper_id] = new Set();
+        }
+        if (mod.module_type) {
+          moduleTypesByPaper[mod.paper_id].add(mod.module_type);
+        }
+      });
+
+      const summaries: PaperSummary[] = (papers || []).map((paper) => ({
+        id: paper.id,
+        title: paper.title,
+        paperType: paper.paper_type,
+        isActive: !!paper.is_active,
+        createdAt: paper.created_at,
+        modulesCount: moduleCountsByPaper[paper.id] || 0,
+        moduleTypes: Array.from(moduleTypesByPaper[paper.id] || []),
+      }));
+
+      const publishedPapers = summaries.filter((p) => p.isActive).length;
+
+      setCenterPapers(summaries);
+      setCenterModuleStats({
+        totalPapers: summaries.length,
+        totalModules: (modules || []).length,
+        publishedPapers,
+        draftPapers: summaries.length - publishedPapers,
+      });
+    } catch (err) {
+      console.error("Error fetching module overview:", err);
+      setCenterPapers([]);
+      setCenterModuleStats({
+        totalPapers: 0,
+        totalModules: 0,
+        publishedPapers: 0,
+        draftPapers: 0,
+      });
+      setCenterModulesError(
+        err instanceof Error ? err.message : "Failed to load modules",
+      );
+    } finally {
+      setCenterModulesLoading(false);
+    }
+  };
+
+  const refreshCenterModules = async () => {
+    if (!currentCenter?.center_id) return;
+    await fetchCenterModules(currentCenter.center_id);
+  };
+
+  useEffect(() => {
+    if (!currentCenter?.center_id) {
+      setCenterPapers([]);
+      setCenterModuleStats(null);
+      setCenterModulesError(null);
+      return;
+    }
+
+    fetchCenterModules(currentCenter.center_id);
+  }, [currentCenter?.center_id]);
 
   // ========== READING MODULE METHODS ==========
 
@@ -251,7 +410,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
       reading: {
         ...prev.reading,
         sections: prev.reading.sections.map((section) =>
-          section.id === sectionId ? { ...section, title } : section
+          section.id === sectionId ? { ...section, title } : section,
         ),
       },
     }));
@@ -263,7 +422,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
       reading: {
         ...prev.reading,
         sections: prev.reading.sections.map((section) =>
-          section.id === sectionId ? { ...section, heading } : section
+          section.id === sectionId ? { ...section, heading } : section,
         ),
       },
     }));
@@ -271,14 +430,14 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
 
   const updateReadingSectionInstruction = (
     sectionId: string,
-    instruction: string
+    instruction: string,
   ) => {
     setModuleData((prev) => ({
       ...prev,
       reading: {
         ...prev.reading,
         sections: prev.reading.sections.map((section) =>
-          section.id === sectionId ? { ...section, instruction } : section
+          section.id === sectionId ? { ...section, instruction } : section,
         ),
       },
     }));
@@ -286,7 +445,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
 
   const updateReadingSectionPassageText = (
     sectionId: string,
-    content: string
+    content: string,
   ) => {
     setModuleData((prev) => ({
       ...prev,
@@ -295,7 +454,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
         sections: prev.reading.sections.map((section) =>
           section.id === sectionId
             ? { ...section, passageText: content }
-            : section
+            : section,
         ),
       },
     }));
@@ -309,7 +468,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
         sections: prev.reading.sections.map((section) =>
           section.id === sectionId
             ? { ...section, renderBlocks: [...section.renderBlocks, block] }
-            : section
+            : section,
         ),
       },
     }));
@@ -318,7 +477,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   const updateReadingRenderBlock = (
     sectionId: string,
     blockIndex: number,
-    block: RenderBlock
+    block: RenderBlock,
   ) => {
     setModuleData((prev) => ({
       ...prev,
@@ -329,10 +488,10 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
             ? {
                 ...section,
                 renderBlocks: section.renderBlocks.map((b, idx) =>
-                  idx === blockIndex ? block : b
+                  idx === blockIndex ? block : b,
                 ),
               }
-            : section
+            : section,
         ),
       },
     }));
@@ -348,10 +507,10 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
             ? {
                 ...section,
                 renderBlocks: section.renderBlocks.filter(
-                  (_, idx) => idx !== blockIndex
+                  (_, idx) => idx !== blockIndex,
                 ),
               }
-            : section
+            : section,
         ),
       },
     }));
@@ -360,7 +519,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   const updateReadingQuestion = (
     sectionId: string,
     questionRef: string,
-    data: QuestionDefinition
+    data: QuestionDefinition,
   ) => {
     setModuleData((prev) => ({
       ...prev,
@@ -375,7 +534,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
                   [questionRef]: data,
                 },
               }
-            : section
+            : section,
         ),
       },
     }));
@@ -390,6 +549,33 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
           if (section.id !== sectionId) return section;
           const { [questionRef]: _, ...rest } = section.questions;
           return { ...section, questions: rest };
+        }),
+      },
+    }));
+  };
+
+  const updateReadingQuestionRef = (
+    sectionId: string,
+    fromRef: string,
+    toRef: string,
+  ) => {
+    if (!toRef || toRef === fromRef) return;
+    setModuleData((prev) => ({
+      ...prev,
+      reading: {
+        ...prev.reading,
+        sections: prev.reading.sections.map((section) => {
+          if (section.id !== sectionId) return section;
+          if (section.questions[toRef]) return section;
+          const { [fromRef]: existing, ...rest } = section.questions;
+          if (!existing) return section;
+          return {
+            ...section,
+            questions: {
+              ...rest,
+              [toRef]: existing,
+            },
+          };
         }),
       },
     }));
@@ -435,7 +621,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
       listening: {
         ...prev.listening,
         sections: prev.listening.sections.map((section) =>
-          section.id === sectionId ? { ...section, title } : section
+          section.id === sectionId ? { ...section, title } : section,
         ),
       },
     }));
@@ -443,14 +629,14 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
 
   const updateListeningSectionInstruction = (
     sectionId: string,
-    instruction: string
+    instruction: string,
   ) => {
     setModuleData((prev) => ({
       ...prev,
       listening: {
         ...prev.listening,
         sections: prev.listening.sections.map((section) =>
-          section.id === sectionId ? { ...section, instruction } : section
+          section.id === sectionId ? { ...section, instruction } : section,
         ),
       },
     }));
@@ -462,7 +648,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
       listening: {
         ...prev.listening,
         sections: prev.listening.sections.map((section) =>
-          section.id === sectionId ? { ...section, audioPath: path } : section
+          section.id === sectionId ? { ...section, audioPath: path } : section,
         ),
       },
     }));
@@ -470,14 +656,14 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
 
   const updateListeningSectionAudio = (
     sectionId: string,
-    file: File | null
+    file: File | null,
   ) => {
     setModuleData((prev) => ({
       ...prev,
       listening: {
         ...prev.listening,
         sections: prev.listening.sections.map((section) =>
-          section.id === sectionId ? { ...section, audioFile: file } : section
+          section.id === sectionId ? { ...section, audioFile: file } : section,
         ),
       },
     }));
@@ -491,7 +677,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
         sections: prev.listening.sections.map((section) =>
           section.id === sectionId
             ? { ...section, renderBlocks: [...section.renderBlocks, block] }
-            : section
+            : section,
         ),
       },
     }));
@@ -500,7 +686,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   const updateListeningRenderBlock = (
     sectionId: string,
     blockIndex: number,
-    block: RenderBlock
+    block: RenderBlock,
   ) => {
     setModuleData((prev) => ({
       ...prev,
@@ -511,10 +697,10 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
             ? {
                 ...section,
                 renderBlocks: section.renderBlocks.map((b, idx) =>
-                  idx === blockIndex ? block : b
+                  idx === blockIndex ? block : b,
                 ),
               }
-            : section
+            : section,
         ),
       },
     }));
@@ -522,7 +708,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
 
   const deleteListeningRenderBlock = (
     sectionId: string,
-    blockIndex: number
+    blockIndex: number,
   ) => {
     setModuleData((prev) => ({
       ...prev,
@@ -533,10 +719,10 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
             ? {
                 ...section,
                 renderBlocks: section.renderBlocks.filter(
-                  (_, idx) => idx !== blockIndex
+                  (_, idx) => idx !== blockIndex,
                 ),
               }
-            : section
+            : section,
         ),
       },
     }));
@@ -545,7 +731,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   const updateListeningQuestion = (
     sectionId: string,
     questionRef: string,
-    data: QuestionDefinition
+    data: QuestionDefinition,
   ) => {
     setModuleData((prev) => ({
       ...prev,
@@ -560,7 +746,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
                   [questionRef]: data,
                 },
               }
-            : section
+            : section,
         ),
       },
     }));
@@ -575,6 +761,33 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
           if (section.id !== sectionId) return section;
           const { [questionRef]: _, ...rest } = section.questions;
           return { ...section, questions: rest };
+        }),
+      },
+    }));
+  };
+
+  const updateListeningQuestionRef = (
+    sectionId: string,
+    fromRef: string,
+    toRef: string,
+  ) => {
+    if (!toRef || toRef === fromRef) return;
+    setModuleData((prev) => ({
+      ...prev,
+      listening: {
+        ...prev.listening,
+        sections: prev.listening.sections.map((section) => {
+          if (section.id !== sectionId) return section;
+          if (section.questions[toRef]) return section;
+          const { [fromRef]: existing, ...rest } = section.questions;
+          if (!existing) return section;
+          return {
+            ...section,
+            questions: {
+              ...rest,
+              [toRef]: existing,
+            },
+          };
         }),
       },
     }));
@@ -597,13 +810,13 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   const updateWritingTaskField = (
     taskId: number,
     field: keyof WritingTask,
-    value: any
+    value: any,
   ) => {
     setModuleData((prev) => ({
       ...prev,
       writing: {
         tasks: prev.writing.tasks.map((task) =>
-          task.id === taskId ? { ...task, [field]: value } : task
+          task.id === taskId ? { ...task, [field]: value } : task,
         ),
       },
     }));
@@ -616,7 +829,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
         tasks: prev.writing.tasks.map((task) =>
           task.id === taskId
             ? { ...task, renderBlocks: [...task.renderBlocks, block] }
-            : task
+            : task,
         ),
       },
     }));
@@ -625,7 +838,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   const updateWritingRenderBlock = (
     taskId: number,
     blockIndex: number,
-    block: RenderBlock
+    block: RenderBlock,
   ) => {
     setModuleData((prev) => ({
       ...prev,
@@ -635,10 +848,10 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
             ? {
                 ...task,
                 renderBlocks: task.renderBlocks.map((b, idx) =>
-                  idx === blockIndex ? block : b
+                  idx === blockIndex ? block : b,
                 ),
               }
-            : task
+            : task,
         ),
       },
     }));
@@ -653,10 +866,10 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
             ? {
                 ...task,
                 renderBlocks: task.renderBlocks.filter(
-                  (_, idx) => idx !== blockIndex
+                  (_, idx) => idx !== blockIndex,
                 ),
               }
-            : task
+            : task,
         ),
       },
     }));
@@ -664,8 +877,14 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
 
   const value: ModuleContextType = {
     moduleData,
-    paperTitle: moduleData.paperTitle,
-    setPaperTitle,
+    moduleTitles: moduleData.moduleTitles,
+    setModuleTitle,
+
+    centerPapers,
+    centerModuleStats,
+    centerModulesLoading,
+    centerModulesError,
+    refreshCenterModules,
 
     // Reading
     readingSections: moduleData.reading.sections,
@@ -679,6 +898,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
     updateReadingRenderBlock,
     deleteReadingRenderBlock,
     updateReadingQuestion,
+    updateReadingQuestionRef,
     deleteReadingQuestion,
     toggleReadingSection,
 
@@ -694,6 +914,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
     updateListeningRenderBlock,
     deleteListeningRenderBlock,
     updateListeningQuestion,
+    updateListeningQuestionRef,
     deleteListeningQuestion,
     toggleListeningSection,
 
