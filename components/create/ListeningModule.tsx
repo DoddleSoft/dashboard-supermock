@@ -345,7 +345,8 @@ export default function ListeningModule({
                           ))}
                         </select>
                         <span className="text-md text-slate-900">
-                          For question placeholder use {"{{1}mcq}"} format
+                          For question placeholder use{" "}
+                          {"{{X}mcq}, {{X}blanks}, {{X}true-false}"} format
                         </span>
                         <button
                           onClick={() => onDeleteRenderBlock(section.id, index)}

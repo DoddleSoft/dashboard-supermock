@@ -7,7 +7,6 @@ import ReadingModule from "../../../../../components/create/ReadingModule";
 import WritingModule from "../../../../../components/create/WritingModule";
 import ListeningModule from "../../../../../components/create/ListeningModule";
 import {
-  ModuleProvider,
   useModuleContext,
   QuestionDefinition,
 } from "../../../../../context/ModuleContext";
@@ -395,10 +394,8 @@ function CreateModuleContent() {
 
 export default function CreateModulePage() {
   return (
-    <ModuleProvider>
-      <Suspense fallback={<SmallLoader subtitle="Loading module editor..." />}>
-        <CreateModuleContent />
-      </Suspense>
-    </ModuleProvider>
+    <Suspense fallback={<SmallLoader subtitle="Loading module editor..." />}>
+      <CreateModuleContent />
+    </Suspense>
   );
 }

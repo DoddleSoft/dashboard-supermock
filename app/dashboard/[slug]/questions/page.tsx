@@ -149,6 +149,15 @@ export default function PapersPage() {
     }
   };
 
+  // Show single loading state while data is loading
+  if (centerModulesLoading || modulesLoading) {
+    return (
+      <div className="max-w-7xl mx-auto">
+        <SmallLoader subtitle="Loading papers and modules..." />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto flex flex-col gap-6">
       {/* Filters */}
@@ -226,7 +235,7 @@ export default function PapersPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm text-slate-500">Total Papers</p>
             <BookOpen className="w-5 h-5 text-blue-600" />
@@ -235,7 +244,7 @@ export default function PapersPage() {
             {centerModuleStats?.totalPapers ?? 0}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm text-slate-500">Published</p>
             <div className="w-3 h-3 rounded-full bg-green-500"></div>
@@ -244,7 +253,7 @@ export default function PapersPage() {
             {centerModuleStats?.publishedPapers ?? 0}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm text-slate-500">Drafts</p>
             <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
@@ -253,7 +262,7 @@ export default function PapersPage() {
             {centerModuleStats?.draftPapers ?? 0}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm text-slate-500">Total Modules</p>
             <Filter className="w-5 h-5 text-purple-600" />
@@ -464,20 +473,13 @@ export default function PapersPage() {
         )}
 
       {/* Empty State */}
-      {!centerModulesLoading && !modulesLoading && totalItems === 0 && (
+      {totalItems === 0 && (
         <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
           <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-4" />
           <p className="text-slate-500 mb-2">No content found</p>
           <p className="text-sm text-slate-400">
             Try adjusting your search or filters, or create new content
           </p>
-        </div>
-      )}
-
-      {/* Loading State */}
-      {(centerModulesLoading || modulesLoading) && (
-        <div className="bg-white rounded-xl border border-slate-200">
-          <SmallLoader subtitle="Loading papers and modules..." />
         </div>
       )}
 
