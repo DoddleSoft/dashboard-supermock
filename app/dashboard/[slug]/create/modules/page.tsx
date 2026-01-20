@@ -10,8 +10,9 @@ import {
   ModuleProvider,
   useModuleContext,
   QuestionDefinition,
-  RenderBlock,
 } from "../../../../../context/ModuleContext";
+import { Loader2 } from "lucide-react";
+import { SmallLoader } from "../../../../../components/ui/SmallLoader";
 
 function CreateModuleContent() {
   const searchParams = useSearchParams();
@@ -38,6 +39,7 @@ function CreateModuleContent() {
     updateReadingRenderBlock,
     deleteReadingRenderBlock,
     updateReadingQuestion,
+    deleteReadingQuestion,
     toggleReadingSection,
     listeningSections,
     listeningExpandedSections,
@@ -50,12 +52,18 @@ function CreateModuleContent() {
     updateListeningRenderBlock,
     deleteListeningRenderBlock,
     updateListeningQuestion,
+    deleteListeningQuestion,
     toggleListeningSection,
     writingTasks,
     updateWritingTaskField,
     addWritingRenderBlock,
     updateWritingRenderBlock,
     deleteWritingRenderBlock,
+    // Save methods
+    saveModule,
+    isSaving,
+    saveError,
+    clearSaveError,
   } = useModuleContext();
 
   const [showQuestionModal, setShowQuestionModal] = useState(false);
@@ -63,6 +71,9 @@ function CreateModuleContent() {
   const [currentModuleType, setCurrentModuleType] = useState<
     "reading" | "listening"
   >("reading");
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [toastType, setToastType] = useState<"success" | "error">("success");
 
   const sectionById = useMemo(
     () => ({
@@ -72,36 +83,6 @@ function CreateModuleContent() {
     [readingSections, listeningSections],
   );
 
-  const getNextQuestionRef = (
-    questions: Record<string, QuestionDefinition>,
-  ) => {
-    const numbers = Object.keys(questions)
-      .map((key) => Number(key))
-      .filter((num) => !Number.isNaN(num));
-    const max = numbers.length ? Math.max(...numbers) : 0;
-    return String(max + 1);
-  };
-
-  const questionTypeToPlaceholder = (
-    questionType:
-      | "fill-blank"
-      | "mcq"
-      | "true-false-not-given"
-      | "yes-no-not-given",
-  ) => {
-    switch (questionType) {
-      case "fill-blank":
-        return "blanks";
-      case "mcq":
-        return "dropdown";
-      case "true-false-not-given":
-      case "yes-no-not-given":
-        return "boolean";
-      default:
-        return "blanks";
-    }
-  };
-
   const addQuestion = (sectionId: string) => {
     setCurrentSectionId(sectionId);
     setCurrentModuleType(type === "listening" ? "listening" : "reading");
@@ -109,10 +90,9 @@ function CreateModuleContent() {
   };
 
   const handleSaveQuestion = (questionData: {
-    text: string;
+    questionRef: string;
     type: "fill-blank" | "mcq" | "true-false-not-given" | "yes-no-not-given";
     blankPosition?: "first" | "middle" | "end";
-    mcqVariant?: "3-options-1-correct" | "5-options-2-correct";
     options?: string[];
     correctAnswers?: string[];
     answer: string;
@@ -123,13 +103,8 @@ function CreateModuleContent() {
     const targetSection = sectionById[currentModuleType](currentSectionId);
     if (!targetSection) return;
 
-    const questionRef = getNextQuestionRef(targetSection.questions);
-    const placeholderType = questionTypeToPlaceholder(questionData.type);
-
-    const renderBlock: RenderBlock = {
-      type: "text",
-      content: `${questionRef}. {{${questionRef}}${placeholderType}} ${questionData.text}`,
-    };
+    const questionRef = questionData.questionRef.trim();
+    if (!questionRef) return;
 
     const optionsFromType =
       questionData.type === "true-false-not-given"
@@ -138,17 +113,24 @@ function CreateModuleContent() {
           ? ["YES", "NO", "NOT GIVEN"]
           : questionData.options;
 
+    const normalizedOptions = optionsFromType?.filter(
+      (opt) => opt && opt.trim(),
+    );
+    const normalizedCorrectAnswers =
+      questionData.type === "mcq"
+        ? (questionData.correctAnswers || []).filter((ans) => ans && ans.trim())
+        : [questionData.answer].filter((ans) => ans && ans.trim());
+
     const questionDefinition: QuestionDefinition = {
       answer: questionData.answer,
-      options: optionsFromType?.filter((opt) => opt && opt.trim()),
+      correctAnswers: normalizedCorrectAnswers,
+      options: normalizedOptions,
       explanation: questionData.explanation,
     };
 
     if (currentModuleType === "reading") {
-      addReadingRenderBlock(currentSectionId, renderBlock);
       updateReadingQuestion(currentSectionId, questionRef, questionDefinition);
     } else {
-      addListeningRenderBlock(currentSectionId, renderBlock);
       updateListeningQuestion(
         currentSectionId,
         questionRef,
@@ -219,6 +201,7 @@ function CreateModuleContent() {
             onToggleSection={toggleReadingSection}
             onAddSection={addReadingSection}
             onAddQuestion={addQuestion}
+            onDeleteQuestion={deleteReadingQuestion}
             onUpdateSectionTitle={updateReadingSectionTitle}
             onUpdateSectionHeading={updateReadingSectionHeading}
             onUpdateSectionInstruction={updateReadingSectionInstruction}
@@ -250,6 +233,7 @@ function CreateModuleContent() {
             onToggleSection={toggleListeningSection}
             onAddSection={addListeningSection}
             onAddQuestion={addQuestion}
+            onDeleteQuestion={deleteListeningQuestion}
             onUpdateSectionTitle={updateListeningSectionTitle}
             onUpdateSectionInstruction={updateListeningSectionInstruction}
             onUpdateSectionAudioPath={updateListeningSectionAudioPath}
@@ -274,9 +258,89 @@ function CreateModuleContent() {
     }
   };
 
+  const handlePreview = () => {
+    router.push(`/dashboard/${slug}/create/modules/preview?type=${type}`);
+  };
+
+  const handleCreateModule = async () => {
+    const currentModuleTitle = moduleTitles[typeKey];
+
+    if (!currentModuleTitle.trim()) {
+      setToastMessage("Please enter a module title");
+      setToastType("error");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+      return;
+    }
+
+    clearSaveError();
+
+    const result = await saveModule(typeKey, currentModuleTitle);
+
+    if (result.success) {
+      setToastMessage(
+        `${typeKey.charAt(0).toUpperCase() + typeKey.slice(1)} module created successfully!`,
+      );
+      setToastType("success");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } else {
+      setToastMessage(result.error || "Failed to create module");
+      setToastType("error");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 5000);
+    }
+  };
+
   return (
     <>
       <div className="max-w-7xl mx-auto">
+        {/* Toast Notification */}
+        {showToast && (
+          <div
+            className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-xl shadow-lg transition-all duration-300 ${
+              toastType === "success"
+                ? "bg-green-50 border border-green-200 text-green-700"
+                : "bg-red-50 border border-red-200 text-red-700"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              {toastType === "success" ? (
+                <svg
+                  className="w-5 h-5"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="w-5 h-5"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              )}
+              <span className="font-medium">{toastMessage}</span>
+              <button
+                onClick={() => setShowToast(false)}
+                className="ml-2 text-current hover:opacity-70"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Paper Title */}
         <div className="mb-6 flex bg-gray-200 pl-4 rounded-lg items-center gap-4">
           <div className="w-12 text-lg font-semibold text-slate-500 tracking-wide">
@@ -297,11 +361,21 @@ function CreateModuleContent() {
 
         {/* Action Buttons */}
         <div className="flex justify-end gap-4 pt-4 border-t border-slate-200">
-          <button className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-medium transition-colors">
+          <button
+            onClick={handlePreview}
+            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-medium transition-colors"
+          >
             Preview
           </button>
-          <button className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium shadow-sm shadow-red-100 transition-colors">
-            Create
+          <button
+            onClick={handleCreateModule}
+            disabled={isSaving || type === "speaking"}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed text-white rounded-xl font-medium shadow-sm shadow-red-100 transition-colors flex items-center gap-2"
+          >
+            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+            {isSaving
+              ? "Creating..."
+              : `Create ${typeKey.charAt(0).toUpperCase() + typeKey.slice(1)} Module`}
           </button>
         </div>
       </div>
@@ -322,11 +396,7 @@ function CreateModuleContent() {
 export default function CreateModulePage() {
   return (
     <ModuleProvider>
-      <Suspense
-        fallback={
-          <div className="p-8 text-center text-slate-500">Loading...</div>
-        }
-      >
+      <Suspense fallback={<SmallLoader subtitle="Loading module editor..." />}>
         <CreateModuleContent />
       </Suspense>
     </ModuleProvider>

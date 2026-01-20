@@ -124,7 +124,6 @@ create table public.modules (
   center_id uuid not null,
   constraint modules_pkey primary key (id),
   constraint modules_center_id_fkey foreign KEY (center_id) references centers (center_id),
-  constraint modules_paper_id_fkey foreign KEY (paper_id) references papers (id) on delete CASCADE,
   constraint modules_module_type_check check (
     (
       module_type = any (
@@ -142,14 +141,12 @@ create table public.modules (
 create index IF not exists idx_modules_paper_id on public.modules using btree (paper_id) TABLESPACE pg_default;
 
 
-
-
 create table public.question_answers (
   id uuid not null default gen_random_uuid (),
   sub_section_id uuid null,
   question_ref text not null,
-  correct_answer text null,
-  alternatives jsonb null,
+  correct_answers jsonb null,
+  options jsonb null,
   explanation text null,
   marks double precision null default 1.0,
   created_at timestamp with time zone null default now(),
@@ -158,7 +155,10 @@ create table public.question_answers (
   constraint question_answers_sub_section_id_fkey foreign KEY (sub_section_id) references sub_sections (id) on delete CASCADE
 ) TABLESPACE pg_default;
 
+create index IF not exists idx_qa_options on public.question_answers using gin (options) TABLESPACE pg_default;
+
 create index IF not exists idx_qa_sub_section_id on public.question_answers using btree (sub_section_id) TABLESPACE pg_default;
+
 
 
 create table public.sections (
@@ -182,6 +182,7 @@ create table public.sections (
 ) TABLESPACE pg_default;
 
 create index IF not exists idx_sections_module_id on public.sections using btree (module_id) TABLESPACE pg_default;
+
 
 
 create table public.student_answers (
@@ -251,6 +252,7 @@ create table public.sub_sections (
 ) TABLESPACE pg_default;
 
 create index IF not exists idx_sub_sections_section_id on public.sub_sections using btree (section_id) TABLESPACE pg_default;
+
 
 
 create table public.users (

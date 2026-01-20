@@ -10,6 +10,17 @@ import React, {
 } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useCentre } from "./CentreContext";
+import {
+  createCompletePaper,
+  createModule as createModuleInDB,
+  uploadAudioFile,
+  ModuleType,
+} from "@/helpers/modules";
+import { readingHelpers } from "@/helpers/reading";
+import { listeningHelpers } from "@/helpers/listening";
+import { writingHelpers } from "@/helpers/writing";
+import { centerHelpers } from "@/helpers/centers";
+import { moduleHelpers } from "@/helpers/modules";
 
 export type RenderBlockType =
   | "header"
@@ -35,6 +46,7 @@ export interface RenderBlock {
 export interface QuestionDefinition {
   type?: "blanks" | "mcq-3" | "mcq-5";
   answer: string;
+  correctAnswers?: string[];
   options?: string[];
   explanation?: string;
 }
@@ -198,12 +210,93 @@ interface ModuleContextType {
   ) => void;
   deleteWritingRenderBlock: (taskId: number, blockIndex: number) => void;
 
+  // Save/Create methods
+  saveModule: (
+    moduleType: ModuleType,
+    paperTitle: string,
+    paperType?: "IELTS" | "OIETC" | "GRE",
+  ) => Promise<{
+    success: boolean;
+    paperId?: string;
+    moduleId?: string;
+    error?: string;
+  }>;
+  saveCompletePaper: (
+    paperTitle: string,
+    paperType?: "IELTS" | "OIETC" | "GRE",
+  ) => Promise<{
+    success: boolean;
+    paperId?: string;
+    moduleIds?: Record<string, string>;
+    error?: string;
+  }>;
+  isSaving: boolean;
+  saveError: string | null;
+  clearSaveError: () => void;
+  resetModuleData: () => void;
+
   // Utility
   generateId: () => string;
 }
 
 // Create context
 const ModuleContext = createContext<ModuleContextType | undefined>(undefined);
+
+// Default module data for reset
+const getDefaultModuleData = (): ModuleData => ({
+  reading: {
+    sections: [
+      {
+        id: "1",
+        title: "Passage 1",
+        heading: "",
+        instruction: "",
+        passageText: "",
+        renderBlocks: [],
+        questions: {},
+      },
+    ],
+    expandedSections: ["1"],
+  },
+  listening: {
+    sections: [
+      {
+        id: "1",
+        title: "Section 1",
+        instruction: "",
+        audioPath: "",
+        audioFile: null,
+        renderBlocks: [],
+        questions: {},
+      },
+    ],
+    expandedSections: ["1"],
+  },
+  writing: {
+    tasks: [
+      {
+        id: 1,
+        title: "Writing Task 1",
+        durationRecommendation: 20,
+        wordCountMin: 150,
+        renderBlocks: [],
+      },
+      {
+        id: 2,
+        title: "Writing Task 2",
+        durationRecommendation: 40,
+        wordCountMin: 250,
+        renderBlocks: [],
+      },
+    ],
+  },
+  moduleTitles: {
+    reading: "",
+    writing: "",
+    listening: "",
+    speaking: "",
+  },
+});
 
 // Provider component
 export function ModuleProvider({ children }: { children: ReactNode }) {
@@ -219,6 +312,12 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
     null,
   );
 
+  // Save state
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const clearSaveError = () => setSaveError(null);
+
   const generateId = () => {
     const id = idCounterRef.current.toString();
     idCounterRef.current += 1;
@@ -226,60 +325,15 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   };
 
   // Initialize module data with default values
-  const [moduleData, setModuleData] = useState<ModuleData>({
-    reading: {
-      sections: [
-        {
-          id: "1",
-          title: "Passage 1",
-          heading: "",
-          instruction: "",
-          passageText: "",
-          renderBlocks: [],
-          questions: {},
-        },
-      ],
-      expandedSections: ["1"],
-    },
-    listening: {
-      sections: [
-        {
-          id: "1",
-          title: "Section 1",
-          instruction: "",
-          audioPath: "",
-          audioFile: null,
-          renderBlocks: [],
-          questions: {},
-        },
-      ],
-      expandedSections: ["1"],
-    },
-    writing: {
-      tasks: [
-        {
-          id: 1,
-          title: "Writing Task 1",
-          durationRecommendation: 20,
-          wordCountMin: 150,
-          renderBlocks: [],
-        },
-        {
-          id: 2,
-          title: "Writing Task 2",
-          durationRecommendation: 40,
-          wordCountMin: 250,
-          renderBlocks: [],
-        },
-      ],
-    },
-    moduleTitles: {
-      reading: "",
-      writing: "",
-      listening: "",
-      speaking: "",
-    },
-  });
+  const [moduleData, setModuleData] = useState<ModuleData>(
+    getDefaultModuleData(),
+  );
+
+  // Reset module data to defaults
+  const resetModuleData = () => {
+    setModuleData(getDefaultModuleData());
+    idCounterRef.current = 2;
+  };
 
   // Module Titles
   const setModuleTitle = (
@@ -296,74 +350,17 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   };
 
   const fetchCenterModules = async (centerId: string) => {
-    try {
-      setCenterModulesLoading(true);
-      setCenterModulesError(null);
+    setCenterModulesLoading(true);
+    setCenterModulesError(null);
 
-      const { data: papers, error: papersError } = await supabase
-        .from("papers")
-        .select("id,title,paper_type,is_active,created_at")
-        .eq("center_id", centerId)
-        .order("created_at", { ascending: false });
+    const result = await centerHelpers.fetchCenterModules(centerId);
 
-      if (papersError) throw papersError;
-
-      const { data: modules, error: modulesError } = await supabase
-        .from("modules")
-        .select("id,paper_id,module_type")
-        .eq("center_id", centerId);
-
-      if (modulesError) throw modulesError;
-
-      const moduleCountsByPaper: Record<string, number> = {};
-      const moduleTypesByPaper: Record<string, Set<string>> = {};
-
-      (modules || []).forEach((mod) => {
-        if (!mod.paper_id) return;
-        moduleCountsByPaper[mod.paper_id] =
-          (moduleCountsByPaper[mod.paper_id] || 0) + 1;
-        if (!moduleTypesByPaper[mod.paper_id]) {
-          moduleTypesByPaper[mod.paper_id] = new Set();
-        }
-        if (mod.module_type) {
-          moduleTypesByPaper[mod.paper_id].add(mod.module_type);
-        }
-      });
-
-      const summaries: PaperSummary[] = (papers || []).map((paper) => ({
-        id: paper.id,
-        title: paper.title,
-        paperType: paper.paper_type,
-        isActive: !!paper.is_active,
-        createdAt: paper.created_at,
-        modulesCount: moduleCountsByPaper[paper.id] || 0,
-        moduleTypes: Array.from(moduleTypesByPaper[paper.id] || []),
-      }));
-
-      const publishedPapers = summaries.filter((p) => p.isActive).length;
-
-      setCenterPapers(summaries);
-      setCenterModuleStats({
-        totalPapers: summaries.length,
-        totalModules: (modules || []).length,
-        publishedPapers,
-        draftPapers: summaries.length - publishedPapers,
-      });
-    } catch (err) {
-      console.error("Error fetching module overview:", err);
-      setCenterPapers([]);
-      setCenterModuleStats({
-        totalPapers: 0,
-        totalModules: 0,
-        publishedPapers: 0,
-        draftPapers: 0,
-      });
-      setCenterModulesError(
-        err instanceof Error ? err.message : "Failed to load modules",
-      );
-    } finally {
-      setCenterModulesLoading(false);
+    setCenterPapers(result.papers);
+    setCenterModuleStats(result.stats);
+    if (result.error) {
+      setCenterModulesError(result.error);
     }
+    setCenterModulesLoading(false);
   };
 
   const refreshCenterModules = async () => {
@@ -385,46 +382,31 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   // ========== READING MODULE METHODS ==========
 
   const addReadingSection = () => {
-    const newSection: ReadingSection = {
-      id: generateId(),
-      title: `Passage ${moduleData.reading.sections.length + 1}`,
-      heading: "",
-      instruction: "",
-      passageText: "",
-      renderBlocks: [],
-      questions: {},
-    };
-
     setModuleData((prev) => ({
       ...prev,
-      reading: {
-        sections: [...prev.reading.sections, newSection],
-        expandedSections: [...prev.reading.expandedSections, newSection.id],
-      },
+      reading: readingHelpers.addSection(prev.reading, generateId),
     }));
   };
 
   const updateReadingSectionTitle = (sectionId: string, title: string) => {
     setModuleData((prev) => ({
       ...prev,
-      reading: {
-        ...prev.reading,
-        sections: prev.reading.sections.map((section) =>
-          section.id === sectionId ? { ...section, title } : section,
-        ),
-      },
+      reading: readingHelpers.updateSectionTitle(
+        prev.reading,
+        sectionId,
+        title,
+      ),
     }));
   };
 
   const updateReadingSectionHeading = (sectionId: string, heading: string) => {
     setModuleData((prev) => ({
       ...prev,
-      reading: {
-        ...prev.reading,
-        sections: prev.reading.sections.map((section) =>
-          section.id === sectionId ? { ...section, heading } : section,
-        ),
-      },
+      reading: readingHelpers.updateSectionHeading(
+        prev.reading,
+        sectionId,
+        heading,
+      ),
     }));
   };
 
@@ -434,12 +416,11 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   ) => {
     setModuleData((prev) => ({
       ...prev,
-      reading: {
-        ...prev.reading,
-        sections: prev.reading.sections.map((section) =>
-          section.id === sectionId ? { ...section, instruction } : section,
-        ),
-      },
+      reading: readingHelpers.updateSectionInstruction(
+        prev.reading,
+        sectionId,
+        instruction,
+      ),
     }));
   };
 
@@ -449,28 +430,18 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   ) => {
     setModuleData((prev) => ({
       ...prev,
-      reading: {
-        ...prev.reading,
-        sections: prev.reading.sections.map((section) =>
-          section.id === sectionId
-            ? { ...section, passageText: content }
-            : section,
-        ),
-      },
+      reading: readingHelpers.updateSectionPassageText(
+        prev.reading,
+        sectionId,
+        content,
+      ),
     }));
   };
 
   const addReadingRenderBlock = (sectionId: string, block: RenderBlock) => {
     setModuleData((prev) => ({
       ...prev,
-      reading: {
-        ...prev.reading,
-        sections: prev.reading.sections.map((section) =>
-          section.id === sectionId
-            ? { ...section, renderBlocks: [...section.renderBlocks, block] }
-            : section,
-        ),
-      },
+      reading: readingHelpers.addRenderBlock(prev.reading, sectionId, block),
     }));
   };
 
@@ -481,38 +452,23 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   ) => {
     setModuleData((prev) => ({
       ...prev,
-      reading: {
-        ...prev.reading,
-        sections: prev.reading.sections.map((section) =>
-          section.id === sectionId
-            ? {
-                ...section,
-                renderBlocks: section.renderBlocks.map((b, idx) =>
-                  idx === blockIndex ? block : b,
-                ),
-              }
-            : section,
-        ),
-      },
+      reading: readingHelpers.updateRenderBlock(
+        prev.reading,
+        sectionId,
+        blockIndex,
+        block,
+      ),
     }));
   };
 
   const deleteReadingRenderBlock = (sectionId: string, blockIndex: number) => {
     setModuleData((prev) => ({
       ...prev,
-      reading: {
-        ...prev.reading,
-        sections: prev.reading.sections.map((section) =>
-          section.id === sectionId
-            ? {
-                ...section,
-                renderBlocks: section.renderBlocks.filter(
-                  (_, idx) => idx !== blockIndex,
-                ),
-              }
-            : section,
-        ),
-      },
+      reading: readingHelpers.deleteRenderBlock(
+        prev.reading,
+        sectionId,
+        blockIndex,
+      ),
     }));
   };
 
@@ -523,34 +479,23 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   ) => {
     setModuleData((prev) => ({
       ...prev,
-      reading: {
-        ...prev.reading,
-        sections: prev.reading.sections.map((section) =>
-          section.id === sectionId
-            ? {
-                ...section,
-                questions: {
-                  ...section.questions,
-                  [questionRef]: data,
-                },
-              }
-            : section,
-        ),
-      },
+      reading: readingHelpers.updateQuestion(
+        prev.reading,
+        sectionId,
+        questionRef,
+        data,
+      ),
     }));
   };
 
   const deleteReadingQuestion = (sectionId: string, questionRef: string) => {
     setModuleData((prev) => ({
       ...prev,
-      reading: {
-        ...prev.reading,
-        sections: prev.reading.sections.map((section) => {
-          if (section.id !== sectionId) return section;
-          const { [questionRef]: _, ...rest } = section.questions;
-          return { ...section, questions: rest };
-        }),
-      },
+      reading: readingHelpers.deleteQuestion(
+        prev.reading,
+        sectionId,
+        questionRef,
+      ),
     }));
   };
 
@@ -559,71 +504,41 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
     fromRef: string,
     toRef: string,
   ) => {
-    if (!toRef || toRef === fromRef) return;
     setModuleData((prev) => ({
       ...prev,
-      reading: {
-        ...prev.reading,
-        sections: prev.reading.sections.map((section) => {
-          if (section.id !== sectionId) return section;
-          if (section.questions[toRef]) return section;
-          const { [fromRef]: existing, ...rest } = section.questions;
-          if (!existing) return section;
-          return {
-            ...section,
-            questions: {
-              ...rest,
-              [toRef]: existing,
-            },
-          };
-        }),
-      },
+      reading: readingHelpers.updateQuestionRef(
+        prev.reading,
+        sectionId,
+        fromRef,
+        toRef,
+      ),
     }));
   };
 
   const toggleReadingSection = (sectionId: string) => {
     setModuleData((prev) => ({
       ...prev,
-      reading: {
-        ...prev.reading,
-        expandedSections: prev.reading.expandedSections.includes(sectionId)
-          ? prev.reading.expandedSections.filter((id) => id !== sectionId)
-          : [...prev.reading.expandedSections, sectionId],
-      },
+      reading: readingHelpers.toggleSection(prev.reading, sectionId),
     }));
   };
 
   // ========== LISTENING MODULE METHODS ==========
 
   const addListeningSection = () => {
-    const newSection: ListeningSection = {
-      id: generateId(),
-      title: `Section ${moduleData.listening.sections.length + 1}`,
-      instruction: "",
-      audioPath: "",
-      audioFile: null,
-      renderBlocks: [],
-      questions: {},
-    };
-
     setModuleData((prev) => ({
       ...prev,
-      listening: {
-        sections: [...prev.listening.sections, newSection],
-        expandedSections: [...prev.listening.expandedSections, newSection.id],
-      },
+      listening: listeningHelpers.addSection(prev.listening, generateId),
     }));
   };
 
   const updateListeningSectionTitle = (sectionId: string, title: string) => {
     setModuleData((prev) => ({
       ...prev,
-      listening: {
-        ...prev.listening,
-        sections: prev.listening.sections.map((section) =>
-          section.id === sectionId ? { ...section, title } : section,
-        ),
-      },
+      listening: listeningHelpers.updateSectionTitle(
+        prev.listening,
+        sectionId,
+        title,
+      ),
     }));
   };
 
@@ -633,24 +548,22 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   ) => {
     setModuleData((prev) => ({
       ...prev,
-      listening: {
-        ...prev.listening,
-        sections: prev.listening.sections.map((section) =>
-          section.id === sectionId ? { ...section, instruction } : section,
-        ),
-      },
+      listening: listeningHelpers.updateSectionInstruction(
+        prev.listening,
+        sectionId,
+        instruction,
+      ),
     }));
   };
 
   const updateListeningSectionAudioPath = (sectionId: string, path: string) => {
     setModuleData((prev) => ({
       ...prev,
-      listening: {
-        ...prev.listening,
-        sections: prev.listening.sections.map((section) =>
-          section.id === sectionId ? { ...section, audioPath: path } : section,
-        ),
-      },
+      listening: listeningHelpers.updateSectionAudioPath(
+        prev.listening,
+        sectionId,
+        path,
+      ),
     }));
   };
 
@@ -660,26 +573,22 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   ) => {
     setModuleData((prev) => ({
       ...prev,
-      listening: {
-        ...prev.listening,
-        sections: prev.listening.sections.map((section) =>
-          section.id === sectionId ? { ...section, audioFile: file } : section,
-        ),
-      },
+      listening: listeningHelpers.updateSectionAudio(
+        prev.listening,
+        sectionId,
+        file,
+      ),
     }));
   };
 
   const addListeningRenderBlock = (sectionId: string, block: RenderBlock) => {
     setModuleData((prev) => ({
       ...prev,
-      listening: {
-        ...prev.listening,
-        sections: prev.listening.sections.map((section) =>
-          section.id === sectionId
-            ? { ...section, renderBlocks: [...section.renderBlocks, block] }
-            : section,
-        ),
-      },
+      listening: listeningHelpers.addRenderBlock(
+        prev.listening,
+        sectionId,
+        block,
+      ),
     }));
   };
 
@@ -690,19 +599,12 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   ) => {
     setModuleData((prev) => ({
       ...prev,
-      listening: {
-        ...prev.listening,
-        sections: prev.listening.sections.map((section) =>
-          section.id === sectionId
-            ? {
-                ...section,
-                renderBlocks: section.renderBlocks.map((b, idx) =>
-                  idx === blockIndex ? block : b,
-                ),
-              }
-            : section,
-        ),
-      },
+      listening: listeningHelpers.updateRenderBlock(
+        prev.listening,
+        sectionId,
+        blockIndex,
+        block,
+      ),
     }));
   };
 
@@ -712,19 +614,11 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   ) => {
     setModuleData((prev) => ({
       ...prev,
-      listening: {
-        ...prev.listening,
-        sections: prev.listening.sections.map((section) =>
-          section.id === sectionId
-            ? {
-                ...section,
-                renderBlocks: section.renderBlocks.filter(
-                  (_, idx) => idx !== blockIndex,
-                ),
-              }
-            : section,
-        ),
-      },
+      listening: listeningHelpers.deleteRenderBlock(
+        prev.listening,
+        sectionId,
+        blockIndex,
+      ),
     }));
   };
 
@@ -735,34 +629,23 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   ) => {
     setModuleData((prev) => ({
       ...prev,
-      listening: {
-        ...prev.listening,
-        sections: prev.listening.sections.map((section) =>
-          section.id === sectionId
-            ? {
-                ...section,
-                questions: {
-                  ...section.questions,
-                  [questionRef]: data,
-                },
-              }
-            : section,
-        ),
-      },
+      listening: listeningHelpers.updateQuestion(
+        prev.listening,
+        sectionId,
+        questionRef,
+        data,
+      ),
     }));
   };
 
   const deleteListeningQuestion = (sectionId: string, questionRef: string) => {
     setModuleData((prev) => ({
       ...prev,
-      listening: {
-        ...prev.listening,
-        sections: prev.listening.sections.map((section) => {
-          if (section.id !== sectionId) return section;
-          const { [questionRef]: _, ...rest } = section.questions;
-          return { ...section, questions: rest };
-        }),
-      },
+      listening: listeningHelpers.deleteQuestion(
+        prev.listening,
+        sectionId,
+        questionRef,
+      ),
     }));
   };
 
@@ -771,37 +654,21 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
     fromRef: string,
     toRef: string,
   ) => {
-    if (!toRef || toRef === fromRef) return;
     setModuleData((prev) => ({
       ...prev,
-      listening: {
-        ...prev.listening,
-        sections: prev.listening.sections.map((section) => {
-          if (section.id !== sectionId) return section;
-          if (section.questions[toRef]) return section;
-          const { [fromRef]: existing, ...rest } = section.questions;
-          if (!existing) return section;
-          return {
-            ...section,
-            questions: {
-              ...rest,
-              [toRef]: existing,
-            },
-          };
-        }),
-      },
+      listening: listeningHelpers.updateQuestionRef(
+        prev.listening,
+        sectionId,
+        fromRef,
+        toRef,
+      ),
     }));
   };
 
   const toggleListeningSection = (sectionId: string) => {
     setModuleData((prev) => ({
       ...prev,
-      listening: {
-        ...prev.listening,
-        expandedSections: prev.listening.expandedSections.includes(sectionId)
-          ? prev.listening.expandedSections.filter((id) => id !== sectionId)
-          : [...prev.listening.expandedSections, sectionId],
-      },
+      listening: listeningHelpers.toggleSection(prev.listening, sectionId),
     }));
   };
 
@@ -814,24 +681,19 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   ) => {
     setModuleData((prev) => ({
       ...prev,
-      writing: {
-        tasks: prev.writing.tasks.map((task) =>
-          task.id === taskId ? { ...task, [field]: value } : task,
-        ),
-      },
+      writing: writingHelpers.updateTaskField(
+        prev.writing,
+        taskId,
+        field,
+        value,
+      ),
     }));
   };
 
   const addWritingRenderBlock = (taskId: number, block: RenderBlock) => {
     setModuleData((prev) => ({
       ...prev,
-      writing: {
-        tasks: prev.writing.tasks.map((task) =>
-          task.id === taskId
-            ? { ...task, renderBlocks: [...task.renderBlocks, block] }
-            : task,
-        ),
-      },
+      writing: writingHelpers.addRenderBlock(prev.writing, taskId, block),
     }));
   };
 
@@ -842,37 +704,141 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   ) => {
     setModuleData((prev) => ({
       ...prev,
-      writing: {
-        tasks: prev.writing.tasks.map((task) =>
-          task.id === taskId
-            ? {
-                ...task,
-                renderBlocks: task.renderBlocks.map((b, idx) =>
-                  idx === blockIndex ? block : b,
-                ),
-              }
-            : task,
-        ),
-      },
+      writing: writingHelpers.updateRenderBlock(
+        prev.writing,
+        taskId,
+        blockIndex,
+        block,
+      ),
     }));
   };
 
   const deleteWritingRenderBlock = (taskId: number, blockIndex: number) => {
     setModuleData((prev) => ({
       ...prev,
-      writing: {
-        tasks: prev.writing.tasks.map((task) =>
-          task.id === taskId
-            ? {
-                ...task,
-                renderBlocks: task.renderBlocks.filter(
-                  (_, idx) => idx !== blockIndex,
-                ),
-              }
-            : task,
-        ),
-      },
+      writing: writingHelpers.deleteRenderBlock(
+        prev.writing,
+        taskId,
+        blockIndex,
+      ),
     }));
+  };
+
+  // ========== SAVE/CREATE METHODS ==========
+
+  /**
+   * Upload audio files for listening sections and update paths
+   */
+  const uploadListeningAudioFiles = async (
+    centerId: string,
+    sections: ListeningSection[],
+  ): Promise<ListeningSection[]> => {
+    return await listeningHelpers.uploadAudioFiles(centerId, sections);
+  };
+
+  /**
+   * Save a single module with its sections
+   */
+  const saveModule = async (
+    moduleType: ModuleType,
+    moduleTitle: string,
+    paperType: "IELTS" | "OIETC" | "GRE" = "IELTS",
+  ): Promise<{
+    success: boolean;
+    paperId?: string;
+    moduleId?: string;
+    error?: string;
+  }> => {
+    if (!currentCenter?.center_id) {
+      return { success: false, error: "No center selected" };
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      const result = await moduleHelpers.saveModule(
+        currentCenter.center_id,
+        moduleType,
+        moduleTitle,
+        moduleData.moduleTitles,
+        moduleData.reading.sections,
+        moduleData.listening.sections,
+        moduleData.writing.tasks,
+      );
+
+      if (!result.success) {
+        setSaveError(result.error || "Failed to save module");
+        return result;
+      }
+
+      // Refresh center modules list
+      await refreshCenterModules();
+
+      return result;
+    } catch (err) {
+      const errorMsg =
+        err instanceof Error ? err.message : "Failed to save module";
+      setSaveError(errorMsg);
+      return { success: false, error: errorMsg };
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  /**
+   * Save a complete paper with all configured modules
+   */
+  const saveCompletePaper = async (
+    paperTitle: string,
+    paperType: "IELTS" | "OIETC" | "GRE" = "IELTS",
+  ): Promise<{
+    success: boolean;
+    paperId?: string;
+    moduleIds?: Record<string, string>;
+    error?: string;
+  }> => {
+    if (!currentCenter?.center_id) {
+      return { success: false, error: "No center selected" };
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      // Upload listening audio files
+      const uploadedListeningSections = await uploadListeningAudioFiles(
+        currentCenter.center_id,
+        moduleData.listening.sections,
+      );
+
+      const result = await moduleHelpers.saveCompletePaper(
+        currentCenter.center_id,
+        paperTitle,
+        paperType,
+        moduleData.moduleTitles,
+        moduleData.reading.sections,
+        uploadedListeningSections,
+        moduleData.writing.tasks,
+      );
+
+      if (!result.success) {
+        setSaveError(result.error || "Failed to create paper");
+        return result;
+      }
+
+      // Refresh center modules list
+      await refreshCenterModules();
+
+      return result;
+    } catch (err) {
+      const errorMsg =
+        err instanceof Error ? err.message : "Failed to create paper";
+      setSaveError(errorMsg);
+      return { success: false, error: errorMsg };
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const value: ModuleContextType = {
@@ -924,6 +890,14 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
     addWritingRenderBlock,
     updateWritingRenderBlock,
     deleteWritingRenderBlock,
+
+    // Save/Create
+    saveModule,
+    saveCompletePaper,
+    isSaving,
+    saveError,
+    clearSaveError,
+    resetModuleData,
 
     // Utility
     generateId,

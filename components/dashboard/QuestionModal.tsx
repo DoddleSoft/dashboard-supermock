@@ -7,10 +7,9 @@ interface QuestionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (question: {
-    text: string;
+    questionRef: string;
     type: "fill-blank" | "mcq" | "true-false-not-given";
     blankPosition?: "first" | "middle" | "end";
-    mcqVariant?: "3-options-1-correct" | "5-options-2-correct";
     options?: string[];
     correctAnswers?: string[];
     answer: string;
@@ -23,107 +22,111 @@ export default function QuestionModal({
   onClose,
   onSave,
 }: QuestionModalProps) {
-  const [questionText, setQuestionText] = React.useState("");
+  const [questionRef, setQuestionRef] = React.useState("");
   const [questionType, setQuestionType] = React.useState<
     "fill-blank" | "mcq" | "true-false-not-given"
   >("mcq");
   const [blankPosition, setBlankPosition] = React.useState<
     "first" | "middle" | "end"
   >("middle");
-  const [mcqVariant, setMcqVariant] = React.useState<
-    "3-options-1-correct" | "5-options-2-correct"
-  >("3-options-1-correct");
-  const [options, setOptions] = React.useState(["", "", ""]);
-  const [correctAnswers, setCorrectAnswers] = React.useState<string[]>([]);
-  const [correctAnswer, setCorrectAnswer] = React.useState("");
+  const [options, setOptions] = React.useState(["", ""]);
+  // For MCQ: array of correct answers; for others: single string
+  const [mcqCorrectAnswers, setMcqCorrectAnswers] = React.useState<string[]>(
+    [],
+  );
+  const [singleAnswer, setSingleAnswer] = React.useState("");
   const [explanation, setExplanation] = React.useState("");
-
-  const handleMcqVariantChange = (
-    variant: "3-options-1-correct" | "5-options-2-correct",
-  ) => {
-    setMcqVariant(variant);
-    setOptions(
-      variant === "3-options-1-correct" ? ["", "", ""] : ["", "", "", "", ""],
-    );
-    setCorrectAnswers([]);
-  };
 
   const toggleCorrectAnswer = (option: string) => {
     if (!option.trim()) return;
 
-    const maxCorrect = mcqVariant === "3-options-1-correct" ? 1 : 2;
-
-    if (correctAnswers.includes(option)) {
-      setCorrectAnswers(correctAnswers.filter((ans) => ans !== option));
+    if (mcqCorrectAnswers.includes(option)) {
+      setMcqCorrectAnswers(mcqCorrectAnswers.filter((ans) => ans !== option));
     } else {
-      if (correctAnswers.length < maxCorrect) {
-        setCorrectAnswers([...correctAnswers, option]);
-      } else if (maxCorrect === 1) {
-        setCorrectAnswers([option]);
-      }
+      setMcqCorrectAnswers([...mcqCorrectAnswers, option]);
     }
   };
 
+  const addOption = () => {
+    setOptions((prev) => [...prev, ""]);
+  };
+
+  const removeOption = (index: number) => {
+    setOptions((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      const removed = prev[index];
+      if (removed && mcqCorrectAnswers.includes(removed)) {
+        setMcqCorrectAnswers((current) =>
+          current.filter((ans) => ans !== removed),
+        );
+      }
+      return next.length ? next : [""];
+    });
+  };
+
   const handleSave = () => {
-    if (!questionText || !explanation) return;
+    if (!questionRef || !explanation) return;
+
+    const refNumber = Number(questionRef);
+    if (Number.isNaN(refNumber) || refNumber < 1 || refNumber > 40) return;
 
     const questionData: any = {
-      text: questionText,
+      questionRef: String(refNumber),
       type: questionType,
       explanation: explanation,
     };
 
     if (questionType === "fill-blank") {
       questionData.blankPosition = blankPosition;
-      questionData.answer = correctAnswer;
+      questionData.answer = singleAnswer;
     } else if (questionType === "mcq") {
-      questionData.mcqVariant = mcqVariant;
       questionData.options = options.filter((opt) => opt.trim());
-      questionData.correctAnswers = correctAnswers;
-      questionData.answer = correctAnswers.join(", ");
+      questionData.correctAnswers = mcqCorrectAnswers;
+      questionData.answer = mcqCorrectAnswers.join(", ");
     } else {
-      questionData.answer = correctAnswer;
+      questionData.answer = singleAnswer;
     }
 
     onSave(questionData);
 
     // Reset form
-    setQuestionText("");
+    setQuestionRef("");
     setQuestionType("mcq");
     setBlankPosition("middle");
-    setMcqVariant("3-options-1-correct");
-    setOptions(["", "", ""]);
-    setCorrectAnswers([]);
-    setCorrectAnswer("");
+    setOptions(["", ""]);
+    setMcqCorrectAnswers([]);
+    setSingleAnswer("");
     setExplanation("");
   };
 
   const handleClose = () => {
     // Reset form on close
-    setQuestionText("");
+    setQuestionRef("");
     setQuestionType("mcq");
     setBlankPosition("middle");
-    setMcqVariant("3-options-1-correct");
-    setOptions(["", "", ""]);
-    setCorrectAnswers([]);
-    setCorrectAnswer("");
+    setOptions(["", ""]);
+    setMcqCorrectAnswers([]);
+    setSingleAnswer("");
     setExplanation("");
     onClose();
   };
 
   const isFormValid = () => {
-    if (!questionText || !explanation) return false;
+    if (!questionRef || !explanation) return false;
+
+    const refNumber = Number(questionRef);
+    if (Number.isNaN(refNumber) || refNumber < 1 || refNumber > 40)
+      return false;
 
     if (questionType === "mcq") {
       return (
-        correctAnswers.length > 0 &&
-        options.filter((opt) => opt.trim()).length >=
-          (mcqVariant === "3-options-1-correct" ? 3 : 5)
+        mcqCorrectAnswers.length > 0 &&
+        options.filter((opt) => opt.trim()).length >= 2
       );
     } else if (questionType === "fill-blank") {
-      return !!correctAnswer;
+      return !!singleAnswer;
     } else {
-      return !!correctAnswer;
+      return !!singleAnswer;
     }
   };
 
@@ -180,8 +183,8 @@ export default function QuestionModal({
               </label>
               <input
                 type="text"
-                value={correctAnswer}
-                onChange={(e) => setCorrectAnswer(e.target.value)}
+                value={singleAnswer}
+                onChange={(e) => setSingleAnswer(e.target.value)}
                 placeholder="Enter the word(s) that fill the blank..."
                 className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400"
               />
@@ -193,50 +196,14 @@ export default function QuestionModal({
             <>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  MCQ Variant
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleMcqVariantChange("3-options-1-correct")
-                    }
-                    className={`px-4 py-2 rounded-xl font-medium transition-all text-sm ${
-                      mcqVariant === "3-options-1-correct"
-                        ? "bg-red-600 text-white"
-                        : "border border-slate-200 text-slate-600 hover:border-red-300"
-                    }`}
-                  >
-                    3 Options, 1 Correct
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleMcqVariantChange("5-options-2-correct")
-                    }
-                    className={`px-4 py-2 rounded-xl font-medium transition-all text-sm ${
-                      mcqVariant === "5-options-2-correct"
-                        ? "bg-red-600 text-white"
-                        : "border border-slate-200 text-slate-600 hover:border-red-300"
-                    }`}
-                  >
-                    5 Options, 2 Correct
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Options (Select{" "}
-                  {mcqVariant === "3-options-1-correct" ? "1" : "2"} correct
-                  answer{mcqVariant === "5-options-2-correct" ? "s" : ""})
+                  Options (select all correct answers)
                 </label>
                 <div className="space-y-2">
                   {options.map((option, index) => (
                     <div key={index} className="flex items-center gap-2">
                       <input
                         type="checkbox"
-                        checked={correctAnswers.includes(option)}
+                        checked={mcqCorrectAnswers.includes(option)}
                         onChange={() => toggleCorrectAnswer(option)}
                         disabled={!option.trim()}
                         className="w-5 h-5 text-red-600 border-slate-300 rounded focus:ring-red-500"
@@ -250,10 +217,9 @@ export default function QuestionModal({
                           newOptions[index] = e.target.value;
                           setOptions(newOptions);
 
-                          // Update correctAnswers if this option was selected
-                          if (correctAnswers.includes(oldValue)) {
-                            setCorrectAnswers(
-                              correctAnswers.map((ans) =>
+                          if (mcqCorrectAnswers.includes(oldValue)) {
+                            setMcqCorrectAnswers(
+                              mcqCorrectAnswers.map((ans) =>
                                 ans === oldValue ? e.target.value : ans,
                               ),
                             );
@@ -264,12 +230,26 @@ export default function QuestionModal({
                         )}`}
                         className="flex-1 px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400"
                       />
+                      <button
+                        type="button"
+                        onClick={() => removeOption(index)}
+                        className="p-2 text-slate-500 hover:text-red-600"
+                        aria-label={`Remove option ${index + 1}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
                   ))}
                 </div>
+                <button
+                  type="button"
+                  onClick={addOption}
+                  className="mt-3 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:border-red-300 hover:text-red-600 text-sm font-medium"
+                >
+                  Add Option
+                </button>
                 <p className="text-xs text-slate-500 mt-2">
-                  Check the box next to the correct answer
-                  {mcqVariant === "5-options-2-correct" ? "s" : ""}
+                  Add as many options as you need and check all correct answers.
                 </p>
               </div>
             </>
@@ -287,9 +267,9 @@ export default function QuestionModal({
                     <button
                       key={ans}
                       type="button"
-                      onClick={() => setCorrectAnswer(ans)}
+                      onClick={() => setSingleAnswer(ans)}
                       className={`px-4 py-2 rounded-xl font-medium transition-all ${
-                        correctAnswer === ans
+                        singleAnswer === ans
                           ? "bg-red-600 text-white"
                           : "border border-slate-200 text-slate-600 hover:border-red-300"
                       }`}
@@ -301,6 +281,21 @@ export default function QuestionModal({
               </div>
             </>
           )}
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Question No. (1-40)
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={40}
+              value={questionRef}
+              onChange={(e) => setQuestionRef(e.target.value)}
+              placeholder="Enter question number (1-40)"
+              className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400"
+            />
+          </div>
 
           {/* Explanation (Common for all types) */}
           <div>

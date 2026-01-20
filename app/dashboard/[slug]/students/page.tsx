@@ -9,6 +9,7 @@ import { EditStudentDrawer } from "@/components/students/EditStudentDrawer";
 import { CreateStudentModal } from "@/components/students/CreateStudentModal";
 import { DeleteConfirmDialog } from "@/components/students/DeleteConfirmDialog";
 import { formatLocalTime, getRelativeTime } from "@/lib/utils";
+import { SmallLoader } from "@/components/ui/SmallLoader";
 import {
   fetchStudents,
   createStudent,
@@ -285,11 +286,7 @@ export default function StudentsPage() {
         </div>
 
         {/* Loading State */}
-        {loading && (
-          <div className="flex items-center justify-center py-16">
-            <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        )}
+        {loading && <SmallLoader subtitle="Loading students..." />}
 
         {/* Table */}
         {!loading && (

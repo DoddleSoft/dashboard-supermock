@@ -1,4 +1,4 @@
-import { Plus, Upload, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Upload, Trash2, ChevronDown, ChevronUp, X } from "lucide-react";
 import { useRef, useEffect, useState } from "react";
 import {
   RenderBlock,
@@ -12,6 +12,7 @@ interface ListeningModuleProps {
   onToggleSection: (sectionId: string) => void;
   onAddSection: () => void;
   onAddQuestion: (sectionId: string) => void;
+  onDeleteQuestion: (sectionId: string, questionRef: string) => void;
   onUpdateSectionTitle: (sectionId: string, newTitle: string) => void;
   onUpdateSectionInstruction: (sectionId: string, instruction: string) => void;
   onUpdateSectionAudioPath: (sectionId: string, path: string) => void;
@@ -31,6 +32,7 @@ export default function ListeningModule({
   onToggleSection,
   onAddSection,
   onAddQuestion,
+  onDeleteQuestion,
   onUpdateSectionTitle,
   onUpdateSectionInstruction,
   onUpdateSectionAudioPath,
@@ -247,15 +249,7 @@ export default function ListeningModule({
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
                   Section Audio
                 </label>
-                <input
-                  type="text"
-                  value={section.audioPath || ""}
-                  onChange={(e) =>
-                    onUpdateSectionAudioPath(section.id, e.target.value)
-                  }
-                  placeholder="Audio URL/path (e.g. /section1.mpeg)"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 text-sm mb-3"
-                />
+
                 {section.audioFile ? (
                   <div className="border-2 border-slate-300 rounded-xl overflow-hidden">
                     <div className="bg-slate-50 p-4 border-b border-slate-200">
@@ -476,12 +470,34 @@ export default function ListeningModule({
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
                   Answer Key
                 </label>
+                {Object.keys(section.questions).length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {Object.keys(section.questions)
+                      .sort((a, b) => Number(a) - Number(b))
+                      .map((ref) => (
+                        <div
+                          key={ref}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold"
+                        >
+                          <span>{ref}</span>
+                          <button
+                            type="button"
+                            onClick={() => onDeleteQuestion(section.id, ref)}
+                            className="ml-1 p-0.5 rounded-full text-slate-500 hover:text-slate-700 hover:bg-slate-200"
+                            aria-label={`Remove question ${ref}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                )}
                 <button
                   onClick={() => onAddQuestion(section.id)}
                   className="w-full px-4 py-4 border-2 border-dashed border-slate-300 text-slate-600 rounded-xl hover:border-red-300 hover:bg-red-50 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
                 >
                   <Plus className="w-4 h-4" />
-                  Add Question
+                  Add Questions Answer
                 </button>
               </div>
             </div>
