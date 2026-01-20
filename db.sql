@@ -49,45 +49,37 @@ update on centers for EACH row
 execute FUNCTION update_updated_at_column ();
 
 
-create table public.mock_attempts (
+-- Create scheduled_tests table
+create table if not exists public.scheduled_tests (
   id uuid not null default gen_random_uuid (),
-  student_id uuid not null,
+  center_id uuid not null,
   paper_id uuid not null,
-  attempt_type text not null,
-  status text not null default 'in_progress'::text,
-  overall_band_score numeric(3, 1) null,
-  started_at timestamp with time zone null default now(),
-  completed_at timestamp with time zone null,
+  title text not null,
+  scheduled_at timestamp with time zone not null,
+  duration_minutes integer null default 180,
+  status text not null default 'scheduled',
+  created_by uuid null,
   created_at timestamp with time zone null default now(),
-  constraint mock_attempts_pkey primary key (id),
-  constraint mock_attempts_paper_id_fkey foreign KEY (paper_id) references papers (id) on delete CASCADE,
-  constraint mock_attempts_student_id_fkey foreign KEY (student_id) references student_profiles (student_id) on delete CASCADE,
-  constraint mock_attempts_attempt_type_check check (
-    (
-      attempt_type = any (
-        array[
-          'full_mock'::text,
-          'practice_sprint'::text,
-          'single_module'::text
-        ]
-      )
-    )
-  ),
-  constraint mock_attempts_status_check check (
-    (
-      status = any (
-        array[
-          'in_progress'::text,
-          'completed'::text,
-          'evaluated'::text,
-          'abandoned'::text
-        ]
-      )
+  updated_at timestamp with time zone null default now(),
+  constraint scheduled_tests_pkey primary key (id),
+  constraint scheduled_tests_center_id_fkey foreign key (center_id) references centers (center_id) on delete cascade,
+  constraint scheduled_tests_paper_id_fkey foreign key (paper_id) references papers (id) on delete cascade,
+  constraint scheduled_tests_status_check check (
+    status = any (
+      array[
+        'scheduled'::text,
+        'in_progress'::text,
+        'completed'::text,
+        'cancelled'::text
+      ]
     )
   )
-) TABLESPACE pg_default;
+) tablespace pg_default;
 
-create index IF not exists idx_attempts_student_type on public.mock_attempts using btree (student_id, attempt_type) TABLESPACE pg_default;
+create index if not exists idx_scheduled_tests_center_id on public.scheduled_tests using btree (center_id) tablespace pg_default;
+create index if not exists idx_scheduled_tests_paper_id on public.scheduled_tests using btree (paper_id) tablespace pg_default;
+create index if not exists idx_scheduled_tests_status on public.scheduled_tests using btree (status) tablespace pg_default;
+create index if not exists idx_scheduled_tests_scheduled_at on public.scheduled_tests using btree (scheduled_at) tablespace pg_default;
 
 
 create table public.papers (
@@ -219,8 +211,19 @@ create table public.student_profiles (
   name text null,
   grade text null,
   status text not null default 'active'::text,
+  enrollment_type public.student_type_enum not null default 'regular'::student_type_enum,
+  visitor_exam_date date null,
   constraint student_profiles_pkey primary key (student_id),
   constraint student_profiles_center_id_fkey foreign KEY (center_id) references centers (center_id) on delete CASCADE,
+  constraint check_regular_student_data check (
+    (
+      (enrollment_type = 'mock_only'::student_type_enum)
+      or (
+        (enrollment_type = 'regular'::student_type_enum)
+        and (guardian is not null)
+      )
+    )
+  ),
   constraint student_profiles_status_check check (
     (
       status = any (
