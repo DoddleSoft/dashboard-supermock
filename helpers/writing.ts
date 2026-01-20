@@ -1,90 +1,186 @@
-import { WritingTask, RenderBlock } from "@/context/ModuleContext";
+import { WritingSection, RenderBlock } from "@/context/ModuleContext";
 import { uploadMediaFile } from "@/helpers/modules";
 
 interface WritingModuleData {
-  tasks: WritingTask[];
+  sections: WritingSection[];
+  expandedSections: string[];
 }
 
 export const writingHelpers = {
-  updateTaskField: (
+  addSection: (
     data: WritingModuleData,
-    taskId: number,
-    field: keyof WritingTask,
-    value: any,
+    generateId: () => string,
+  ): WritingModuleData => {
+    const newSection: WritingSection = {
+      id: generateId(),
+      heading: `Writing Task ${data.sections.length + 1}`,
+      subheading: "",
+      renderBlocks: [],
+    };
+
+    return {
+      sections: [...data.sections, newSection],
+      expandedSections: [...data.expandedSections, newSection.id],
+    };
+  },
+
+  updateSectionHeading: (
+    data: WritingModuleData,
+    sectionId: string,
+    heading: string,
   ): WritingModuleData => {
     return {
-      tasks: data.tasks.map((task) =>
-        task.id === taskId ? { ...task, [field]: value } : task,
+      ...data,
+      sections: data.sections.map((section) =>
+        section.id === sectionId ? { ...section, heading } : section,
+      ),
+    };
+  },
+
+  updateSectionSubheading: (
+    data: WritingModuleData,
+    sectionId: string,
+    subheading: string,
+  ): WritingModuleData => {
+    return {
+      ...data,
+      sections: data.sections.map((section) =>
+        section.id === sectionId ? { ...section, subheading } : section,
+      ),
+    };
+  },
+
+  updateSectionInstruction: (
+    data: WritingModuleData,
+    sectionId: string,
+    instruction: string,
+  ): WritingModuleData => {
+    return {
+      ...data,
+      sections: data.sections.map((section) =>
+        section.id === sectionId ? { ...section, instruction } : section,
+      ),
+    };
+  },
+
+  updateSectionTime: (
+    data: WritingModuleData,
+    sectionId: string,
+    timeMinutes: number,
+  ): WritingModuleData => {
+    return {
+      ...data,
+      sections: data.sections.map((section) =>
+        section.id === sectionId ? { ...section, timeMinutes } : section,
+      ),
+    };
+  },
+
+  updateSectionMinWords: (
+    data: WritingModuleData,
+    sectionId: string,
+    minWords: number,
+  ): WritingModuleData => {
+    return {
+      ...data,
+      sections: data.sections.map((section) =>
+        section.id === sectionId ? { ...section, minWords } : section,
       ),
     };
   },
 
   addRenderBlock: (
     data: WritingModuleData,
-    taskId: number,
+    sectionId: string,
     block: RenderBlock,
   ): WritingModuleData => {
     return {
-      tasks: data.tasks.map((task) =>
-        task.id === taskId
-          ? { ...task, renderBlocks: [...task.renderBlocks, block] }
-          : task,
+      ...data,
+      sections: data.sections.map((section) =>
+        section.id === sectionId
+          ? { ...section, renderBlocks: [...section.renderBlocks, block] }
+          : section,
       ),
     };
   },
 
   updateRenderBlock: (
     data: WritingModuleData,
-    taskId: number,
+    sectionId: string,
     blockIndex: number,
     block: RenderBlock,
   ): WritingModuleData => {
     return {
-      tasks: data.tasks.map((task) =>
-        task.id === taskId
+      ...data,
+      sections: data.sections.map((section) =>
+        section.id === sectionId
           ? {
-              ...task,
-              renderBlocks: task.renderBlocks.map((b, idx) =>
+              ...section,
+              renderBlocks: section.renderBlocks.map((b, idx) =>
                 idx === blockIndex ? block : b,
               ),
             }
-          : task,
+          : section,
       ),
     };
   },
 
   deleteRenderBlock: (
     data: WritingModuleData,
-    taskId: number,
+    sectionId: string,
     blockIndex: number,
   ): WritingModuleData => {
     return {
-      tasks: data.tasks.map((task) =>
-        task.id === taskId
+      ...data,
+      sections: data.sections.map((section) =>
+        section.id === sectionId
           ? {
-              ...task,
-              renderBlocks: task.renderBlocks.filter(
+              ...section,
+              renderBlocks: section.renderBlocks.filter(
                 (_, idx) => idx !== blockIndex,
               ),
             }
-          : task,
+          : section,
       ),
     };
   },
 
+  toggleSection: (
+    data: WritingModuleData,
+    sectionId: string,
+  ): WritingModuleData => {
+    return {
+      ...data,
+      expandedSections: data.expandedSections.includes(sectionId)
+        ? data.expandedSections.filter((id) => id !== sectionId)
+        : [...data.expandedSections, sectionId],
+    };
+  },
+
+  deleteSection: (
+    data: WritingModuleData,
+    sectionId: string,
+  ): WritingModuleData => {
+    return {
+      sections: data.sections.filter((section) => section.id !== sectionId),
+      expandedSections: data.expandedSections.filter((id) => id !== sectionId),
+    };
+  },
+
   /**
-   * Process and upload image files in render blocks for writing tasks
+   * Process and upload image files in render blocks
+   * Converts base64 images to uploaded files and updates URLs
    */
   uploadImages: async (
     centerId: string,
-    tasks: WritingTask[],
-  ): Promise<WritingTask[]> => {
-    const updatedTasks: WritingTask[] = [];
+    sections: WritingSection[],
+  ): Promise<WritingSection[]> => {
+    const updatedSections: WritingSection[] = [];
 
-    for (const task of tasks) {
+    for (const section of sections) {
       const updatedBlocks: RenderBlock[] = [];
 
-      for (const block of task.renderBlocks) {
+      for (const block of section.renderBlocks) {
         if (block.type === "image" && block.content) {
           // Check if content is a base64 data URL
           if (block.content.startsWith("data:image/")) {
@@ -128,12 +224,12 @@ export const writingHelpers = {
         }
       }
 
-      updatedTasks.push({
-        ...task,
+      updatedSections.push({
+        ...section,
         renderBlocks: updatedBlocks,
       });
     }
 
-    return updatedTasks;
+    return updatedSections;
   },
 };

@@ -172,6 +172,8 @@ create table public.sections (
   instruction text null,
   created_at timestamp with time zone null default now(),
   updated_at timestamp with time zone null default now(),
+  params jsonb null default '{}'::jsonb,
+  subtext text null,
   constraint sections_pkey primary key (id),
   constraint sections_module_id_fkey foreign KEY (module_id) references modules (id) on delete CASCADE,
   constraint sections_content_type_check check (

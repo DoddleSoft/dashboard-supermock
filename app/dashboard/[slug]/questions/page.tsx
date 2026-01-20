@@ -18,7 +18,7 @@ import {
   Layers,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { useModuleContext } from "../../../../context/ModuleContext";
 import { createClient } from "../../../../lib/supabase/client";
 import { useCentre } from "../../../../context/CentreContext";
@@ -43,6 +43,7 @@ const formatDate = (dateString: string) => {
 
 export default function PapersPage() {
   const params = useParams();
+  const router = useRouter();
   const slug = params.slug as string;
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
@@ -55,6 +56,16 @@ export default function PapersPage() {
   const [activeView, setActiveView] = useState<"all" | "papers" | "modules">(
     "all",
   );
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    open: boolean;
+    moduleId: string | null;
+    moduleName: string | null;
+  }>({
+    open: false,
+    moduleId: null,
+    moduleName: null,
+  });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { centerPapers, centerModuleStats, centerModulesLoading } =
     useModuleContext();
@@ -83,6 +94,35 @@ export default function PapersPage() {
       setStandaloneModules(data);
     }
     setModulesLoading(false);
+  };
+
+  const handleDeleteModule = async () => {
+    if (!deleteConfirm.moduleId) return;
+
+    setIsDeleting(true);
+    const supabase = createClient();
+
+    const { error } = await supabase
+      .from("modules")
+      .delete()
+      .eq("id", deleteConfirm.moduleId);
+
+    setIsDeleting(false);
+
+    if (!error) {
+      setStandaloneModules(
+        standaloneModules.filter((m) => m.id !== deleteConfirm.moduleId),
+      );
+      setDeleteConfirm({ open: false, moduleId: null, moduleName: null });
+      setActiveMenu(null);
+    }
+  };
+
+  const handleViewModule = (moduleId: string, moduleType: string) => {
+    router.push(
+      `/dashboard/${slug}/create/modules/preview?type=${moduleType.toLowerCase()}`,
+    );
+    setActiveMenu(null);
   };
 
   const filteredPapers = centerPapers.filter((paper) => {
@@ -427,16 +467,23 @@ export default function PapersPage() {
 
                         {activeMenu === module.id && (
                           <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl border border-slate-200 shadow-lg z-10">
-                            <button className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 rounded-t-xl">
+                            <button
+                              onClick={() =>
+                                handleViewModule(module.id, module.module_type)
+                              }
+                              className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 rounded-t-xl"
+                            >
                               <Eye className="w-4 h-4" />
                               View Details
                             </button>
-                            <button className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
-                              <Edit className="w-4 h-4" />
-                              Edit Module
-                            </button>
                             <button
-                              onClick={() => setActiveMenu(null)}
+                              onClick={() =>
+                                setDeleteConfirm({
+                                  open: true,
+                                  moduleId: module.id,
+                                  moduleName: module.heading,
+                                })
+                              }
                               className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 rounded-b-xl"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -574,6 +621,47 @@ export default function PapersPage() {
                   <p className="text-xs text-slate-500">Full IELTS test</p>
                 </div>
               </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirm.open && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-6">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">
+                Delete Module
+              </h3>
+              <p className="text-sm text-slate-600">
+                Are you sure you want to delete{" "}
+                <strong>{deleteConfirm.moduleName}</strong>? This action cannot
+                be undone.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() =>
+                  setDeleteConfirm({
+                    open: false,
+                    moduleId: null,
+                    moduleName: null,
+                  })
+                }
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2.5 border border-slate-300 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteModule}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed text-white rounded-xl font-medium shadow-sm shadow-red-100 transition-colors"
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
             </div>
           </div>
         </div>

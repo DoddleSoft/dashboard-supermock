@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   ReadingSection,
   ListeningSection,
-  WritingTask,
+  WritingSection,
   RenderBlock,
   QuestionDefinition,
 } from "@/context/ModuleContext";
@@ -15,8 +15,7 @@ export interface CreateModulePayload {
   moduleType: ModuleType;
   title: string;
   instruction?: string;
-  sections?: ReadingSection[] | ListeningSection[];
-  tasks?: WritingTask[];
+  sections?: ReadingSection[] | ListeningSection[] | WritingSection[];
 }
 
 export interface CreatePaperPayload {
@@ -151,13 +150,17 @@ export async function createModule(
         );
       } else if (
         payload.moduleType === "writing" &&
-        payload.tasks &&
-        payload.tasks.length > 0
+        payload.sections &&
+        payload.sections.length > 0
       ) {
         console.log(
-          `[createModule] Creating ${payload.tasks.length} writing tasks`,
+          `[createModule] Creating ${payload.sections.length} writing sections`,
         );
-        await createWritingSections(supabase, moduleId, payload.tasks);
+        await createWritingSections(
+          supabase,
+          moduleId,
+          payload.sections as WritingSection[],
+        );
       }
 
       console.log(
@@ -272,55 +275,66 @@ async function createListeningSections(
 async function createWritingSections(
   supabase: ReturnType<typeof createClient>,
   moduleId: string,
-  tasks: WritingTask[],
+  sections: WritingSection[],
 ): Promise<void> {
-  const hasMeaningfulContent = (block: RenderBlock) => {
-    const content = (block.content || "").trim();
-    const boundary = (block.questions || "").trim();
-    return content.length > 0 || boundary.length > 0;
-  };
+  // For writing module, each render block becomes a separate section row
+  // All blocks from the same WritingSection share the same metadata (title, subheading, instruction, params)
 
-  const sectionIds = tasks.map(() => crypto.randomUUID());
-  const sectionsToInsert = tasks.map((task, taskIndex) => ({
-    id: sectionIds[taskIndex],
-    module_id: moduleId,
-    title: task.title,
-    section_index: taskIndex + 1,
-    content_type: "text" as const,
-    instruction: `Write at least ${task.wordCountMin} words. Recommended time: ${task.durationRecommendation} minutes.`,
-  }));
+  const sectionsToInsert: Array<{
+    id: string;
+    module_id: string;
+    title: string;
+    section_index: number;
+    content_type: "text" | "image";
+    content_text: string | null;
+    instruction: string | null;
+    params: { timeMinutes?: number; minWords?: number };
+    subtext: string | null;
+    resource_url: string | null;
+  }> = [];
 
-  const sectionChunks = chunkArray(sectionsToInsert, INSERT_CHUNK_SIZE);
-  const sectionResults = await Promise.all(
-    sectionChunks.map((chunk) => supabase.from("sections").insert(chunk)),
-  );
+  let globalIndex = 0;
 
-  for (const result of sectionResults) {
-    if (result.error) throw result.error;
-  }
+  sections.forEach((section: WritingSection) => {
+    // Each render block becomes its own section row
+    section.renderBlocks.forEach((block: RenderBlock) => {
+      globalIndex++;
 
-  const subSectionsToInsert = tasks.flatMap((task, index) => {
-    const sectionId = sectionIds[index];
-    const meaningfulBlocks = task.renderBlocks.filter(hasMeaningfulContent);
-    return meaningfulBlocks.map((block) => ({
-      id: crypto.randomUUID(),
-      section_id: sectionId,
-      boundary_text: block.questions || null,
-      sub_type: block.type === "editor" ? "editor" : block.type,
-      content_template: block.content || "",
-      resource_url: block.type === "image" ? block.content : null,
-    }));
+      const contentType = block.type === "image" ? "image" : "text";
+      const subtext =
+        block.type === "image"
+          ? block.label || null // Image: label goes to subtext
+          : block.content || null; // Text: content goes to subtext
+      const resourceUrl =
+        block.type === "image"
+          ? block.content || null // Image: URL goes to resource_url
+          : null;
+
+      sectionsToInsert.push({
+        id: crypto.randomUUID(),
+        module_id: moduleId,
+        title: section.heading,
+        section_index: globalIndex,
+        content_type: contentType,
+        content_text: section.subheading || null,
+        instruction: section.instruction || null,
+        params: {
+          timeMinutes: section.timeMinutes,
+          minWords: section.minWords,
+        },
+        subtext: subtext,
+        resource_url: resourceUrl,
+      });
+    });
   });
 
-  if (subSectionsToInsert.length > 0) {
-    const subSectionChunks = chunkArray(subSectionsToInsert, INSERT_CHUNK_SIZE);
-    const subSectionResults = await Promise.all(
-      subSectionChunks.map((chunk) =>
-        supabase.from("sub_sections").insert(chunk),
-      ),
+  if (sectionsToInsert.length > 0) {
+    const sectionChunks = chunkArray(sectionsToInsert, INSERT_CHUNK_SIZE);
+    const sectionResults = await Promise.all(
+      sectionChunks.map((chunk) => supabase.from("sections").insert(chunk)),
     );
 
-    for (const result of subSectionResults) {
+    for (const result of sectionResults) {
       if (result.error) throw result.error;
     }
   }
@@ -529,7 +543,8 @@ export async function createCompletePaper(
     writing?: {
       title: string;
       instruction?: string;
-      tasks: WritingTask[];
+      sections: WritingSection[];
+      expandedSections: string[];
     };
   },
 ): Promise<{
@@ -588,14 +603,14 @@ export async function createCompletePaper(
     }
 
     // 4. Create writing module if provided
-    if (modules.writing && modules.writing.tasks.length > 0) {
+    if (modules.writing && modules.writing.sections.length > 0) {
       const result = await createModule({
         centerId,
         paperId,
         moduleType: "writing",
         title: modules.writing.title || "Writing Module",
         instruction: modules.writing.instruction,
-        tasks: modules.writing.tasks,
+        sections: modules.writing.sections,
       });
 
       if (!result.success) {
@@ -685,7 +700,7 @@ export const moduleHelpers = {
     moduleTitles: Record<string, string>,
     readingSections?: ReadingSection[],
     listeningSections?: ListeningSection[],
-    writingTasks?: WritingTask[],
+    writingSections?: WritingSection[],
   ): Promise<{
     success: boolean;
     paperId?: string;
@@ -703,12 +718,15 @@ export const moduleHelpers = {
           listeningSections && listeningSections.length > 0
         ),
         listeningSectionCount: listeningSections?.length || 0,
-        hasWritingTasks: !!(writingTasks && writingTasks.length > 0),
-        writingTaskCount: writingTasks?.length || 0,
+        hasWritingSections: !!(writingSections && writingSections.length > 0),
+        writingSectionCount: writingSections?.length || 0,
       });
 
-      let sections: ReadingSection[] | ListeningSection[] | undefined;
-      let tasks: WritingTask[] | undefined;
+      let sections:
+        | ReadingSection[]
+        | ListeningSection[]
+        | WritingSection[]
+        | undefined;
       const title =
         moduleTitle || moduleTitles[moduleType] || `${moduleType} Module`;
 
@@ -727,17 +745,19 @@ export const moduleHelpers = {
           centerId,
           sectionsWithAudio,
         );
-      } else if (moduleType === "writing" && writingTasks) {
+      } else if (moduleType === "writing" && writingSections) {
         const { writingHelpers } = await import("@/helpers/writing");
-        tasks = await writingHelpers.uploadImages(centerId, writingTasks);
+        sections = await writingHelpers.uploadImages(centerId, writingSections);
       }
 
       const result = await createModule({
         centerId,
         moduleType,
         title,
-        sections: sections as ReadingSection[] | ListeningSection[],
-        tasks,
+        sections: sections as
+          | ReadingSection[]
+          | ListeningSection[]
+          | WritingSection[],
       });
 
       return result;
@@ -759,7 +779,7 @@ export const moduleHelpers = {
     moduleTitles: Record<string, string>,
     readingSections: ReadingSection[],
     listeningSections: ListeningSection[],
-    writingTasks: WritingTask[],
+    writingSections: WritingSection[],
   ): Promise<{
     success: boolean;
     paperId?: string;
@@ -788,9 +808,9 @@ export const moduleHelpers = {
         uploadedListeningSections,
       );
 
-      const uploadedWritingTasks = await writingHelpers.uploadImages(
+      const uploadedWritingSections = await writingHelpers.uploadImages(
         centerId,
-        writingTasks,
+        writingSections,
       );
 
       const modules: Parameters<typeof createCompletePaper>[3] = {};
@@ -808,8 +828,8 @@ export const moduleHelpers = {
           s.audioPath ||
           Object.keys(s.questions).length > 0,
       );
-      const hasWritingContent = uploadedWritingTasks.some(
-        (t) => t.renderBlocks.length > 0,
+      const hasWritingContent = uploadedWritingSections.some(
+        (s) => s.renderBlocks.length > 0,
       );
 
       if (hasReadingContent) {
@@ -829,7 +849,8 @@ export const moduleHelpers = {
       if (hasWritingContent) {
         modules.writing = {
           title: moduleTitles.writing || "Writing Module",
-          tasks: uploadedWritingTasks,
+          sections: uploadedWritingSections,
+          expandedSections: uploadedWritingSections.map((s) => s.id),
         };
       }
 

@@ -30,6 +30,7 @@ function CreateModuleContent() {
     readingSections,
     readingExpandedSections,
     addReadingSection,
+    deleteReadingSection,
     updateReadingSectionTitle,
     updateReadingSectionHeading,
     updateReadingSectionInstruction,
@@ -43,6 +44,7 @@ function CreateModuleContent() {
     listeningSections,
     listeningExpandedSections,
     addListeningSection,
+    deleteListeningSection,
     updateListeningSectionTitle,
     updateListeningSectionInstruction,
     updateListeningSectionAudioPath,
@@ -53,8 +55,16 @@ function CreateModuleContent() {
     updateListeningQuestion,
     deleteListeningQuestion,
     toggleListeningSection,
-    writingTasks,
-    updateWritingTaskField,
+    writingSections,
+    writingExpandedSections,
+    addWritingSection,
+    deleteWritingSection,
+    toggleWritingSection,
+    updateWritingSectionHeading,
+    updateWritingSectionSubheading,
+    updateWritingSectionInstruction,
+    updateWritingSectionTime,
+    updateWritingSectionMinWords,
     addWritingRenderBlock,
     updateWritingRenderBlock,
     deleteWritingRenderBlock,
@@ -199,6 +209,7 @@ function CreateModuleContent() {
             expandedSections={readingExpandedSections}
             onToggleSection={toggleReadingSection}
             onAddSection={addReadingSection}
+            onDeleteSection={deleteReadingSection}
             onAddQuestion={addQuestion}
             onDeleteQuestion={deleteReadingQuestion}
             onUpdateSectionTitle={updateReadingSectionTitle}
@@ -215,10 +226,18 @@ function CreateModuleContent() {
       case "writing":
         return (
           <WritingModule
-            tasks={writingTasks}
-            onUpdateTaskField={updateWritingTaskField}
-            onAddRenderBlock={(taskId) =>
-              addWritingRenderBlock(taskId, { type: "text", content: "" })
+            sections={writingSections}
+            expandedSections={writingExpandedSections}
+            onToggleSection={toggleWritingSection}
+            onAddSection={addWritingSection}
+            onDeleteSection={deleteWritingSection}
+            onUpdateSectionHeading={updateWritingSectionHeading}
+            onUpdateSectionSubheading={updateWritingSectionSubheading}
+            onUpdateSectionInstruction={updateWritingSectionInstruction}
+            onUpdateSectionTime={updateWritingSectionTime}
+            onUpdateSectionMinWords={updateWritingSectionMinWords}
+            onAddRenderBlock={(sectionId) =>
+              addWritingRenderBlock(sectionId, { type: "text", content: "" })
             }
             onUpdateRenderBlock={updateWritingRenderBlock}
             onDeleteRenderBlock={deleteWritingRenderBlock}
@@ -231,6 +250,7 @@ function CreateModuleContent() {
             expandedSections={listeningExpandedSections}
             onToggleSection={toggleListeningSection}
             onAddSection={addListeningSection}
+            onDeleteSection={deleteListeningSection}
             onAddQuestion={addQuestion}
             onDeleteQuestion={deleteListeningQuestion}
             onUpdateSectionTitle={updateListeningSectionTitle}
@@ -283,6 +303,9 @@ function CreateModuleContent() {
       setToastType("success");
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
+
+      // Clear the module title after successful creation
+      setModuleTitle(typeKey, "");
     } else {
       setToastMessage(result.error || "Failed to create module");
       setToastType("error");

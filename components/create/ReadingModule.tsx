@@ -5,12 +5,14 @@ import {
   RenderBlockType,
   ReadingSection,
 } from "../../context/ModuleContext";
+import { compressImage } from "../../lib/mediaCompression";
 
 interface ReadingModuleProps {
   sections: ReadingSection[];
   expandedSections: string[];
   onToggleSection: (sectionId: string) => void;
   onAddSection: () => void;
+  onDeleteSection: (sectionId: string) => void;
   onAddQuestion: (sectionId: string) => void;
   onDeleteQuestion: (sectionId: string, questionRef: string) => void;
   onUpdateSectionTitle: (sectionId: string, newTitle: string) => void;
@@ -31,6 +33,7 @@ export default function ReadingModule({
   expandedSections,
   onToggleSection,
   onAddSection,
+  onDeleteSection,
   onAddQuestion,
   onDeleteQuestion,
   onUpdateSectionTitle,
@@ -44,6 +47,9 @@ export default function ReadingModule({
   const [placeholderDrafts, setPlaceholderDrafts] = useState<
     Record<string, { number: string; type: "blanks" | "dropdown" | "boolean" }>
   >({});
+  const [compressingImages, setCompressingImages] = useState<Set<string>>(
+    new Set(),
+  );
 
   const blockTypes: RenderBlockType[] = ["text", "image"];
 
@@ -93,21 +99,43 @@ export default function ReadingModule({
   const toStorageContent = (value: string) =>
     value.replace(/⟦Q(\d+):(blanks|dropdown|boolean)⟧/g, "{{$1}$2}");
 
-  const handleImageFileChange = (
+  const handleImageFileChange = async (
     sectionId: string,
     index: number,
     block: RenderBlock,
     file?: File | null,
   ) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      onUpdateRenderBlock(sectionId, index, {
-        ...block,
-        content: reader.result as string,
+
+    const blockKey = `${sectionId}-${index}`;
+    setCompressingImages((prev) => new Set(prev).add(blockKey));
+
+    try {
+      // Compress the image first
+      const compressedFile = await compressImage(file);
+
+      // Convert compressed file to data URL
+      const reader = new FileReader();
+      reader.onload = () => {
+        onUpdateRenderBlock(sectionId, index, {
+          ...block,
+          content: reader.result as string,
+        });
+        setCompressingImages((prev) => {
+          const next = new Set(prev);
+          next.delete(blockKey);
+          return next;
+        });
+      };
+      reader.readAsDataURL(compressedFile);
+    } catch (error) {
+      console.error("Failed to process image:", error);
+      setCompressingImages((prev) => {
+        const next = new Set(prev);
+        next.delete(blockKey);
+        return next;
       });
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   return (
@@ -118,11 +146,11 @@ export default function ReadingModule({
           className="border border-slate-200 rounded-xl overflow-hidden"
         >
           {/* Section Header */}
-          <div className="p-6" onClick={() => onToggleSection(section.id)}>
+          <div className="p-6 border-b border-slate-200">
             <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
               Section
             </label>
-            <div className="flex items-center cursor-pointer">
+            <div className="flex items-center gap-2">
               <input
                 type="text"
                 value={section.title}
@@ -132,20 +160,31 @@ export default function ReadingModule({
                 }}
                 onClick={(e) => e.stopPropagation()}
                 placeholder="Enter the title for this section..."
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 text-sm"
+                className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 text-sm"
               />
-              {expandedSections.includes(section.id) ? (
-                <ChevronUp className="w-5 h-5 text-slate-400 mx-4" />
-              ) : (
-                <ChevronDown className="w-5 h-5 text-slate-400 mx-4" />
-              )}
+              <button
+                onClick={() => onToggleSection(section.id)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                {expandedSections.includes(section.id) ? (
+                  <ChevronUp className="w-5 h-5 text-slate-400" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-slate-400" />
+                )}
+              </button>
+              <button
+                onClick={() => onDeleteSection(section.id)}
+                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
             </div>
           </div>
 
           {expandedSections.includes(section.id) && (
             <div className="px-6 pb-4">
               {/* Heading */}
-              <div className="mb-6">
+              <div className="my-6">
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
                   Heading
                 </label>
@@ -161,7 +200,7 @@ export default function ReadingModule({
               </div>
 
               {/* Instruction */}
-              <div className="mb-6">
+              <div className="my-6">
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
                   Instruction
                 </label>
@@ -176,7 +215,7 @@ export default function ReadingModule({
               </div>
 
               {/* Paragraph Content */}
-              <div className="mb-6">
+              <div className="my-6">
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
                   Passage
                 </label>

@@ -14,6 +14,7 @@ import {
 import {
   ListeningSection,
   ReadingSection,
+  WritingSection,
   RenderBlock,
   useModuleContext,
 } from "@/context/ModuleContext";
@@ -65,7 +66,7 @@ export default function PreviewPage() {
     ? queryType
     : "reading";
 
-  const { moduleTitles, readingSections, listeningSections, writingTasks } =
+  const { moduleTitles, readingSections, listeningSections, writingSections } =
     useModuleContext();
 
   const [selectedId, setSelectedId] = useState<string | number | null>(null);
@@ -75,36 +76,22 @@ export default function PreviewPage() {
   const sections = useMemo(() => {
     if (type === "reading") return readingSections;
     if (type === "listening") return listeningSections;
-    return [] as ReadingSection[] | ListeningSection[];
-  }, [type, readingSections, listeningSections]);
-
-  const tasks = useMemo(
-    () => (type === "writing" ? writingTasks : []),
-    [type, writingTasks],
-  );
+    if (type === "writing") return writingSections;
+    return [] as (ReadingSection | ListeningSection | WritingSection)[];
+  }, [type, readingSections, listeningSections, writingSections]);
 
   useEffect(() => {
-    if (type === "writing") {
-      setSelectedId(tasks[0]?.id ?? null);
-      return;
-    }
-
     setSelectedId(sections[0]?.id ?? null);
-  }, [type, sections, tasks]);
+  }, [type, sections]);
 
   useEffect(() => {
     setAnswers({});
   }, [selectedId, type]);
 
-  const selectedSection = useMemo(() => {
-    if (type === "writing") return null;
-    return sections.find((section) => section.id === selectedId) || null;
-  }, [sections, selectedId, type]);
-
-  const selectedTask = useMemo(() => {
-    if (type !== "writing") return null;
-    return tasks.find((task) => task.id === selectedId) || null;
-  }, [tasks, selectedId, type]);
+  const selectedSection = useMemo(
+    () => sections.find((section) => section.id === selectedId) || null,
+    [sections, selectedId],
+  );
 
   useEffect(() => {
     if (type !== "listening") {
@@ -167,10 +154,8 @@ export default function PreviewPage() {
           questions={
             type === "writing"
               ? {}
-              : (selectedSection?.questions as Record<
-                  string,
-                  { answer: string; options?: string[] }
-                >) || {}
+              : (selectedSection as ReadingSection | ListeningSection)
+                  .questions || {}
           }
           answers={answers}
           onAnswerChange={(qNum: string, value: string) =>
@@ -216,55 +201,31 @@ export default function PreviewPage() {
           </h2>
 
           <div className="space-y-2">
-            {type === "writing" &&
-              tasks.map((task, index) => (
-                <button
-                  key={task.id}
-                  onClick={() => setSelectedId(task.id)}
-                  className={`w-full rounded-xl border px-3 py-3 text-left text-sm font-medium transition-colors ${
-                    selectedId === task.id
-                      ? "border-red-500 bg-red-50 text-red-700"
-                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                  }`}
-                >
-                  <p className="font-semibold">Task {index + 1}</p>
-                  <p className="text-xs text-slate-500 truncate">
-                    {task.title || "Untitled task"}
-                  </p>
-                </button>
-              ))}
+            {sections.map((section, index) => (
+              <button
+                key={section.id}
+                onClick={() => setSelectedId(section.id)}
+                className={`w-full rounded-xl border px-3 py-3 text-left text-sm font-medium transition-colors ${
+                  selectedId === section.id
+                    ? "border-red-500 bg-red-50 text-red-700"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                <p className="font-semibold">
+                  {type === "writing"
+                    ? `Task ${index + 1}`
+                    : `Section ${index + 1}`}
+                </p>
+                <p className="text-xs text-slate-500 truncate">
+                  {type === "writing"
+                    ? (section as WritingSection).heading || "Untitled"
+                    : (section as ReadingSection | ListeningSection).title ||
+                      "Untitled"}
+                </p>
+              </button>
+            ))}
 
-            {type !== "writing" &&
-              (sections as (ReadingSection | ListeningSection)[]).map(
-                (section) => (
-                  <button
-                    key={section.id}
-                    onClick={() => setSelectedId(section.id)}
-                    className={`w-full rounded-xl border px-3 py-3 text-left text-sm font-medium transition-colors ${
-                      selectedId === section.id
-                        ? "border-red-500 bg-red-50 text-red-700"
-                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                    }`}
-                  >
-                    <p className="font-semibold">
-                      {section.title || "Untitled section"}
-                    </p>
-                    {"heading" in section && section.heading ? (
-                      <p className="text-xs text-slate-500 truncate">
-                        {section.heading}
-                      </p>
-                    ) : null}
-                  </button>
-                ),
-              )}
-
-            {type === "writing" && tasks.length === 0 && (
-              <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
-                No tasks yet
-              </div>
-            )}
-
-            {type !== "writing" && sections.length === 0 && (
+            {sections.length === 0 && (
               <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
                 No sections yet
               </div>
@@ -272,61 +233,44 @@ export default function PreviewPage() {
           </div>
         </div>
 
-        {/* Right: Sub sections */}
+        {/* Right: Section Content */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 space-y-6">
-          {type === "writing" && selectedTask && (
+          {selectedSection ? (
             <>
               <div className="space-y-2">
                 <h2 className="text-xl font-semibold text-slate-900">
-                  {selectedTask.title || "Untitled task"}
+                  {type === "writing"
+                    ? (selectedSection as WritingSection).heading || "Untitled"
+                    : (selectedSection as ReadingSection | ListeningSection)
+                        .title || "Untitled"}
                 </h2>
-                <div className="flex flex-wrap gap-3 text-sm text-slate-500">
-                  <span className="rounded-full bg-slate-100 px-3 py-1">
-                    Duration: {selectedTask.durationRecommendation} min
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-3 py-1">
-                    Minimum: {selectedTask.wordCountMin} words
-                  </span>
-                </div>
+                {type === "writing" &&
+                  (selectedSection as WritingSection).subheading && (
+                    <p className="text-sm text-slate-600">
+                      {(selectedSection as WritingSection).subheading}
+                    </p>
+                  )}
+                {type !== "writing" &&
+                  (selectedSection as ReadingSection | ListeningSection)
+                    .instruction && (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                      {
+                        (selectedSection as ReadingSection | ListeningSection)
+                          .instruction
+                      }
+                    </div>
+                  )}
               </div>
 
-              <div className="space-y-4">
-                {selectedTask.renderBlocks.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
-                    No blocks added yet
-                  </div>
-                ) : (
-                  selectedTask.renderBlocks.map(renderBlock)
-                )}
-              </div>
-            </>
-          )}
-
-          {type !== "writing" && selectedSection && (
-            <>
-              <div className="space-y-2">
-                <h2 className="text-xl font-semibold text-slate-900">
-                  {selectedSection.title || "Untitled section"}
-                </h2>
-                {"heading" in selectedSection && selectedSection.heading ? (
-                  <p className="text-sm text-slate-600">
-                    {selectedSection.heading}
-                  </p>
-                ) : null}
-                {selectedSection.instruction ? (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                    {selectedSection.instruction}
-                  </div>
-                ) : null}
-              </div>
-
+              {/* For Reading/Listening sections, show special content */}
               {type === "reading" && "passageText" in selectedSection && (
                 <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                   <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
                     Passage
                   </p>
                   <p className="text-sm text-slate-700 whitespace-pre-line">
-                    {selectedSection.passageText || "No passage added"}
+                    {(selectedSection as ReadingSection).passageText ||
+                      "No passage added"}
                   </p>
                 </div>
               )}
@@ -344,6 +288,7 @@ export default function PreviewPage() {
                 </div>
               )}
 
+              {/* Render Blocks */}
               <div className="space-y-4">
                 {selectedSection.renderBlocks.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
@@ -354,37 +299,37 @@ export default function PreviewPage() {
                 )}
               </div>
 
-              {Object.keys(selectedSection.questions || {}).length > 0 && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-                    Answer Key
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {Object.keys(selectedSection.questions)
-                      .sort((a, b) => Number(a) - Number(b))
-                      .map((ref) => (
-                        <span
-                          key={ref}
-                          className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600"
-                        >
-                          Q{ref}
-                        </span>
-                      ))}
+              {/* Answer Key for Reading/Listening */}
+              {type !== "writing" &&
+                Object.keys(
+                  (selectedSection as ReadingSection | ListeningSection)
+                    .questions || {},
+                ).length > 0 && (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+                      Answer Key
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.keys(
+                        (selectedSection as ReadingSection | ListeningSection)
+                          .questions,
+                      )
+                        .sort((a, b) => Number(a) - Number(b))
+                        .map((ref) => (
+                          <span
+                            key={ref}
+                            className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600"
+                          >
+                            Q{ref}
+                          </span>
+                        ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
             </>
-          )}
-
-          {type !== "writing" && !selectedSection && (
+          ) : (
             <div className="rounded-xl border border-dashed border-slate-200 p-10 text-center text-sm text-slate-500">
-              Select a section to preview
-            </div>
-          )}
-
-          {type === "writing" && !selectedTask && (
-            <div className="rounded-xl border border-dashed border-slate-200 p-10 text-center text-sm text-slate-500">
-              Select a task to preview
+              Select a {type === "writing" ? "task" : "section"} to preview
             </div>
           )}
         </div>

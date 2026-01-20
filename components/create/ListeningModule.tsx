@@ -5,12 +5,14 @@ import {
   RenderBlockType,
   ListeningSection,
 } from "../../context/ModuleContext";
+import { compressImage, compressAudio } from "../../lib/mediaCompression";
 
 interface ListeningModuleProps {
   sections: ListeningSection[];
   expandedSections: string[];
   onToggleSection: (sectionId: string) => void;
   onAddSection: () => void;
+  onDeleteSection: (sectionId: string) => void;
   onAddQuestion: (sectionId: string) => void;
   onDeleteQuestion: (sectionId: string, questionRef: string) => void;
   onUpdateSectionTitle: (sectionId: string, newTitle: string) => void;
@@ -31,6 +33,7 @@ export default function ListeningModule({
   expandedSections,
   onToggleSection,
   onAddSection,
+  onDeleteSection,
   onAddQuestion,
   onDeleteQuestion,
   onUpdateSectionTitle,
@@ -48,6 +51,12 @@ export default function ListeningModule({
   const [placeholderDrafts, setPlaceholderDrafts] = useState<
     Record<string, { number: string; type: "blanks" | "dropdown" | "boolean" }>
   >({});
+  const [compressingImages, setCompressingImages] = useState<Set<string>>(
+    new Set(),
+  );
+  const [compressingAudio, setCompressingAudio] = useState<Set<string>>(
+    new Set(),
+  );
 
   const blockTypes: RenderBlockType[] = ["text", "image"];
 
@@ -74,53 +83,73 @@ export default function ListeningModule({
     }));
   };
 
-  const insertPlaceholder = (
-    sectionId: string,
-    index: number,
-    block: RenderBlock,
-  ) => {
-    const draft = getDraft(sectionId, index);
-    if (!draft.number) return;
-    const placeholder = `⟦Q${draft.number}:${draft.type}⟧`;
-    const separator = block.content && !block.content.endsWith(" ") ? " " : "";
-    onUpdateRenderBlock(sectionId, index, {
-      ...block,
-      content: toStorageContent(
-        `${toDisplayContent(block.content)}${separator}${placeholder}`,
-      ),
-    });
-  };
-
   const toDisplayContent = (value: string) =>
     value.replace(/\{\{(\d+)\}(blanks|dropdown|boolean)\}\}/g, "⟦Q$1:$2⟧");
 
   const toStorageContent = (value: string) =>
     value.replace(/⟦Q(\d+):(blanks|dropdown|boolean)⟧/g, "{{$1}$2}");
 
-  const handleImageFileChange = (
+  const handleImageFileChange = async (
     sectionId: string,
     index: number,
     block: RenderBlock,
     file?: File | null,
   ) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      onUpdateRenderBlock(sectionId, index, {
-        ...block,
-        content: reader.result as string,
+
+    const blockKey = `${sectionId}-${index}`;
+    setCompressingImages((prev) => new Set(prev).add(blockKey));
+
+    try {
+      // Compress the image first
+      const compressedFile = await compressImage(file);
+
+      // Convert compressed file to data URL
+      const reader = new FileReader();
+      reader.onload = () => {
+        onUpdateRenderBlock(sectionId, index, {
+          ...block,
+          content: reader.result as string,
+        });
+        setCompressingImages((prev) => {
+          const next = new Set(prev);
+          next.delete(blockKey);
+          return next;
+        });
+      };
+      reader.readAsDataURL(compressedFile);
+    } catch (error) {
+      console.error("Failed to process image:", error);
+      setCompressingImages((prev) => {
+        const next = new Set(prev);
+        next.delete(blockKey);
+        return next;
       });
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
-  const handleAudioChange = (
+  const handleAudioChange = async (
     e: React.ChangeEvent<HTMLInputElement>,
     sectionId: string,
   ) => {
     const file = e.target.files?.[0];
     if (file) {
-      onUpdateSectionAudio(sectionId, file);
+      setCompressingAudio((prev) => new Set(prev).add(sectionId));
+      try {
+        // Compress the audio first
+        const compressedFile = await compressAudio(file);
+        onUpdateSectionAudio(sectionId, compressedFile);
+      } catch (error) {
+        console.error("Failed to process audio:", error);
+        // Fallback to original file if compression fails
+        onUpdateSectionAudio(sectionId, file);
+      } finally {
+        setCompressingAudio((prev) => {
+          const next = new Set(prev);
+          next.delete(sectionId);
+          return next;
+        });
+      }
     }
   };
 
@@ -205,26 +234,39 @@ export default function ListeningModule({
           className="border border-slate-200 rounded-xl overflow-hidden"
         >
           {/* Section Header */}
-          <div
-            className="flex items-center justify-between p-4 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
-            onClick={() => onToggleSection(section.id)}
-          >
-            <input
-              type="text"
-              value={section.title}
-              onChange={(e) => {
-                e.stopPropagation();
-                onUpdateSectionTitle(section.id, e.target.value);
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="text-sm font-semibold text-slate-600 uppercase tracking-wide bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-red-500 rounded px-2 py-1"
-              placeholder="Section Title"
-            />
-            {expandedSections.includes(section.id) ? (
-              <ChevronUp className="w-5 h-5 text-slate-400" />
-            ) : (
-              <ChevronDown className="w-5 h-5 text-slate-400" />
-            )}
+          <div className="p-6 border-b border-slate-200">
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+              Section
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={section.title}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  onUpdateSectionTitle(section.id, e.target.value);
+                }}
+                onClick={(e) => e.stopPropagation()}
+                placeholder="Enter the title for this task..."
+                className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 text-sm"
+              />
+              <button
+                onClick={() => onToggleSection(section.id)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                {expandedSections.includes(section.id) ? (
+                  <ChevronUp className="w-5 h-5 text-slate-400" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-slate-400" />
+                )}
+              </button>
+              <button
+                onClick={() => onDeleteSection(section.id)}
+                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {expandedSections.includes(section.id) && (
@@ -249,6 +291,13 @@ export default function ListeningModule({
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
                   Section Audio
                 </label>
+
+                {compressingAudio.has(section.id) && (
+                  <div className="mb-3 flex items-center gap-2 text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span>Compressing audio...</span>
+                  </div>
+                )}
 
                 {section.audioFile ? (
                   <div className="border-2 border-slate-300 rounded-xl overflow-hidden">

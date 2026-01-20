@@ -214,6 +214,16 @@ export const listeningHelpers = {
     };
   },
 
+  deleteSection: (
+    data: ListeningModuleData,
+    sectionId: string,
+  ): ListeningModuleData => {
+    return {
+      sections: data.sections.filter((section) => section.id !== sectionId),
+      expandedSections: data.expandedSections.filter((id) => id !== sectionId),
+    };
+  },
+
   uploadAudioFiles: async (
     centerId: string,
     sections: ListeningSection[],

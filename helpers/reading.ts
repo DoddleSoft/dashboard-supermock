@@ -216,6 +216,16 @@ export const readingHelpers = {
     };
   },
 
+  deleteSection: (
+    data: ReadingModuleData,
+    sectionId: string,
+  ): ReadingModuleData => {
+    return {
+      sections: data.sections.filter((section) => section.id !== sectionId),
+      expandedSections: data.expandedSections.filter((id) => id !== sectionId),
+    };
+  },
+
   /**
    * Process and upload image files in render blocks
    * Converts base64 images to uploaded files and updates URLs

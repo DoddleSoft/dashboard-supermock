@@ -71,11 +71,13 @@ export interface ListeningSection {
   questions: Record<string, QuestionDefinition>;
 }
 
-export interface WritingTask {
-  id: number;
-  title: string;
-  durationRecommendation: number;
-  wordCountMin: number;
+export interface WritingSection {
+  id: string;
+  heading: string;
+  subheading?: string;
+  instruction?: string;
+  timeMinutes?: number;
+  minWords?: number;
   renderBlocks: RenderBlock[];
 }
 
@@ -107,7 +109,8 @@ interface ModuleData {
     expandedSections: string[];
   };
   writing: {
-    tasks: WritingTask[];
+    sections: WritingSection[];
+    expandedSections: string[];
   };
   moduleTitles: {
     reading: string;
@@ -163,6 +166,7 @@ interface ModuleContextType {
   ) => void;
   deleteReadingQuestion: (sectionId: string, questionRef: string) => void;
   toggleReadingSection: (sectionId: string) => void;
+  deleteReadingSection: (sectionId: string) => void;
 
   // Listening module methods
   listeningSections: ListeningSection[];
@@ -194,21 +198,32 @@ interface ModuleContextType {
   ) => void;
   deleteListeningQuestion: (sectionId: string, questionRef: string) => void;
   toggleListeningSection: (sectionId: string) => void;
+  deleteListeningSection: (sectionId: string) => void;
 
   // Writing module methods
-  writingTasks: WritingTask[];
-  updateWritingTaskField: (
-    taskId: number,
-    field: keyof WritingTask,
-    value: any,
+  writingSections: WritingSection[];
+  writingExpandedSections: string[];
+  addWritingSection: () => void;
+  deleteWritingSection: (sectionId: string) => void;
+  toggleWritingSection: (sectionId: string) => void;
+  updateWritingSectionHeading: (sectionId: string, heading: string) => void;
+  updateWritingSectionSubheading: (
+    sectionId: string,
+    subheading: string,
   ) => void;
-  addWritingRenderBlock: (taskId: number, block: RenderBlock) => void;
+  updateWritingSectionInstruction: (
+    sectionId: string,
+    instruction: string,
+  ) => void;
+  updateWritingSectionTime: (sectionId: string, timeMinutes: number) => void;
+  updateWritingSectionMinWords: (sectionId: string, minWords: number) => void;
+  addWritingRenderBlock: (sectionId: string, block: RenderBlock) => void;
   updateWritingRenderBlock: (
-    taskId: number,
+    sectionId: string,
     blockIndex: number,
     block: RenderBlock,
   ) => void;
-  deleteWritingRenderBlock: (taskId: number, blockIndex: number) => void;
+  deleteWritingRenderBlock: (sectionId: string, blockIndex: number) => void;
 
   // Save/Create methods
   saveModule: (
@@ -273,22 +288,15 @@ const getDefaultModuleData = (): ModuleData => ({
     expandedSections: ["1"],
   },
   writing: {
-    tasks: [
+    sections: [
       {
-        id: 1,
-        title: "Writing Task 1",
-        durationRecommendation: 20,
-        wordCountMin: 150,
-        renderBlocks: [],
-      },
-      {
-        id: 2,
-        title: "Writing Task 2",
-        durationRecommendation: 40,
-        wordCountMin: 250,
+        id: "1",
+        heading: "Writing Task 1",
+        subheading: "",
         renderBlocks: [],
       },
     ],
+    expandedSections: ["1"],
   },
   moduleTitles: {
     reading: "",
@@ -522,6 +530,13 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
     }));
   };
 
+  const deleteReadingSection = (sectionId: string) => {
+    setModuleData((prev) => ({
+      ...prev,
+      reading: readingHelpers.deleteSection(prev.reading, sectionId),
+    }));
+  };
+
   // ========== LISTENING MODULE METHODS ==========
 
   const addListeningSection = () => {
@@ -672,33 +687,111 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
     }));
   };
 
-  // ========== WRITING MODULE METHODS ==========
-
-  const updateWritingTaskField = (
-    taskId: number,
-    field: keyof WritingTask,
-    value: any,
-  ) => {
+  const deleteListeningSection = (sectionId: string) => {
     setModuleData((prev) => ({
       ...prev,
-      writing: writingHelpers.updateTaskField(
+      listening: listeningHelpers.deleteSection(prev.listening, sectionId),
+    }));
+  };
+
+  // ========== WRITING MODULE METHODS ==========
+
+  // ========== WRITING MODULE METHODS ==========
+
+  const addWritingSection = () => {
+    setModuleData((prev) => ({
+      ...prev,
+      writing: writingHelpers.addSection(prev.writing, generateId),
+    }));
+  };
+
+  const deleteWritingSection = (sectionId: string) => {
+    setModuleData((prev) => ({
+      ...prev,
+      writing: writingHelpers.deleteSection(prev.writing, sectionId),
+    }));
+  };
+
+  const toggleWritingSection = (sectionId: string) => {
+    setModuleData((prev) => ({
+      ...prev,
+      writing: writingHelpers.toggleSection(prev.writing, sectionId),
+    }));
+  };
+
+  const updateWritingSectionHeading = (sectionId: string, heading: string) => {
+    setModuleData((prev) => ({
+      ...prev,
+      writing: writingHelpers.updateSectionHeading(
         prev.writing,
-        taskId,
-        field,
-        value,
+        sectionId,
+        heading,
       ),
     }));
   };
 
-  const addWritingRenderBlock = (taskId: number, block: RenderBlock) => {
+  const updateWritingSectionSubheading = (
+    sectionId: string,
+    subheading: string,
+  ) => {
     setModuleData((prev) => ({
       ...prev,
-      writing: writingHelpers.addRenderBlock(prev.writing, taskId, block),
+      writing: writingHelpers.updateSectionSubheading(
+        prev.writing,
+        sectionId,
+        subheading,
+      ),
+    }));
+  };
+
+  const updateWritingSectionInstruction = (
+    sectionId: string,
+    instruction: string,
+  ) => {
+    setModuleData((prev) => ({
+      ...prev,
+      writing: writingHelpers.updateSectionInstruction(
+        prev.writing,
+        sectionId,
+        instruction,
+      ),
+    }));
+  };
+
+  const updateWritingSectionTime = (sectionId: string, timeMinutes: number) => {
+    setModuleData((prev) => ({
+      ...prev,
+      writing: writingHelpers.updateSectionTime(
+        prev.writing,
+        sectionId,
+        timeMinutes,
+      ),
+    }));
+  };
+
+  const updateWritingSectionMinWords = (
+    sectionId: string,
+    minWords: number,
+  ) => {
+    setModuleData((prev) => ({
+      ...prev,
+      writing: writingHelpers.updateSectionMinWords(
+        prev.writing,
+        sectionId,
+        minWords,
+      ),
+    }));
+  };
+
+  const addWritingRenderBlock = (sectionId: string, block: RenderBlock) => {
+    setModuleData((prev) => ({
+      ...prev,
+      writing: writingHelpers.addRenderBlock(prev.writing, sectionId, block),
     }));
   };
 
   const updateWritingRenderBlock = (
-    taskId: number,
+    sectionId: string,
     blockIndex: number,
     block: RenderBlock,
   ) => {
@@ -706,19 +799,19 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
       ...prev,
       writing: writingHelpers.updateRenderBlock(
         prev.writing,
-        taskId,
+        sectionId,
         blockIndex,
         block,
       ),
     }));
   };
 
-  const deleteWritingRenderBlock = (taskId: number, blockIndex: number) => {
+  const deleteWritingRenderBlock = (sectionId: string, blockIndex: number) => {
     setModuleData((prev) => ({
       ...prev,
       writing: writingHelpers.deleteRenderBlock(
         prev.writing,
-        taskId,
+        sectionId,
         blockIndex,
       ),
     }));
@@ -764,7 +857,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
         moduleData.moduleTitles,
         moduleData.reading.sections,
         moduleData.listening.sections,
-        moduleData.writing.tasks,
+        moduleData.writing.sections,
       );
 
       if (!result.success) {
@@ -819,7 +912,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
         moduleData.moduleTitles,
         moduleData.reading.sections,
         uploadedListeningSections,
-        moduleData.writing.tasks,
+        moduleData.writing.sections,
       );
 
       if (!result.success) {
@@ -867,6 +960,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
     updateReadingQuestionRef,
     deleteReadingQuestion,
     toggleReadingSection,
+    deleteReadingSection,
 
     // Listening
     listeningSections: moduleData.listening.sections,
@@ -883,10 +977,19 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
     updateListeningQuestionRef,
     deleteListeningQuestion,
     toggleListeningSection,
+    deleteListeningSection,
 
     // Writing
-    writingTasks: moduleData.writing.tasks,
-    updateWritingTaskField,
+    writingSections: moduleData.writing.sections,
+    writingExpandedSections: moduleData.writing.expandedSections,
+    addWritingSection,
+    deleteWritingSection,
+    toggleWritingSection,
+    updateWritingSectionHeading,
+    updateWritingSectionSubheading,
+    updateWritingSectionInstruction,
+    updateWritingSectionTime,
+    updateWritingSectionMinWords,
     addWritingRenderBlock,
     updateWritingRenderBlock,
     deleteWritingRenderBlock,
