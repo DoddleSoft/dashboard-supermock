@@ -12,6 +12,9 @@ import {
   Building2,
   ArrowBigDown,
   ChevronDown,
+  NotepadText,
+  LifeBuoy,
+  Handshake,
 } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
 import { CentreProvider, useCentre } from "../../../context/CentreContext";
@@ -32,10 +35,20 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
   // Generate navigation items with proper slug
   const slug = params.slug as string;
+  const supportItem = {
+    label: "Support",
+    href: `/dashboard/${slug}/support`,
+    icon: Handshake,
+  };
+  const isSupportActive = pathname === supportItem.href;
+
+  // navigation items
   const navigationItems: NavItem[] = [
     { label: "Overview", href: `/dashboard/${slug}`, icon: LayoutDashboard },
     { label: "Tests", href: `/dashboard/${slug}/tests`, icon: FileText },
     { label: "Questions", href: `/dashboard/${slug}/questions`, icon: Layers },
+    { label: "Papers", href: `/dashboard/${slug}/papers`, icon: NotepadText },
+
     {
       label: "Reviews",
       href: `/dashboard/${slug}/reviews`,
@@ -103,6 +116,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
+
+        <div className="px-3 pb-2">
+          <SidebarItem
+            item={supportItem}
+            isCollapsed={isCollapsed}
+            isActive={isSupportActive}
+          />
+        </div>
 
         {/* Logout Button at Bottom */}
         <div className="p-3 border-t border-slate-200">

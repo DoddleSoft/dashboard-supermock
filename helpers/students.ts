@@ -30,6 +30,7 @@ export const fetchStudents = async (centerId: string): Promise<Student[]> => {
       address: student.address,
       grade: student.grade,
       status: student.status || "active",
+      enrollment_type: student.enrollment_type || "regular",
       testsCompleted: 0, // You'll need to calculate this from tests table
       enrolled_at: student.enrolled_at,
       updated_at: student.updated_at,
@@ -56,7 +57,7 @@ export const createStudent = async (
     guardian_phone?: string;
     date_of_birth?: string;
     address?: string;
-  }
+  },
 ) => {
   try {
     const { data, error } = await supabase
@@ -107,7 +108,7 @@ export const updateStudent = async (
     address?: string;
     grade?: string;
     status?: "active" | "cancelled" | "archived" | "passed";
-  }
+  },
 ) => {
   try {
     const { error } = await supabase

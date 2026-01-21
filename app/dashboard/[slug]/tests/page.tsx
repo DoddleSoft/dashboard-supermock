@@ -17,9 +17,7 @@ import {
   User,
   Calendar,
   Clock,
-  Check,
-  Mic,
-  ChevronDown,
+  Users,
 } from "lucide-react";
 import { useCentre } from "@/context/CentreContext";
 import {
@@ -30,11 +28,6 @@ import {
   ScheduledTest,
   TestStats,
 } from "@/helpers/tests";
-import {
-  fetchStandaloneModules,
-  createPaper,
-  Module,
-} from "@/helpers/papers";
 import { SmallLoader } from "@/components/ui/SmallLoader";
 
 export default function TestsPage() {
@@ -60,28 +53,9 @@ export default function TestsPage() {
   });
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Paper creation state
-  const [showCreatePaperModal, setShowCreatePaperModal] = useState(false);
-  const [paperTitle, setPaperTitle] = useState("");
-  const [paperType, setPaperType] = useState<"IELTS" | "OIETC" | "GRE">(
-    "IELTS"
-  );
-  const [availableModules, setAvailableModules] = useState<Module[]>([]);
-  const [selectedModules, setSelectedModules] = useState<{
-    reading?: string;
-    listening?: string;
-    writing?: string;
-    speaking?: string;
-  }>({});
-  const [showModuleDropdown, setShowModuleDropdown] = useState<string | null>(
-    null
-  );
-  const [creatingPaper, setCreatingPaper] = useState(false);
-
   useEffect(() => {
     if (currentCenter?.center_id) {
       loadData();
-      loadModules();
     }
   }, [currentCenter?.center_id]);
 
@@ -97,13 +71,6 @@ export default function TestsPage() {
     setTests(testsData);
     setStats(statsData);
     setLoading(false);
-  };
-
-  const loadModules = async () => {
-    if (!currentCenter?.center_id) return;
-
-    const modules = await fetchStandaloneModules(currentCenter.center_id);
-    setAvailableModules(modules);
   };
 
   const filteredTests = tests.filter((test) => {
@@ -184,87 +151,6 @@ export default function TestsPage() {
       .join(" ");
   };
 
-  const handleCreatePaper = async () => {
-    if (!paperTitle.trim()) {
-      alert("Please enter a paper title");
-      return;
-    }
-
-    if (
-      !selectedModules.reading &&
-      !selectedModules.listening &&
-      !selectedModules.writing &&
-      !selectedModules.speaking
-    ) {
-      alert("Please select at least one module");
-      return;
-    }
-
-    setCreatingPaper(true);
-
-    const result = await createPaper({
-      centerId: currentCenter!.center_id,
-      title: paperTitle,
-      paperType: paperType,
-      readingModuleId: selectedModules.reading,
-      listeningModuleId: selectedModules.listening,
-      writingModuleId: selectedModules.writing,
-      speakingModuleId: selectedModules.speaking,
-    });
-
-    setCreatingPaper(false);
-
-    if (result.success) {
-      setShowCreatePaperModal(false);
-      setPaperTitle("");
-      setSelectedModules({});
-      loadData(); // Reload to update stats
-    }
-  };
-
-  const getModulesByType = (type: string) => {
-    return availableModules.filter((m) => m.module_type === type);
-  };
-
-  const getSelectedModule = (type: string) => {
-    const moduleId = selectedModules[type as keyof typeof selectedModules];
-    return availableModules.find((m) => m.id === moduleId);
-  };
-
-  const getModuleIcon = (type: string) => {
-    switch (type.toLowerCase()) {
-      case "reading":
-        return <BookOpen className="w-4 h-4" />;
-      case "listening":
-        return <Headphones className="w-4 h-4" />;
-      case "writing":
-        return <PenTool className="w-4 h-4" />;
-      case "speaking":
-        return <Mic className="w-4 h-4" />;
-      default:
-        return <FileText className="w-4 h-4" />;
-    }
-  };
-
-  const getModuleColor = (type: string) => {
-    switch (type.toLowerCase()) {
-      case "reading":
-        return "bg-blue-100 text-blue-600 border-blue-200";
-      case "listening":
-        return "bg-purple-100 text-purple-600 border-purple-200";
-      case "writing":
-        return "bg-green-100 text-green-600 border-green-200";
-      case "speaking":
-        return "bg-orange-100 text-orange-600 border-orange-200";
-      default:
-        return "bg-slate-100 text-slate-600 border-slate-200";
-    }
-  };
-
-  const formatModuleType = (type: string) => {
-    return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
-  };
-
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto">
@@ -279,12 +165,12 @@ export default function TestsPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           {/* Filters */}
-          <div className="flex items-center w-180 gap-3">
+          <div className="flex items-center w-180 gap-2">
             <div className="flex-1 max-w-sm relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search by title or module..."
+                placeholder="Search by title..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 text-sm"
@@ -304,14 +190,7 @@ export default function TestsPage() {
             </select>
           </div>
 
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setShowCreatePaperModal(true)}
-              className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-xl font-medium shadow-sm shadow-red-100 transition-all duration-200 flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Create Paper
-            </button>
+          <div className="flex items-center gap-2">
             <Link
               href={`/dashboard/${slug}/create/test`}
               className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl font-medium shadow-sm shadow-red-100 transition-all duration-200 flex items-center gap-2"
@@ -487,10 +366,21 @@ export default function TestsPage() {
                           <button
                             onClick={() =>
                               router.push(
-                                `/dashboard/${slug}/create/test?edit=${test.id}`,
+                                `/dashboard/${slug}/tests/${test.id}/add-students`,
                               )
                             }
                             className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-t-lg transition-colors"
+                          >
+                            <Users className="w-4 h-4" />
+                            Add Students
+                          </button>
+                          <button
+                            onClick={() =>
+                              router.push(
+                                `/dashboard/${slug}/create/test?edit=${test.id}`,
+                              )
+                            }
+                            className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 text-slate-700 text-sm font-medium transition-colors"
                           >
                             <Edit2 className="w-4 h-4" />
                             Edit
@@ -543,206 +433,6 @@ export default function TestsPage() {
           </div>
         )}
       </div>
-
-      {/* Create Paper Modal */}
-      {showCreatePaperModal && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowCreatePaperModal(false)}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="sticky top-0 bg-white flex items-center justify-between p-6 border-b border-slate-200">
-              <div>
-                <h3 className="text-lg font-bold text-slate-900">
-                  Create Test Paper
-                </h3>
-                <p className="text-sm text-slate-500 mt-1">
-                  Select modules to create a complete test paper
-                </p>
-              </div>
-              <button
-                onClick={() => setShowCreatePaperModal(false)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-slate-400" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              {/* Paper Title */}
-              <div>
-                <label className="block text-sm font-medium text-slate-900 mb-2">
-                  Paper Title *
-                </label>
-                <input
-                  type="text"
-                  value={paperTitle}
-                  onChange={(e) => setPaperTitle(e.target.value)}
-                  placeholder="e.g., IELTS Academic Test 01"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400"
-                />
-              </div>
-
-              {/* Paper Type */}
-              <div>
-                <label className="block text-sm font-medium text-slate-900 mb-2">
-                  Paper Type *
-                </label>
-                <select
-                  value={paperType}
-                  onChange={(e) =>
-                    setPaperType(e.target.value as "IELTS" | "OIETC" | "GRE")
-                  }
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 bg-white"
-                >
-                  <option value="IELTS">IELTS</option>
-                  <option value="OIETC">OIETC</option>
-                  <option value="GRE">GRE</option>
-                </select>
-              </div>
-
-              {/* Module Selection */}
-              <div>
-                <label className="block text-sm font-medium text-slate-900 mb-4">
-                  Select Modules (Select at least one)
-                </label>
-                <div className="space-y-4">
-                  {["reading", "listening", "writing", "speaking"].map(
-                    (moduleType) => {
-                      const modulesOfType = getModulesByType(moduleType);
-                      const selected = getSelectedModule(moduleType);
-
-                      return (
-                        <div key={moduleType}>
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <div
-                                className={`w-8 h-8 rounded-lg flex items-center justify-center ${getModuleColor(
-                                  moduleType
-                                )}`}
-                              >
-                                {getModuleIcon(moduleType)}
-                              </div>
-                              <span className="text-sm font-medium text-slate-900">
-                                {formatModuleType(moduleType)}
-                              </span>
-                            </div>
-                            <span className="text-xs text-slate-500">
-                              {modulesOfType.length} available
-                            </span>
-                          </div>
-
-                          <div className="relative">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setShowModuleDropdown(
-                                  showModuleDropdown === moduleType
-                                    ? null
-                                    : moduleType
-                                )
-                              }
-                              disabled={modulesOfType.length === 0}
-                              className="w-full flex items-center justify-between px-4 py-2.5 border border-slate-200 rounded-xl hover:border-slate-300 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              <span
-                                className={
-                                  selected ? "text-slate-900" : "text-slate-400"
-                                }
-                              >
-                                {selected
-                                  ? selected.heading
-                                  : modulesOfType.length === 0
-                                  ? "No modules available"
-                                  : "Choose a module..."}
-                              </span>
-                              <ChevronDown className="w-5 h-5 text-slate-400" />
-                            </button>
-
-                            {showModuleDropdown === moduleType &&
-                              modulesOfType.length > 0 && (
-                                <div className="absolute z-10 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-auto">
-                                  {modulesOfType.map((module) => (
-                                    <button
-                                      key={module.id}
-                                      type="button"
-                                      onClick={() => {
-                                        setSelectedModules((prev) => ({
-                                          ...prev,
-                                          [moduleType]: module.id,
-                                        }));
-                                        setShowModuleDropdown(null);
-                                      }}
-                                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors text-left border-b border-slate-100 last:border-0"
-                                    >
-                                      <div>
-                                        <p className="text-sm font-medium text-slate-900">
-                                          {module.heading}
-                                        </p>
-                                        {module.subheading && (
-                                          <p className="text-xs text-slate-500">
-                                            {module.subheading}
-                                          </p>
-                                        )}
-                                      </div>
-                                      {selected?.id === module.id && (
-                                        <Check className="w-4 h-4 text-green-600" />
-                                      )}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-                          </div>
-                        </div>
-                      );
-                    }
-                  )}
-                </div>
-              </div>
-
-              {availableModules.length === 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
-                  <p className="text-blue-900 text-sm mb-2">
-                    No standalone modules available
-                  </p>
-                  <Link
-                    href={`/dashboard/${slug}/questions`}
-                    className="text-red-600 hover:text-red-700 text-sm font-medium"
-                    onClick={() => setShowCreatePaperModal(false)}
-                  >
-                    Create modules first
-                  </Link>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-4 pt-4 border-t border-slate-200">
-                <button
-                  onClick={() => {
-                    setShowCreatePaperModal(false);
-                    setPaperTitle("");
-                    setSelectedModules({});
-                  }}
-                  disabled={creatingPaper}
-                  className="flex-1 px-6 py-3 border border-slate-300 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleCreatePaper}
-                  disabled={creatingPaper}
-                  className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed text-white rounded-xl font-medium shadow-sm shadow-red-100 transition-all duration-200"
-                >
-                  {creatingPaper ? "Creating..." : "Create Paper"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Delete Confirmation Dialog */}
       {deleteConfirm.open && (

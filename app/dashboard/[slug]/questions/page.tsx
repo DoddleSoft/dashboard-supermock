@@ -1,29 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  Search,
-  Filter,
-  Eye,
-  Edit,
-  Trash2,
-  MoreVertical,
-  BookOpen,
-  Headphones,
-  PenTool,
-  Mic,
-  Plus,
-  FileText,
-  X,
-  Layers,
-  Calendar,
-} from "lucide-react";
-import Link from "next/link";
+import { Search, Plus, FileText, Package, BookOpen } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useModuleContext } from "../../../../context/ModuleContext";
 import { createClient } from "../../../../lib/supabase/client";
 import { useCentre } from "../../../../context/CentreContext";
 import { SmallLoader } from "../../../../components/ui/SmallLoader";
+import { CreateModuleModal } from "../../../../components/questions/CreatePaperModal";
+import { DeleteModuleDialog } from "../../../../components/questions/DeleteModuleDialog";
+import { PaperCard } from "../../../../components/ui/PaperCard";
+import { ModuleCard } from "../../../../components/ui/ModuleCard";
 
 interface StandaloneModule {
   id: string;
@@ -147,49 +134,6 @@ export default function PapersPage() {
 
   const totalItems = filteredPapers.length + filteredModules.length;
 
-  const normalizeType = (type: string) =>
-    type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
-
-  const getPrimaryType = (moduleTypes: string[]) => {
-    if (moduleTypes.length === 1) return normalizeType(moduleTypes[0]);
-    if (moduleTypes.length > 1) return "Mixed";
-    return "Unknown";
-  };
-
-  const getModuleIcon = (type: string) => {
-    switch (type) {
-      case "Reading":
-        return <BookOpen className="w-5 h-5" />;
-      case "Writing":
-        return <PenTool className="w-5 h-5" />;
-      case "Listening":
-        return <Headphones className="w-5 h-5" />;
-      case "Speaking":
-        return <Mic className="w-5 h-5" />;
-      case "Mixed":
-        return <FileText className="w-5 h-5" />;
-      default:
-        return null;
-    }
-  };
-
-  const getModuleColor = (type: string) => {
-    switch (type) {
-      case "Reading":
-        return "bg-blue-100 text-blue-600 border-blue-200";
-      case "Writing":
-        return "bg-green-100 text-green-600 border-green-200";
-      case "Listening":
-        return "bg-purple-100 text-purple-600 border-purple-200";
-      case "Speaking":
-        return "bg-orange-100 text-orange-600 border-orange-200";
-      case "Mixed":
-        return "bg-slate-100 text-slate-600 border-slate-200";
-      default:
-        return "bg-slate-100 text-slate-600 border-slate-200";
-    }
-  };
-
   // Show single loading state while data is loading
   if (centerModulesLoading || modulesLoading) {
     return (
@@ -276,41 +220,31 @@ export default function PapersPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-slate-500">Total Papers</p>
-            <BookOpen className="w-5 h-5 text-blue-600" />
+        <div className="bg-white rounded-md border border-slate-200 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-slate-500 text-sm">Total Papers</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1">
+                {centerModuleStats?.totalPapers ?? 0}
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-md bg-red-100 text-red-600 flex items-center justify-center">
+              <FileText className="w-6 h-6" />
+            </div>
           </div>
-          <p className="text-3xl font-bold text-slate-900">
-            {centerModuleStats?.totalPapers ?? 0}
-          </p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-slate-500">Published</p>
-            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+        <div className="bg-white rounded-md border border-slate-200 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-slate-500 text-sm">Total Modules</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1">
+                {centerModuleStats?.totalModules ?? 0}
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center">
+              <Package className="w-6 h-6" />
+            </div>
           </div>
-          <p className="text-3xl font-bold text-slate-900">
-            {centerModuleStats?.publishedPapers ?? 0}
-          </p>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-slate-500">Drafts</p>
-            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-          </div>
-          <p className="text-3xl font-bold text-slate-900">
-            {centerModuleStats?.draftPapers ?? 0}
-          </p>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-slate-500">Total Modules</p>
-            <Filter className="w-5 h-5 text-purple-600" />
-          </div>
-          <p className="text-3xl font-bold text-slate-900">
-            {centerModuleStats?.totalModules ?? 0}
-          </p>
         </div>
       </div>
 
@@ -319,7 +253,6 @@ export default function PapersPage() {
         filteredPapers.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <Layers className="w-5 h-5 text-slate-600" />
               <h2 className="text-lg font-semibold text-slate-900">
                 Test Papers
               </h2>
@@ -328,102 +261,18 @@ export default function PapersPage() {
               </span>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              {filteredPapers.map((paper) => {
-                return (
-                  <div
-                    key={paper.id}
-                    className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-md transition-all"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-4 flex-1">
-                        <div className="w-12 h-12 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center flex-shrink-0">
-                          <FileText className="w-6 h-6" />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-slate-900 mb-1">
-                            {paper.title}
-                          </h3>
-                          <div className="flex items-center gap-4 text-sm text-slate-500 mb-3">
-                            <span className="flex items-center gap-1">
-                              <span className="font-medium text-slate-700">
-                                {paper.modulesCount}
-                              </span>{" "}
-                              Modules
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <span className="font-medium text-slate-700">
-                                {paper.paperType || "N/A"}
-                              </span>
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <span className="font-medium text-slate-700">
-                                {formatDate(paper.createdAt)}
-                              </span>
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                                paper.isActive
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-yellow-100 text-yellow-700"
-                              }`}
-                            >
-                              {paper.isActive ? "Published" : "Draft"}
-                            </span>
-                            {paper.moduleTypes.map((type) => {
-                              const normalizedType = normalizeType(type);
-                              return (
-                                <span
-                                  key={type}
-                                  className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${getModuleColor(normalizedType)}`}
-                                >
-                                  {getModuleIcon(normalizedType)}
-                                  {normalizedType}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="relative">
-                        <button
-                          onClick={() =>
-                            setActiveMenu(
-                              activeMenu === paper.id ? null : paper.id,
-                            )
-                          }
-                          className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                        >
-                          <MoreVertical className="w-5 h-5 text-slate-400" />
-                        </button>
-
-                        {activeMenu === paper.id && (
-                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl border border-slate-200 shadow-lg z-10">
-                            <button className="w-full px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3 rounded-t-xl">
-                              <Eye className="w-4 h-4" />
-                              View Details
-                            </button>
-                            <button className="w-full px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3">
-                              <Edit className="w-4 h-4" />
-                              Edit Paper
-                            </button>
-                            <button
-                              onClick={() => setActiveMenu(null)}
-                              className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 rounded-b-xl"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {filteredPapers.map((paper) => (
+                <PaperCard
+                  key={paper.id}
+                  paper={paper}
+                  activeMenu={activeMenu}
+                  onMenuToggle={(paperId) =>
+                    setActiveMenu(activeMenu === paperId ? null : paperId)
+                  }
+                  onMenuClose={() => setActiveMenu(null)}
+                  formatDate={formatDate}
+                />
+              ))}
             </div>
           </div>
         )}
@@ -441,100 +290,25 @@ export default function PapersPage() {
               </span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {filteredModules.map((module) => {
-                const normalizedType = normalizeType(module.module_type);
-                return (
-                  <div
-                    key={module.id}
-                    className="group relative bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-visible"
-                  >
-                    {/* Top Decorative Line (Optional: colored based on type) */}
-                    <div
-                      className={`h-1.5 w-full rounded-t-2xl bg-gradient-to-r from-slate-200 to-transparent ${getModuleColor(normalizedType).replace("text-", "bg-").split(" ")[0]}`}
-                    />
-
-                    <div className="py-2 px-4">
-                      {/* Header: Icon & Menu */}
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center gap-4 flex-1">
-                          <div
-                            className={`w-14 h-14 rounded-md flex items-center justify-center text-2xl shadow-sm ${getModuleColor(normalizedType).replace("border-", "bg-opacity-10 bg-")}`}
-                          >
-                            {/* Ensure Icon is passed a className for size/color if needed */}
-                            {getModuleIcon(normalizedType)}
-                          </div>
-
-                          <div className="flex-1">
-                            <h3 className="text-lg font-bold text-slate-900 mb-2 leading-tight line-clamp-1 group-hover:text-indigo-600 transition-colors">
-                              {module.heading}
-                            </h3>
-                            <span
-                              className={`inline-flex items-center px-3 py-1 rounded-full text-xs tracking-wide bg-opacity-10 ${getModuleColor(normalizedType).replace("border-", "bg-")}`}
-                            >
-                              {normalizedType}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="relative">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveMenu(
-                                activeMenu === module.id ? null : module.id,
-                              );
-                            }}
-                            className={`p-2 rounded-full hover:bg-slate-100 transition-colors ${activeMenu === module.id ? "bg-slate-100 text-slate-900" : "text-slate-400"}`}
-                          >
-                            <MoreVertical className="w-5 h-5" />
-                          </button>
-
-                          {/* Dropdown Menu */}
-                          {activeMenu === module.id && (
-                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                              <div className="py-1">
-                                <button
-                                  onClick={() =>
-                                    handleViewModule(
-                                      module.id,
-                                      module.module_type,
-                                    )
-                                  }
-                                  className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-3 transition-colors"
-                                >
-                                  <Eye className="w-4 h-4" />
-                                  View Details
-                                </button>
-                                <div className="h-px bg-slate-100 my-1" />
-                                <button
-                                  onClick={() =>
-                                    setDeleteConfirm({
-                                      open: true,
-                                      moduleId: module.id,
-                                      moduleName: module.heading,
-                                    })
-                                  }
-                                  className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors rounded-b-xl"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                  Delete Module
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Footer: Badges & Metadata */}
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                        <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
-                          {formatDate(module.created_at)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {filteredModules.map((module) => (
+                <ModuleCard
+                  key={module.id}
+                  module={module}
+                  activeMenu={activeMenu}
+                  onMenuToggle={(moduleId) =>
+                    setActiveMenu(activeMenu === moduleId ? null : moduleId)
+                  }
+                  onViewModule={handleViewModule}
+                  onDeleteModule={(moduleId, moduleName) =>
+                    setDeleteConfirm({
+                      open: true,
+                      moduleId,
+                      moduleName,
+                    })
+                  }
+                  formatDate={formatDate}
+                />
+              ))}
             </div>
           </div>
         )}
@@ -551,141 +325,26 @@ export default function PapersPage() {
       )}
 
       {/* Create Test Paper Modal */}
-      {showCreateModal && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowCreateModal(false)}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-6 border-b border-slate-200">
-              <div>
-                <h3 className="text-lg font-bold text-slate-900">
-                  Create Test Paper
-                </h3>
-                <p className="text-sm text-slate-500 mt-1">
-                  Select a module type to begin
-                </p>
-              </div>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-slate-400" />
-              </button>
-            </div>
-
-            <div className="p-6 grid grid-cols-2 gap-4">
-              <Link
-                href={`/dashboard/${slug}/create/modules?type=reading`}
-                className="flex items-center gap-3 p-4 border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all"
-                onClick={() => setShowCreateModal(false)}
-              >
-                <div className="w-12 h-12 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-900">Reading Module</p>
-                  <p className="text-xs text-slate-500">
-                    Passage-based questions
-                  </p>
-                </div>
-              </Link>
-
-              <Link
-                href={`/dashboard/${slug}/create/modules?type=listening`}
-                className="flex items-center gap-3 p-4 border border-slate-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all"
-                onClick={() => setShowCreateModal(false)}
-              >
-                <div className="w-12 h-12 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
-                  <Headphones className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-900">
-                    Listening Module
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    Audio-based questions
-                  </p>
-                </div>
-              </Link>
-
-              <Link
-                href={`/dashboard/${slug}/create/modules?type=writing`}
-                className="flex items-center gap-3 p-4 border border-slate-200 rounded-xl hover:border-green-300 hover:bg-green-50 transition-all"
-                onClick={() => setShowCreateModal(false)}
-              >
-                <div className="w-12 h-12 rounded-lg bg-green-100 text-green-600 flex items-center justify-center flex-shrink-0">
-                  <PenTool className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-900">Writing Module</p>
-                  <p className="text-xs text-slate-500">Prompt-based tasks</p>
-                </div>
-              </Link>
-
-              <Link
-                href={`/dashboard/${slug}/create/test`}
-                className="flex items-center gap-3 p-4 border border-slate-200 rounded-xl hover:border-red-300 hover:bg-red-50 transition-all"
-                onClick={() => setShowCreateModal(false)}
-              >
-                <div className="w-12 h-12 rounded-lg bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
-                  <FileText className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-900">
-                    Complete Test Paper
-                  </p>
-                  <p className="text-xs text-slate-500">Full IELTS test</p>
-                </div>
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
+      <CreateModuleModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        slug={slug}
+      />
 
       {/* Delete Confirmation Dialog */}
-      {deleteConfirm.open && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-6">
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 mb-2">
-                Delete Module
-              </h3>
-              <p className="text-sm text-slate-600">
-                Are you sure you want to delete{" "}
-                <strong>{deleteConfirm.moduleName}</strong>? This action cannot
-                be undone.
-              </p>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() =>
-                  setDeleteConfirm({
-                    open: false,
-                    moduleId: null,
-                    moduleName: null,
-                  })
-                }
-                disabled={isDeleting}
-                className="flex-1 px-4 py-2.5 border border-slate-300 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteModule}
-                disabled={isDeleting}
-                className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed text-white rounded-xl font-medium shadow-sm shadow-red-100 transition-colors"
-              >
-                {isDeleting ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteModuleDialog
+        isOpen={deleteConfirm.open}
+        moduleName={deleteConfirm.moduleName}
+        isDeleting={isDeleting}
+        onConfirm={handleDeleteModule}
+        onCancel={() =>
+          setDeleteConfirm({
+            open: false,
+            moduleId: null,
+            moduleName: null,
+          })
+        }
+      />
     </div>
   );
 }

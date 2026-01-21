@@ -19,7 +19,11 @@ import {
 } from "lucide-react";
 import { useCentre } from "@/context/CentreContext";
 import { fetchStudents } from "@/helpers/students";
-import { createScheduledTest, updateScheduledTest } from "@/helpers/tests";
+import {
+  createScheduledTest,
+  updateScheduledTest,
+  fetchScheduledTest,
+} from "@/helpers/tests";
 import { SmallLoader } from "@/components/ui/SmallLoader";
 import { createClient } from "@/lib/supabase/client";
 
@@ -73,6 +77,9 @@ export default function CreateTestPage() {
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
   const [duration, setDuration] = useState(180);
+  const [status, setStatus] = useState<
+    "scheduled" | "in_progress" | "completed" | "cancelled"
+  >("scheduled");
 
   // Data state
   const [papers, setPapers] = useState<Paper[]>([]);
@@ -85,6 +92,12 @@ export default function CreateTestPage() {
       loadData();
     }
   }, [currentCenter?.center_id]);
+
+  useEffect(() => {
+    if (editId && currentCenter?.center_id) {
+      loadTestData();
+    }
+  }, [editId, currentCenter?.center_id]);
 
   const loadData = async () => {
     if (!currentCenter?.center_id) return;
@@ -133,6 +146,41 @@ export default function CreateTestPage() {
 
     // Fetch students
     const studentsData = await fetchStudents(currentCenter.center_id);
+
+    setLoading(false);
+  };
+
+  const loadTestData = async () => {
+    if (!editId) return;
+
+    setLoading(true);
+    const testData = await fetchScheduledTest(editId);
+
+    if (testData) {
+      setTestTitle(testData.title);
+      setDuration(testData.duration_minutes);
+      setStatus(testData.status);
+
+      // Parse scheduled_at into date and time
+      const scheduledDate = new Date(testData.scheduled_at);
+      const dateStr = scheduledDate.toISOString().split("T")[0];
+      const timeStr = scheduledDate.toTimeString().slice(0, 5);
+      setScheduledDate(dateStr);
+      setScheduledTime(timeStr);
+
+      // Set selected paper after papers are loaded
+      if (testData.paper) {
+        setSelectedPaper({
+          id: testData.paper_id,
+          title: testData.paper.title,
+          paper_type: testData.paper.paper_type,
+          reading_module: testData.paper.reading_module,
+          listening_module: testData.paper.listening_module,
+          writing_module: testData.paper.writing_module,
+          speaking_module: testData.paper.speaking_module,
+        });
+      }
+    }
 
     setLoading(false);
   };
@@ -202,6 +250,7 @@ export default function CreateTestPage() {
       title: testTitle,
       scheduledAt: scheduledAt.toISOString(),
       durationMinutes: duration,
+      status: status,
     };
 
     const result = editId
@@ -414,6 +463,33 @@ export default function CreateTestPage() {
             Standard IELTS test is 180 minutes (3 hours)
           </p>
         </div>
+
+        {/* Status (only show when editing) */}
+        {editId && (
+          <div className="bg-white rounded-xl border border-slate-200 p-6">
+            <label className="block text-sm font-medium text-slate-900 mb-2">
+              Test Status
+            </label>
+            <select
+              value={status}
+              onChange={(e) =>
+                setStatus(
+                  e.target.value as
+                    | "scheduled"
+                    | "in_progress"
+                    | "completed"
+                    | "cancelled",
+                )
+              }
+              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 bg-white"
+            >
+              <option value="scheduled">Scheduled</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex items-center gap-4">

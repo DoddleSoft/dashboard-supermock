@@ -10,6 +10,7 @@ export interface Student {
   address: string | null;
   grade: string | null;
   status: "active" | "cancelled" | "archived" | "passed";
+  enrollment_type: "regular" | "mock_only";
   enrolled_at: string;
   updated_at: string;
   testsCompleted: number;

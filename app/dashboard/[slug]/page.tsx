@@ -11,8 +11,7 @@ import { Loader } from "@/components/ui/Loader";
 export default function DashboardPage() {
   const params = useParams();
   const slug = params.slug as string;
-  const { currentCenter, dashboardStats, loading, isValidCenter, isOwner } =
-    useCentre();
+  const { dashboardStats, loading, isValidCenter, isOwner } = useCentre();
 
   // If validation fails or center doesn't exist, show 404
   useEffect(() => {
@@ -53,12 +52,19 @@ export default function DashboardPage() {
       trend: "neutral" as const,
       color: "bg-purple-100 text-purple-600",
     },
+    {
+      label: "Total Mock Test Registered",
+      value: dashboardStats?.totalMockTestRegistered ?? 0,
+      change: `${dashboardStats?.totalMockTestRegistered ?? 0} active students`,
+      trend: "up" as const,
+      color: "bg-blue-100 text-blue-600",
+    },
   ];
 
   return (
     <div className="max-w-7xl flex flex-col gap-8 mx-auto">
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-4 gap-6">
         {stats.map((stat) => {
           return (
             <div

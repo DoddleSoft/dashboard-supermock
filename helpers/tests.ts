@@ -46,7 +46,85 @@ export interface CreateTestPayload {
   title: string;
   scheduledAt: string;
   durationMinutes?: number;
+  status?: "scheduled" | "in_progress" | "completed" | "cancelled";
 }
+
+/**
+ * Fetch a single scheduled test by ID
+ */
+export const fetchScheduledTest = async (
+  testId: string,
+): Promise<ScheduledTest | null> => {
+  try {
+    const supabase = createClient();
+
+    const { data, error } = await supabase
+      .from("scheduled_tests")
+      .select(
+        `
+        *,
+        paper:papers!scheduled_tests_paper_id_fkey (
+          id,
+          title,
+          paper_type,
+          reading_module:modules!papers_reading_fk(id, heading, module_type),
+          listening_module:modules!papers_listening_fk(id, heading, module_type),
+          writing_module:modules!papers_writing_fk(id, heading, module_type),
+          speaking_module:modules!papers_speaking_fk(id, heading, module_type)
+        )
+      `,
+      )
+      .eq("id", testId)
+      .single();
+
+    if (error) throw error;
+    if (!data) return null;
+
+    // Fetch students
+    const { data: studentsData } = await supabase
+      .from("test_students")
+      .select(
+        `
+        student:student_profiles!test_students_student_id_fkey (
+          student_id,
+          name,
+          email
+        )
+      `,
+      )
+      .eq("test_id", data.id);
+
+    // Build modules array
+    const modules: Array<{
+      id: string;
+      module_type: string;
+      heading: string;
+    }> = [];
+
+    if (data.paper?.reading_module) {
+      modules.push(data.paper.reading_module);
+    }
+    if (data.paper?.listening_module) {
+      modules.push(data.paper.listening_module);
+    }
+    if (data.paper?.writing_module) {
+      modules.push(data.paper.writing_module);
+    }
+    if (data.paper?.speaking_module) {
+      modules.push(data.paper.speaking_module);
+    }
+
+    return {
+      ...data,
+      modules,
+      students: studentsData?.map((s: any) => s.student) || [],
+    };
+  } catch (error) {
+    console.error("Error fetching scheduled test:", error);
+    toast.error("Failed to load test data");
+    return null;
+  }
+};
 
 /**
  * Fetch all scheduled tests for a center
@@ -271,6 +349,8 @@ export const updateScheduledTest = async (
     if (updates.scheduledAt) updateData.scheduled_at = updates.scheduledAt;
     if (updates.durationMinutes)
       updateData.duration_minutes = updates.durationMinutes;
+    if (updates.paperId) updateData.paper_id = updates.paperId;
+    if (updates.status) updateData.status = updates.status;
 
     const { error: testError } = await supabase
       .from("scheduled_tests")
@@ -278,26 +358,6 @@ export const updateScheduledTest = async (
       .eq("id", testId);
 
     if (testError) throw testError;
-
-    // Update students if provided
-    if (updates.studentIds !== undefined) {
-      // Delete existing students
-      await supabase.from("test_students").delete().eq("test_id", testId);
-
-      // Insert new students
-      if (updates.studentIds.length > 0) {
-        const studentInserts = updates.studentIds.map((studentId) => ({
-          test_id: testId,
-          student_id: studentId,
-        }));
-
-        const { error: studentsError } = await supabase
-          .from("test_students")
-          .insert(studentInserts);
-
-        if (studentsError) throw studentsError;
-      }
-    }
 
     toast.success("Test updated successfully!");
     return { success: true };

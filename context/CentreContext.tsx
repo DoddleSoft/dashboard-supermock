@@ -26,6 +26,7 @@ export interface DashboardStats {
   totalStudents: number;
   completedTests: number;
   totalPapers: number;
+  totalMockTestRegistered: number;
 }
 
 export interface CentreContextType {
@@ -95,10 +96,28 @@ export function CentreProvider({ children }: { children: ReactNode }) {
 
       if (testsError) throw testsError;
 
+      // Fetch total mock attempts for students in this center
+      const { count: mockAttemptsCount, error: mockAttemptsError } =
+        await supabase
+          .from("mock_attempts")
+          .select("id", { count: "exact", head: true })
+          .in(
+            "student_id",
+            (
+              await supabase
+                .from("student_profiles")
+                .select("student_id")
+                .eq("center_id", centerId)
+            ).data?.map((s: any) => s.student_id) || [],
+          );
+
+      if (mockAttemptsError) throw mockAttemptsError;
+
       setDashboardStats({
         totalStudents: studentsCount || 0,
         completedTests: completedTests || 0,
         totalPapers: papersCount || 0,
+        totalMockTestRegistered: mockAttemptsCount || 0,
       });
     } catch (err) {
       console.error("Error fetching dashboard stats:", err);
@@ -106,6 +125,7 @@ export function CentreProvider({ children }: { children: ReactNode }) {
         totalStudents: 0,
         completedTests: 0,
         totalPapers: 0,
+        totalMockTestRegistered: 0,
       });
     }
   };

@@ -16,7 +16,9 @@ export const centerHelpers = {
     try {
       const { data: papers, error: papersError } = await supabase
         .from("papers")
-        .select("id,title,paper_type,is_active,created_at")
+        .select(
+          "id,title,paper_type,is_active,created_at,reading_module_id,listening_module_id,writing_module_id,speaking_module_id",
+        )
         .eq("center_id", centerId)
         .order("created_at", { ascending: false });
 
@@ -24,35 +26,57 @@ export const centerHelpers = {
 
       const { data: modules, error: modulesError } = await supabase
         .from("modules")
-        .select("id,paper_id,module_type")
+        .select("id,module_type")
         .eq("center_id", centerId);
 
       if (modulesError) throw modulesError;
 
-      const moduleCountsByPaper: Record<string, number> = {};
-      const moduleTypesByPaper: Record<string, Set<string>> = {};
-
+      // Create a map of module IDs to their types
+      const moduleTypeMap: Record<string, string> = {};
       (modules || []).forEach((mod) => {
-        if (!mod.paper_id) return;
-        moduleCountsByPaper[mod.paper_id] =
-          (moduleCountsByPaper[mod.paper_id] || 0) + 1;
-        if (!moduleTypesByPaper[mod.paper_id]) {
-          moduleTypesByPaper[mod.paper_id] = new Set();
-        }
-        if (mod.module_type) {
-          moduleTypesByPaper[mod.paper_id].add(mod.module_type);
+        if (mod.id && mod.module_type) {
+          moduleTypeMap[mod.id] = mod.module_type;
         }
       });
 
-      const summaries: PaperSummary[] = (papers || []).map((paper) => ({
-        id: paper.id,
-        title: paper.title,
-        paperType: paper.paper_type,
-        isActive: !!paper.is_active,
-        createdAt: paper.created_at,
-        modulesCount: moduleCountsByPaper[paper.id] || 0,
-        moduleTypes: Array.from(moduleTypesByPaper[paper.id] || []),
-      }));
+      const summaries: PaperSummary[] = (papers || []).map((paper) => {
+        const moduleTypes: string[] = [];
+        let modulesCount = 0;
+
+        // Check each module reference in the paper
+        if (paper.reading_module_id && moduleTypeMap[paper.reading_module_id]) {
+          moduleTypes.push(moduleTypeMap[paper.reading_module_id]);
+          modulesCount++;
+        }
+        if (
+          paper.listening_module_id &&
+          moduleTypeMap[paper.listening_module_id]
+        ) {
+          moduleTypes.push(moduleTypeMap[paper.listening_module_id]);
+          modulesCount++;
+        }
+        if (paper.writing_module_id && moduleTypeMap[paper.writing_module_id]) {
+          moduleTypes.push(moduleTypeMap[paper.writing_module_id]);
+          modulesCount++;
+        }
+        if (
+          paper.speaking_module_id &&
+          moduleTypeMap[paper.speaking_module_id]
+        ) {
+          moduleTypes.push(moduleTypeMap[paper.speaking_module_id]);
+          modulesCount++;
+        }
+
+        return {
+          id: paper.id,
+          title: paper.title,
+          paperType: paper.paper_type,
+          isActive: !!paper.is_active,
+          createdAt: paper.created_at,
+          modulesCount,
+          moduleTypes,
+        };
+      });
 
       const publishedPapers = summaries.filter((p) => p.isActive).length;
 

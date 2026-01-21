@@ -26,6 +26,7 @@ export default function StudentsPage() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [selectedEnrollmentType, setSelectedEnrollmentType] = useState<string>("regular");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -88,7 +89,9 @@ export default function StudentsPage() {
       (student.email?.toLowerCase() || "").includes(searchQuery.toLowerCase());
     const matchesStatus =
       selectedStatus === "all" || student.status === selectedStatus;
-    return matchesSearch && matchesStatus;
+    const matchesEnrollmentType =
+      selectedEnrollmentType === "all" || student.enrollment_type === selectedEnrollmentType;
+    return matchesSearch && matchesStatus && matchesEnrollmentType;
   });
 
   const handleCreateStudent = async (e: React.FormEvent) => {
@@ -272,6 +275,16 @@ export default function StudentsPage() {
                 <option value="passed">Passed</option>
                 <option value="archived">Archived</option>
                 <option value="cancelled">Cancelled</option>
+              </select>
+
+              <select
+                value={selectedEnrollmentType}
+                onChange={(e) => setSelectedEnrollmentType(e.target.value)}
+                className="px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 bg-white text-sm font-medium"
+              >
+                <option value="all">All Types</option>
+                <option value="regular">Regular</option>
+                <option value="mock_only">Mock Only</option>
               </select>
             </div>
             <button
