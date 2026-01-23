@@ -64,7 +64,7 @@ export default function SupportPage() {
 
       if (result.success) {
         toast.success(
-          "Support request submitted successfully! We'll get back to you soon.",
+          "Message submitted successful. We'll get back to you soon.",
         );
         setFormData({
           email: user.email || "",
@@ -72,10 +72,10 @@ export default function SupportPage() {
           message: "",
         });
       } else {
-        toast.error(result.error || "Failed to submit support request");
+        toast.error(result.error || "Failed to submit support message");
       }
     } catch (error) {
-      console.error("Error submitting support request:", error);
+      console.error("Error submitting support message:", error);
       toast.error("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);

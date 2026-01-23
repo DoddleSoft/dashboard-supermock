@@ -259,29 +259,22 @@ create table public.sub_sections (
 create index IF not exists idx_sub_sections_section_id on public.sub_sections using btree (section_id) TABLESPACE pg_default;
 
 
-
 create table public.users (
   user_id uuid not null,
   email text not null,
-  role text not null,
+  role public.user_role_enum not null,
   full_name text not null,
   is_active boolean null default true,
   created_at timestamp without time zone null default CURRENT_TIMESTAMP,
   updated_at timestamp without time zone null default CURRENT_TIMESTAMP,
   constraint users_pkey primary key (user_id),
-  constraint users_email_key unique (email),
-  constraint users_role_check check (
-    (
-      role = any (
-        array['student'::text, 'examiner'::text, 'admin'::text]
-      )
-    )
-  )
+  constraint users_email_key unique (email)
 ) TABLESPACE pg_default;
 
 create trigger update_users_updated_at BEFORE
 update on users for EACH row
 execute FUNCTION update_updated_at_column ();
+
 
 
 create table public.waitlist (
@@ -309,3 +302,16 @@ create index IF not exists waitlist_location_idx on public.waitlist using btree 
 create trigger update_waitlist_updated_at BEFORE
 update on waitlist for EACH row
 execute FUNCTION update_updated_at_column ();
+
+
+create table public.center_members (
+  membership_id uuid not null default gen_random_uuid (),
+  center_id uuid not null,
+  user_id uuid not null,
+  invited_at timestamp without time zone null default CURRENT_TIMESTAMP,
+  code_hash text not null,
+  constraint center_members_pkey primary key (membership_id),
+  constraint center_members_unq unique (center_id, user_id),
+  constraint center_members_center_fkey foreign KEY (center_id) references centers (center_id) on delete CASCADE,
+  constraint center_members_user_fkey foreign KEY (user_id) references users (user_id) on delete CASCADE
+) TABLESPACE pg_default;

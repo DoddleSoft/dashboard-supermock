@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   MoreVertical,
   Eye,
@@ -9,6 +10,9 @@ import {
   Headphones,
   Mic,
 } from "lucide-react";
+import { ViewPaperModal } from "./ViewPaperModal";
+import { EditPaperModal } from "./EditPaperModal";
+import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
 
 interface PaperCardProps {
   paper: {
@@ -19,11 +23,38 @@ interface PaperCardProps {
     createdAt: string;
     isActive: boolean;
     moduleTypes: string[];
+    readingModuleId?: string | null;
+    listeningModuleId?: string | null;
+    writingModuleId?: string | null;
+    speakingModuleId?: string | null;
+    readingModuleName?: string | null;
+    listeningModuleName?: string | null;
+    writingModuleName?: string | null;
+    speakingModuleName?: string | null;
   };
   activeMenu: string | null;
   onMenuToggle: (paperId: string) => void;
   onMenuClose: () => void;
   formatDate: (dateString: string) => string;
+  availableModules: {
+    id: string;
+    module_type: string;
+    heading: string;
+    subheading?: string;
+  }[];
+  onPaperUpdate?: (
+    paperId: string,
+    data: {
+      title: string;
+      paperType: string;
+      isActive: boolean;
+      readingModuleId?: string | null;
+      listeningModuleId?: string | null;
+      writingModuleId?: string | null;
+      speakingModuleId?: string | null;
+    },
+  ) => Promise<{ success: boolean; error?: string }>;
+  onPaperDelete?: (paperId: string) => Promise<void>;
 }
 
 const normalizeType = (type: string) =>
@@ -63,13 +94,101 @@ const getModuleColor = (type: string) => {
   }
 };
 
+const getModuleNameById = (
+  modules: {
+    id: string;
+    module_type: string;
+    heading: string;
+    subheading?: string;
+  }[],
+  moduleId?: string | null,
+) => {
+  if (!moduleId) return null;
+  return modules.find((m) => m.id === moduleId)?.heading ?? null;
+};
+
 export function PaperCard({
   paper,
   activeMenu,
   onMenuToggle,
   onMenuClose,
   formatDate,
+  availableModules,
+  onPaperUpdate,
+  onPaperDelete,
 }: PaperCardProps) {
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  useEffect(() => {
+    if (activeMenu !== paper.id) {
+      setShowDeleteConfirm(false);
+    }
+  }, [activeMenu, paper.id]);
+
+  const handleViewDetails = () => {
+    setShowViewModal(true);
+    setShowDeleteConfirm(false);
+    onMenuClose();
+  };
+
+  const handleEditPaper = () => {
+    setShowEditModal(true);
+    setShowDeleteConfirm(false);
+    onMenuClose();
+  };
+
+  const handleDeletePaper = async () => {
+    if (!onPaperDelete || isDeleting) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await onPaperDelete(paper.id);
+    } catch (error) {
+      console.error("Failed to delete paper:", error);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+      onMenuClose();
+    }
+  };
+
+  const handleDeleteClick = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteConfirm(false);
+  };
+
+  const handleSavePaper = async (data: {
+    title: string;
+    paperType: string;
+    isActive: boolean;
+    readingModuleId?: string | null;
+    listeningModuleId?: string | null;
+    writingModuleId?: string | null;
+    speakingModuleId?: string | null;
+  }) => {
+    if (!onPaperUpdate) {
+      return { success: false, error: "Update handler not provided" };
+    }
+
+    try {
+      const result = await onPaperUpdate(paper.id, data);
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Failed to update paper",
+      };
+    }
+  };
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-md transition-all">
       <div className="flex items-start justify-between">
@@ -136,16 +255,22 @@ export function PaperCard({
 
           {activeMenu === paper.id && (
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl border border-slate-200 shadow-lg z-10">
-              <button className="w-full px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3 rounded-t-xl">
+              <button
+                onClick={handleViewDetails}
+                className="w-full px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3 rounded-t-xl"
+              >
                 <Eye className="w-4 h-4" />
                 View Details
               </button>
-              <button className="w-full px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3">
+              <button
+                onClick={handleEditPaper}
+                className="w-full px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3"
+              >
                 <Edit className="w-4 h-4" />
                 Edit Paper
               </button>
               <button
-                onClick={onMenuClose}
+                onClick={handleDeleteClick}
                 className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 rounded-b-xl"
               >
                 <Trash2 className="w-4 h-4" />
@@ -155,6 +280,43 @@ export function PaperCard({
           )}
         </div>
       </div>
+
+      {/* Modals */}
+      <ViewPaperModal
+        paper={{
+          ...paper,
+          readingModuleName:
+            paper.readingModuleName ??
+            getModuleNameById(availableModules, paper.readingModuleId),
+          listeningModuleName:
+            paper.listeningModuleName ??
+            getModuleNameById(availableModules, paper.listeningModuleId),
+          writingModuleName:
+            paper.writingModuleName ??
+            getModuleNameById(availableModules, paper.writingModuleId),
+          speakingModuleName:
+            paper.speakingModuleName ??
+            getModuleNameById(availableModules, paper.speakingModuleId),
+        }}
+        isOpen={showViewModal}
+        onClose={() => setShowViewModal(false)}
+      />
+      <EditPaperModal
+        paper={paper}
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        availableModules={availableModules}
+        onSave={handleSavePaper}
+      />
+      <DeleteConfirmationDialog
+        isOpen={showDeleteConfirm}
+        title="Delete Paper"
+        description="This action will permanently remove the paper."
+        itemName={paper.title}
+        isDeleting={isDeleting}
+        onConfirm={handleDeletePaper}
+        onCancel={handleCancelDelete}
+      />
     </div>
   );
 }

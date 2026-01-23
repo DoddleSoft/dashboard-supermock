@@ -10,12 +10,7 @@ import React, {
 } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useCentre } from "./CentreContext";
-import {
-  createCompletePaper,
-  createModule as createModuleInDB,
-  uploadAudioFile,
-  ModuleType,
-} from "@/helpers/modules";
+import { ModuleType } from "@/helpers/modules";
 import { readingHelpers } from "@/helpers/reading";
 import { listeningHelpers } from "@/helpers/listening";
 import { writingHelpers } from "@/helpers/writing";
@@ -89,6 +84,14 @@ export interface PaperSummary {
   createdAt: string;
   modulesCount: number;
   moduleTypes: string[];
+  readingModuleId?: string | null;
+  listeningModuleId?: string | null;
+  writingModuleId?: string | null;
+  speakingModuleId?: string | null;
+  readingModuleName?: string | null;
+  listeningModuleName?: string | null;
+  writingModuleName?: string | null;
+  speakingModuleName?: string | null;
 }
 
 export interface ModuleOverviewStats {
@@ -96,6 +99,16 @@ export interface ModuleOverviewStats {
   totalModules: number;
   publishedPapers: number;
   draftPapers: number;
+}
+
+// Stored Module Structure (from database)
+export interface StoredModule {
+  module_id: string;
+  module_type: "reading" | "listening" | "writing" | "speaking";
+  title: string;
+  paper_id: string;
+  created_at: string;
+  sections: any[]; // Contains the full section structure with renderBlocks and questions
 }
 
 // Module Data interface
@@ -135,6 +148,11 @@ interface ModuleContextType {
   centerModulesLoading: boolean;
   centerModulesError: string | null;
   refreshCenterModules: () => Promise<void>;
+
+  // Full modules data from RPC
+  storedModules: StoredModule[];
+  loadAllModules: () => Promise<void>;
+  isLoadingModules: boolean;
 
   // Reading module methods
   readingSections: ReadingSection[];
@@ -320,6 +338,10 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
     null,
   );
 
+  // Full modules data
+  const [storedModules, setStoredModules] = useState<StoredModule[]>([]);
+  const [isLoadingModules, setIsLoadingModules] = useState(false);
+
   // Save state
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -376,15 +398,55 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
     await fetchCenterModules(currentCenter.center_id);
   };
 
+  /**
+   * Load all modules with full structure using RPC
+   * This is called once when center is loaded and after CRUD operations
+   */
+  const loadAllModules = async () => {
+    if (!currentCenter?.center_id) {
+      setStoredModules([]);
+      return;
+    }
+
+    setIsLoadingModules(true);
+    try {
+      const { data, error } = await supabase.rpc("get_center_modules_v2", {
+        p_center_id: currentCenter.center_id,
+      });
+
+      if (error) {
+        console.error("Error loading modules:", error);
+        setCenterModulesError(error.message);
+        setStoredModules([]);
+      } else {
+        setStoredModules(data || []);
+        setCenterModulesError(null);
+      }
+    } catch (err) {
+      console.error("Failed to load modules:", err);
+      setCenterModulesError(
+        err instanceof Error ? err.message : "Failed to load modules",
+      );
+      setStoredModules([]);
+    } finally {
+      setIsLoadingModules(false);
+    }
+  };
+
   useEffect(() => {
     if (!currentCenter?.center_id) {
       setCenterPapers([]);
       setCenterModuleStats(null);
       setCenterModulesError(null);
+      setStoredModules([]);
       return;
     }
 
+    // Fetch summary data first (faster)
     fetchCenterModules(currentCenter.center_id);
+
+    // Load full modules data in background (doesn't block UI)
+    loadAllModules();
   }, [currentCenter?.center_id]);
 
   // ========== READING MODULE METHODS ==========
@@ -829,9 +891,6 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
     return await listeningHelpers.uploadAudioFiles(centerId, sections);
   };
 
-  /**
-   * Save a single module with its sections
-   */
   const saveModule = async (
     moduleType: ModuleType,
     moduleTitle: string,
@@ -865,8 +924,8 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
         return result;
       }
 
-      // Refresh center modules list
-      await refreshCenterModules();
+      // Refresh center modules list and reload full modules
+      await Promise.all([refreshCenterModules(), loadAllModules()]);
 
       return result;
     } catch (err) {
@@ -920,8 +979,8 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
         return result;
       }
 
-      // Refresh center modules list
-      await refreshCenterModules();
+      // Refresh center modules list and reload full modules
+      await Promise.all([refreshCenterModules(), loadAllModules()]);
 
       return result;
     } catch (err) {
@@ -944,6 +1003,10 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
     centerModulesLoading,
     centerModulesError,
     refreshCenterModules,
+
+    storedModules,
+    loadAllModules,
+    isLoadingModules,
 
     // Reading
     readingSections: moduleData.reading.sections,

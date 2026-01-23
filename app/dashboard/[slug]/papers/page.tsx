@@ -10,6 +10,9 @@ import {
   Module,
   fetchPapers,
   Paper,
+  updatePaper,
+  deletePaper,
+  togglePaperStatus,
 } from "@/helpers/papers";
 import { SmallLoader } from "@/components/ui/SmallLoader";
 import { useModuleContext } from "@/context/ModuleContext";
@@ -28,6 +31,7 @@ export default function PapersPage() {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [showCreatePaperModal, setShowCreatePaperModal] = useState(false);
   const [paperTitle, setPaperTitle] = useState("");
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
   const { centerPapers } = useModuleContext();
   const [paperType, setPaperType] = useState<"IELTS" | "OIETC" | "GRE">(
@@ -119,6 +123,46 @@ export default function PapersPage() {
     }
   };
 
+  const handleUpdatePaper = async (
+    paperId: string,
+    data: {
+      title: string;
+      paperType: string;
+      isActive: boolean;
+      readingModuleId?: string | null;
+      listeningModuleId?: string | null;
+      writingModuleId?: string | null;
+      speakingModuleId?: string | null;
+    },
+  ) => {
+    const result = await updatePaper(paperId, {
+      title: data.title,
+      paperType: data.paperType as "IELTS" | "OIETC" | "GRE",
+      readingModuleId: data.readingModuleId || undefined,
+      listeningModuleId: data.listeningModuleId || undefined,
+      writingModuleId: data.writingModuleId || undefined,
+      speakingModuleId: data.speakingModuleId || undefined,
+      instruction: undefined,
+    });
+
+    const currentPaper = papers.find((p) => p.id === paperId);
+    if (result.success && currentPaper) {
+      if (data.isActive !== currentPaper.is_active) {
+        await togglePaperStatus(paperId, data.isActive);
+      }
+      await loadData();
+    }
+
+    return result;
+  };
+
+  const handleDeletePaper = async (paperId: string) => {
+    const result = await deletePaper(paperId);
+    if (result.success) {
+      await loadData();
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto">
@@ -154,7 +198,18 @@ export default function PapersPage() {
         {papers.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {papers.map((paper) => (
-              <PaperCardWithModules key={paper.id} paper={paper} />
+              <PaperCardWithModules
+                key={paper.id}
+                paper={paper}
+                activeMenu={activeMenu}
+                onMenuToggle={(paperId) =>
+                  setActiveMenu(activeMenu === paperId ? null : paperId)
+                }
+                onMenuClose={() => setActiveMenu(null)}
+                availableModules={availableModules}
+                onPaperUpdate={handleUpdatePaper}
+                onPaperDelete={handleDeletePaper}
+              />
             ))}
           </div>
         ) : (

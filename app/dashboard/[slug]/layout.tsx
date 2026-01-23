@@ -15,6 +15,7 @@ import {
   NotepadText,
   LifeBuoy,
   Handshake,
+  UserStar,
 } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
 import { CentreProvider, useCentre } from "../../../context/CentreContext";
@@ -55,6 +56,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       icon: BarChart3,
     },
     { label: "Students", href: `/dashboard/${slug}/students`, icon: Users },
+    { label: "Members", href: `/dashboard/${slug}/members`, icon: UserStar },
   ];
 
   // Set mounted after initial render

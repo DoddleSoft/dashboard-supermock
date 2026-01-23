@@ -26,16 +26,20 @@ export const centerHelpers = {
 
       const { data: modules, error: modulesError } = await supabase
         .from("modules")
-        .select("id,module_type")
+        .select("id,module_type,heading")
         .eq("center_id", centerId);
 
       if (modulesError) throw modulesError;
 
       // Create a map of module IDs to their types
       const moduleTypeMap: Record<string, string> = {};
+      const moduleNameMap: Record<string, string> = {};
       (modules || []).forEach((mod) => {
         if (mod.id && mod.module_type) {
           moduleTypeMap[mod.id] = mod.module_type;
+        }
+        if (mod.id && mod.heading) {
+          moduleNameMap[mod.id] = mod.heading;
         }
       });
 
@@ -75,6 +79,14 @@ export const centerHelpers = {
           createdAt: paper.created_at,
           modulesCount,
           moduleTypes,
+          readingModuleId: paper.reading_module_id ?? null,
+          listeningModuleId: paper.listening_module_id ?? null,
+          writingModuleId: paper.writing_module_id ?? null,
+          speakingModuleId: paper.speaking_module_id ?? null,
+          readingModuleName: moduleNameMap[paper.reading_module_id] ?? null,
+          listeningModuleName: moduleNameMap[paper.listening_module_id] ?? null,
+          writingModuleName: moduleNameMap[paper.writing_module_id] ?? null,
+          speakingModuleName: moduleNameMap[paper.speaking_module_id] ?? null,
         };
       });
 

@@ -11,6 +11,7 @@ import { CreateModuleModal } from "../../../../components/questions/CreatePaperM
 import { DeleteModuleDialog } from "../../../../components/questions/DeleteModuleDialog";
 import { PaperCard } from "../../../../components/ui/PaperCard";
 import { ModuleCard } from "../../../../components/ui/ModuleCard";
+import { deletePaper, updatePaper } from "../../../../helpers/papers";
 
 interface StandaloneModule {
   id: string;
@@ -18,6 +19,7 @@ interface StandaloneModule {
   heading: string;
   created_at: string;
   subheading?: string;
+  paper_id?: string | null;
 }
 
 const formatDate = (dateString: string) => {
@@ -40,6 +42,7 @@ export default function PapersPage() {
   const [standaloneModules, setStandaloneModules] = useState<
     StandaloneModule[]
   >([]);
+  const [allModules, setAllModules] = useState<StandaloneModule[]>([]);
   const [modulesLoading, setModulesLoading] = useState(true);
   const [activeView, setActiveView] = useState<"all" | "papers" | "modules">(
     "all",
@@ -55,8 +58,12 @@ export default function PapersPage() {
   });
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const { centerPapers, centerModuleStats, centerModulesLoading } =
-    useModuleContext();
+  const {
+    centerPapers,
+    centerModuleStats,
+    centerModulesLoading,
+    refreshCenterModules,
+  } = useModuleContext();
   const { currentCenter } = useCentre();
 
   useEffect(() => {
@@ -73,15 +80,51 @@ export default function PapersPage() {
 
     const { data, error } = await supabase
       .from("modules")
-      .select("id, module_type, heading, subheading, created_at")
+      .select("id, module_type, heading, subheading, created_at, paper_id")
       .eq("center_id", currentCenter.center_id)
-      .is("paper_id", null)
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      setStandaloneModules(data);
+      setAllModules(data);
+      setStandaloneModules(data.filter((module) => !module.paper_id));
     }
     setModulesLoading(false);
+  };
+
+  const handleUpdatePaper = async (
+    paperId: string,
+    data: {
+      title: string;
+      paperType: string;
+      isActive: boolean;
+      readingModuleId?: string | null;
+      listeningModuleId?: string | null;
+      writingModuleId?: string | null;
+      speakingModuleId?: string | null;
+    },
+  ) => {
+    const result = await updatePaper(paperId, {
+      title: data.title,
+      paperType: data.paperType as "IELTS" | "OIETC" | "GRE",
+      readingModuleId: data.readingModuleId || undefined,
+      listeningModuleId: data.listeningModuleId || undefined,
+      writingModuleId: data.writingModuleId || undefined,
+      speakingModuleId: data.speakingModuleId || undefined,
+      instruction: undefined,
+    });
+
+    if (result.success) {
+      await refreshCenterModules();
+    }
+
+    return result;
+  };
+
+  const handleDeletePaper = async (paperId: string) => {
+    const result = await deletePaper(paperId);
+    if (result.success) {
+      await refreshCenterModules();
+    }
   };
 
   const handleDeleteModule = async () => {
@@ -108,7 +151,7 @@ export default function PapersPage() {
 
   const handleViewModule = (moduleId: string, moduleType: string) => {
     router.push(
-      `/dashboard/${slug}/create/modules/preview?type=${moduleType.toLowerCase()}`,
+      `/dashboard/${slug}/create/modules/preview?type=${moduleType.toLowerCase()}&moduleId=${moduleId}`,
     );
     setActiveMenu(null);
   };
@@ -271,6 +314,9 @@ export default function PapersPage() {
                   }
                   onMenuClose={() => setActiveMenu(null)}
                   formatDate={formatDate}
+                  availableModules={allModules}
+                  onPaperUpdate={handleUpdatePaper}
+                  onPaperDelete={handleDeletePaper}
                 />
               ))}
             </div>

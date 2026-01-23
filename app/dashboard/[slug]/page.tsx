@@ -32,7 +32,7 @@ export default function DashboardPage() {
 
   const stats = [
     {
-      label: "Total Registered Students",
+      label: "Registered Students",
       value: dashboardStats?.totalStudents ?? 0,
       change: `${dashboardStats?.totalStudents ?? 0} active students`,
       trend: "up" as const,
@@ -53,7 +53,7 @@ export default function DashboardPage() {
       color: "bg-purple-100 text-purple-600",
     },
     {
-      label: "Total Mock Test Registered",
+      label: "Mock Registered",
       value: dashboardStats?.totalMockTestRegistered ?? 0,
       change: `${dashboardStats?.totalMockTestRegistered ?? 0} active students`,
       trend: "up" as const,
@@ -73,17 +73,14 @@ export default function DashboardPage() {
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center justify-between w-full">
-                  <p className="text-slate-500 text-lg mb-1">{stat.label}</p>
+                  <p className="text-slate-500 text-md mb-1">{stat.label}</p>
                   <p className="text-3xl font-bold text-slate-900">
                     {stat.value}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {stat.trend === "up" && (
-                  <TrendingUp className="w-4 h-4 text-green-600" />
-                )}
-                <p className="text-sm text-slate-600">{stat.change}</p>
+                <p className="text-xs text-slate-600">{stat.change}</p>
               </div>
             </div>
           );

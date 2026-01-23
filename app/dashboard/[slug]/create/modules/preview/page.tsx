@@ -17,8 +17,11 @@ import {
   WritingSection,
   RenderBlock,
   useModuleContext,
+  StoredModule,
 } from "@/context/ModuleContext";
 import RenderBlockView from "@/components/ui/RenderBlock";
+import { Loader } from "@/components/ui/Loader";
+import { createClient } from "@/lib/supabase/client";
 
 type ModuleType = "reading" | "writing" | "listening" | "speaking";
 
@@ -50,6 +53,34 @@ const getModuleTitle = (
   },
 ) => titles[type] || `${getTypeLabel(type)} Module`;
 
+/**
+ * Convert a Supabase storage path to a public URL
+ */
+const getAudioUrl = (audioPath: string | null | undefined): string | null => {
+  if (!audioPath || typeof audioPath !== "string") return null;
+
+  // Trim whitespace
+  const trimmed = audioPath.trim();
+  if (!trimmed) return null;
+
+  // If it's already a full URL, return as-is
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("blob:")
+  ) {
+    return trimmed;
+  }
+
+  // If it's a Supabase storage path, construct the public URL
+  // Expected format: "bucket_name/path/to/file" or "path/to/file"
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) return null;
+  
+  const path = `${supabaseUrl}/storage/v1/object/public/${trimmed}`;
+  return path;
+};
+
 export default function PreviewPage() {
   const params = useParams();
   const router = useRouter();
@@ -66,27 +97,61 @@ export default function PreviewPage() {
     ? queryType
     : "reading";
 
-  const { moduleTitles, readingSections, listeningSections, writingSections } =
-    useModuleContext();
+  const {
+    moduleTitles,
+    readingSections,
+    listeningSections,
+    writingSections,
+    storedModules,
+    isLoadingModules,
+  } = useModuleContext();
+
+  const moduleId = searchParams.get("moduleId");
 
   const [selectedId, setSelectedId] = useState<string | number | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
 
+  const selectedStoredModule = useMemo<StoredModule | null>(() => {
+    if (!moduleId) return null;
+    return storedModules.find((m) => m.module_id === moduleId) || null;
+  }, [moduleId, storedModules]);
+
+  const effectiveType: ModuleType =
+    (selectedStoredModule?.module_type as ModuleType | undefined) || type;
+
   const sections = useMemo(() => {
-    if (type === "reading") return readingSections;
-    if (type === "listening") return listeningSections;
-    if (type === "writing") return writingSections;
+    if (selectedStoredModule) {
+      return (selectedStoredModule.sections || []) as (
+        | ReadingSection
+        | ListeningSection
+        | WritingSection
+      )[];
+    }
+    if (effectiveType === "reading") return readingSections;
+    if (effectiveType === "listening") return listeningSections;
+    if (effectiveType === "writing") return writingSections;
     return [] as (ReadingSection | ListeningSection | WritingSection)[];
-  }, [type, readingSections, listeningSections, writingSections]);
+  }, [
+    selectedStoredModule,
+    effectiveType,
+    readingSections,
+    listeningSections,
+    writingSections,
+  ]);
+
+  const previewTitle = useMemo(() => {
+    if (selectedStoredModule?.title?.trim()) return selectedStoredModule.title;
+    return getModuleTitle(effectiveType, moduleTitles);
+  }, [selectedStoredModule, effectiveType, moduleTitles]);
 
   useEffect(() => {
     setSelectedId(sections[0]?.id ?? null);
-  }, [type, sections]);
+  }, [effectiveType, sections]);
 
   useEffect(() => {
     setAnswers({});
-  }, [selectedId, type]);
+  }, [selectedId, effectiveType]);
 
   const selectedSection = useMemo(
     () => sections.find((section) => section.id === selectedId) || null,
@@ -94,7 +159,7 @@ export default function PreviewPage() {
   );
 
   useEffect(() => {
-    if (type !== "listening") {
+    if (effectiveType !== "listening") {
       setAudioUrl(null);
       return;
     }
@@ -105,18 +170,44 @@ export default function PreviewPage() {
       return;
     }
 
+    // If it's a local audio file (from file input), use blob URL
     if (section.audioFile) {
       const url = URL.createObjectURL(section.audioFile);
       setAudioUrl(url);
       return () => URL.revokeObjectURL(url);
     }
 
-    setAudioUrl(section.audioPath || null);
-  }, [selectedSection, type]);
+    // If it's a stored module with audioPath (from database)
+    const audioPath = (section as any)?.audioPath || (section as any)?.resource_url;
+    const url = getAudioUrl(audioPath);
+    setAudioUrl(url);
+  }, [selectedSection, effectiveType]);
 
   const handleBack = () => {
     router.push(`/dashboard/${slug}/create/modules?type=${type}`);
   };
+
+  // Show error ONLY if module was explicitly not found after loading completed
+  if (moduleId && !isLoadingModules && !selectedStoredModule) {
+    return (
+      <div className="max-w-7xl mx-auto flex flex-col items-center justify-center py-20">
+        <BookOpen className="h-16 w-16 text-slate-300 mb-4" />
+        <h2 className="text-xl font-semibold text-slate-900 mb-2">
+          Module Not Found
+        </h2>
+        <p className="text-sm text-slate-600 mb-6">
+          The module you're looking for doesn't exist or has been deleted.
+        </p>
+        <button
+          onClick={() => router.push(`/dashboard/${slug}/create/modules`)}
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Modules
+        </button>
+      </div>
+    );
+  }
 
   const renderBlock = (block: RenderBlock, index: number) => {
     if (block.type === "editor") {
@@ -152,7 +243,7 @@ export default function PreviewPage() {
         <RenderBlockView
           block={{ type: block.type, content: block.content || "" }}
           questions={
-            type === "writing"
+            effectiveType === "writing"
               ? {}
               : (selectedSection as ReadingSection | ListeningSection)
                   .questions || {}
@@ -181,14 +272,12 @@ export default function PreviewPage() {
             Back to editor
           </button>
           <span className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
-            {getTypeIcon(type)}
-            {getTypeLabel(type)} Preview
+            {getTypeIcon(effectiveType)}
+            {getTypeLabel(effectiveType)} Preview
           </span>
         </div>
         <div className="text-right">
-          <h1 className="text-2xl font-bold text-slate-900">
-            {getModuleTitle(type, moduleTitles)}
-          </h1>
+          <h1 className="text-2xl font-bold text-slate-900">{previewTitle}</h1>
           <p className="text-sm text-slate-500">Preview mode only</p>
         </div>
       </div>
@@ -197,7 +286,7 @@ export default function PreviewPage() {
         {/* Left: Sections */}
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
-            {type === "writing" ? "Tasks" : "Sections"}
+            {effectiveType === "writing" ? "Tasks" : "Sections"}
           </h2>
 
           <div className="space-y-2">
@@ -212,12 +301,12 @@ export default function PreviewPage() {
                 }`}
               >
                 <p className="font-semibold">
-                  {type === "writing"
+                  {effectiveType === "writing"
                     ? `Task ${index + 1}`
                     : `Section ${index + 1}`}
                 </p>
                 <p className="text-xs text-slate-500 truncate">
-                  {type === "writing"
+                  {effectiveType === "writing"
                     ? (section as WritingSection).heading || "Untitled"
                     : (section as ReadingSection | ListeningSection).title ||
                       "Untitled"}
@@ -235,22 +324,26 @@ export default function PreviewPage() {
 
         {/* Right: Section Content */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 space-y-6">
-          {selectedSection ? (
+          {moduleId && isLoadingModules && !selectedStoredModule ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <Loader subtitle="Loading module details..." />
+            </div>
+          ) : selectedSection ? (
             <>
               <div className="space-y-2">
                 <h2 className="text-xl font-semibold text-slate-900">
-                  {type === "writing"
+                  {effectiveType === "writing"
                     ? (selectedSection as WritingSection).heading || "Untitled"
                     : (selectedSection as ReadingSection | ListeningSection)
                         .title || "Untitled"}
                 </h2>
-                {type === "writing" &&
+                {effectiveType === "writing" &&
                   (selectedSection as WritingSection).subheading && (
                     <p className="text-sm text-slate-600">
                       {(selectedSection as WritingSection).subheading}
                     </p>
                   )}
-                {type !== "writing" &&
+                {effectiveType !== "writing" &&
                   (selectedSection as ReadingSection | ListeningSection)
                     .instruction && (
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
@@ -263,27 +356,38 @@ export default function PreviewPage() {
               </div>
 
               {/* For Reading/Listening sections, show special content */}
-              {type === "reading" && "passageText" in selectedSection && (
-                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                    Passage
-                  </p>
-                  <p className="text-sm text-slate-700 whitespace-pre-line">
-                    {(selectedSection as ReadingSection).passageText ||
-                      "No passage added"}
-                  </p>
-                </div>
-              )}
+              {effectiveType === "reading" &&
+                "passageText" in selectedSection && (
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                      Passage
+                    </p>
+                    <p className="text-sm text-slate-700 whitespace-pre-line">
+                      {(selectedSection as ReadingSection).passageText ||
+                        "No passage added"}
+                    </p>
+                  </div>
+                )}
 
-              {type === "listening" && (
+              {effectiveType === "listening" && (
                 <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                   <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
                     Audio
                   </p>
                   {audioUrl ? (
-                    <audio controls className="w-full" src={audioUrl} />
+                    <audio
+                      controls
+                      className="w-full"
+                      src={audioUrl}
+                      key={audioUrl}
+                      crossOrigin="anonymous"
+                    />
                   ) : (
-                    <p className="text-sm text-slate-500">No audio attached</p>
+                    <p className="text-sm text-slate-500">
+                      {selectedStoredModule
+                        ? "No audio attached to this section"
+                        : "No audio attached"}
+                    </p>
                   )}
                 </div>
               )}
@@ -300,7 +404,7 @@ export default function PreviewPage() {
               </div>
 
               {/* Answer Key for Reading/Listening */}
-              {type !== "writing" &&
+              {effectiveType !== "writing" &&
                 Object.keys(
                   (selectedSection as ReadingSection | ListeningSection)
                     .questions || {},
@@ -329,7 +433,8 @@ export default function PreviewPage() {
             </>
           ) : (
             <div className="rounded-xl border border-dashed border-slate-200 p-10 text-center text-sm text-slate-500">
-              Select a {type === "writing" ? "task" : "section"} to preview
+              Select a {effectiveType === "writing" ? "task" : "section"} to
+              preview
             </div>
           )}
         </div>
