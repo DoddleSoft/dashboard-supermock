@@ -76,7 +76,7 @@ const getAudioUrl = (audioPath: string | null | undefined): string | null => {
   // Expected format: "bucket_name/path/to/file" or "path/to/file"
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!supabaseUrl) return null;
-  
+
   const path = `${supabaseUrl}/storage/v1/object/public/${trimmed}`;
   return path;
 };
@@ -178,7 +178,8 @@ export default function PreviewPage() {
     }
 
     // If it's a stored module with audioPath (from database)
-    const audioPath = (section as any)?.audioPath || (section as any)?.resource_url;
+    const audioPath =
+      (section as any)?.audioPath || (section as any)?.resource_url;
     const url = getAudioUrl(audioPath);
     setAudioUrl(url);
   }, [selectedSection, effectiveType]);
@@ -362,10 +363,10 @@ export default function PreviewPage() {
                     <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
                       Passage
                     </p>
-                    <p className="text-sm text-slate-700 whitespace-pre-line">
+                    <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
                       {(selectedSection as ReadingSection).passageText ||
                         "No passage added"}
-                    </p>
+                    </div>
                   </div>
                 )}
 

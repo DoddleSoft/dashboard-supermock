@@ -309,7 +309,7 @@ export default function ReadingModule({
                             onChange={(e) =>
                               onUpdateRenderBlock(section.id, index, {
                                 ...block,
-                                content: toStorageContent(e.target.value),
+                                content: e.target.value,
                               })
                             }
                             placeholder="Write the passage text or questions here..."

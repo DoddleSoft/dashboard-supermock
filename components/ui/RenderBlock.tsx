@@ -11,10 +11,10 @@ const RenderBlock = ({
 }) => {
   const { type, content } = block;
 
-  // Parse placeholders like {{1}boolean}, {{8}blanks}, {{14}dropdown}, {{3}mcq}, {{5}true-false-not-given}
+  // Parse placeholders like {{1}boolean}, {{8}blanks}, {{14}dropdown}, {{3}mcq}, {{5}true-false-not-given}, {{2}true-false}
   const renderContent = (text: string) => {
     const regex =
-      /{{(\d+)}(boolean|blanks|dropdown|mcq|true-false-not-given|fill-blank)}/g;
+      /{{(\d+)}(boolean|blanks|dropdown|mcq|true-false-not-given|true-false|fill-blank)}/g;
     const parts: React.ReactElement[] = [];
     let lastIndex = 0;
     let match;
@@ -36,9 +36,11 @@ const RenderBlock = ({
           ? "dropdown"
           : inputType === "true-false-not-given"
             ? "boolean"
-            : inputType === "fill-blank"
-              ? "blanks"
-              : inputType;
+            : inputType === "true-false"
+              ? "boolean"
+              : inputType === "fill-blank"
+                ? "blanks"
+                : inputType;
       const qData = questions[qNum];
 
       const resolvedOptions =
@@ -156,7 +158,7 @@ const RenderBlock = ({
       );
     case "text":
       return (
-        <div className="mb-2 text-xs leading-7 text-gray-800">
+        <div className="mb-2 text-xs leading-7 text-gray-800 whitespace-pre-wrap">
           {renderContent(content)}
         </div>
       );
