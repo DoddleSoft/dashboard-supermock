@@ -28,10 +28,7 @@ export function DeleteConfirmDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6">
-          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-100 mb-4 mx-auto">
-            <X className="w-6 h-6 text-red-600" />
-          </div>
-          <h3 className="text-lg font-bold text-slate-900 text-center mb-2">
+          <h3 className="text-xl font-bold text-red-900 text-center mb-4">
             Delete Student
           </h3>
           <p className="text-sm text-slate-600 text-center mb-6">

@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Dashboard | SuperMock",
+  title: "Dashboard | SuperMock - IELTS Mock Test Platform",
   description: "Manage your IELTS mock test and your center with SuperMock.net",
 };
 

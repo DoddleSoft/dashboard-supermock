@@ -27,7 +27,7 @@ export function SidebarItem({ item, isCollapsed, isActive }: SidebarItemProps) {
           "px-4 py-2.5 gap-3",
           isActive
             ? "bg-red-50 text-red-600 shadow-sm"
-            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
         )}
       >
         <Icon className="h-5 w-5 flex-shrink-0" />

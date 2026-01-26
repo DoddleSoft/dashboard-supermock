@@ -11,6 +11,8 @@ export interface ScheduledTest {
   status: "scheduled" | "in_progress" | "completed" | "cancelled";
   created_at: string;
   updated_at: string;
+  otp: number | null;
+  atendee: number | null;
   paper?: {
     title: string;
     paper_type: string;
@@ -416,6 +418,37 @@ export const cancelScheduledTest = async (
   } catch (error: any) {
     console.error("Error cancelling scheduled test:", error);
     const errorMessage = error?.message || "Failed to cancel test";
+    toast.error(errorMessage);
+    return { success: false, error: errorMessage };
+  }
+};
+
+/**
+ * Generate and save OTP for a scheduled test (Server-Side)
+ */
+export const generateScheduledTestOtp = async (
+  testId: string,
+): Promise<{ success: boolean; otp?: number; error?: string }> => {
+  try {
+    const supabase = createClient();
+
+    // Call the RPC function we created
+    const { data, error } = await supabase.rpc("generate_unique_test_otp", {
+      target_test_id: testId,
+    });
+
+    if (error) throw error;
+
+    // Handle manual error returns from function (e.g. invalid ID)
+    if (!data.success) {
+      throw new Error(data.error);
+    }
+
+    toast.success("OTP generated successfully!");
+    return { success: true, otp: data.otp };
+  } catch (error: any) {
+    console.error("Error generating OTP:", error);
+    const errorMessage = error?.message || "Failed to generate OTP";
     toast.error(errorMessage);
     return { success: false, error: errorMessage };
   }

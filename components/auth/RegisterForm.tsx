@@ -65,7 +65,7 @@ export function RegisterForm() {
       const result = await signUp(
         formData.email,
         formData.password,
-        formData.fullName.trim()
+        formData.fullName.trim(),
       );
 
       if (!result.success) {
@@ -234,18 +234,8 @@ export function RegisterForm() {
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">Or</span>
-            </div>
-          </div>
-
           {/* Footer Text */}
-          <p className="text-center text-xs text-gray-500">
+          <p className="text-center text-xs text-gray-500 mt-4">
             By creating an account, you agree to our{" "}
             <Link
               href="#"

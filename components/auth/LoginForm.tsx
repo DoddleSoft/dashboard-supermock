@@ -27,7 +27,7 @@ export function LoginForm() {
     const registered = searchParams.get("registered");
     if (registered === "true") {
       setSuccessMessage(
-        "Account created successfully! Please check your email to verify your account, then sign in."
+        "Account created successfully! Please check your email to verify your account, then sign in.",
       );
     }
   }, [searchParams]);
@@ -215,20 +215,8 @@ export function LoginForm() {
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">
-                Or continue with
-              </span>
-            </div>
-          </div>
-
           {/* Footer Text */}
-          <p className="text-center text-xs text-gray-500">
+          <p className="text-center text-xs text-gray-500 mt-4">
             By signing in, you agree to our{" "}
             <Link
               href="#"

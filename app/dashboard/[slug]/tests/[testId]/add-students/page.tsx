@@ -268,6 +268,7 @@ export default function AddStudentsPage() {
       const mockAttemptInserts = allStudentIds.map((student_id) => ({
         student_id: student_id,
         paper_id: test.paper_id,
+        scheduled_test_id: testId,
         attempt_type: "full_mock",
         status: "in_progress",
       }));

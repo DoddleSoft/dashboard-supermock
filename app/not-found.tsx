@@ -29,7 +29,7 @@ export default function NotFound() {
 
         <div className="mt-12">
           <Link
-            href="/dashboard"
+            href="/"
             className="group relative inline-flex items-center gap-2 overflow-hidden rounded-full border border-gray-900 bg-gray-900 px-8 py-3 text-white transition-all hover:bg-transparent hover:text-gray-900"
           >
             <motion.span

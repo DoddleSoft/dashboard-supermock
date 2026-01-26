@@ -15,9 +15,12 @@ import {
   Trash2,
   X,
   User,
+  UserCheck,
   Calendar,
   Clock,
   Users,
+  KeyRound,
+  RectangleEllipsis,
 } from "lucide-react";
 import { useCentre } from "@/context/CentreContext";
 import {
@@ -25,6 +28,7 @@ import {
   fetchTestStats,
   deleteScheduledTest,
   cancelScheduledTest,
+  generateScheduledTestOtp,
   ScheduledTest,
   TestStats,
 } from "@/helpers/tests";
@@ -42,6 +46,7 @@ export default function TestsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [otpLoadingId, setOtpLoadingId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     open: boolean;
     testId: string | null;
@@ -103,6 +108,21 @@ export default function TestsPage() {
       loadData();
     }
     setOpenMenuId(null);
+  };
+
+  const handleGenerateOtp = async (testId: string) => {
+    const test = tests.find((t) => t.id === testId);
+    if (!test || test.otp) return;
+
+    setOtpLoadingId(testId);
+    const result = await generateScheduledTestOtp(testId);
+    setOtpLoadingId(null);
+
+    if (result.success && result.otp) {
+      setTests((prev) =>
+        prev.map((t) => (t.id === testId ? { ...t, otp: result.otp! } : t)),
+      );
+    }
   };
 
   const getTestModuleIcon = (module: string) => {
@@ -344,71 +364,98 @@ export default function TestsPage() {
                     </div>
                   )}
 
-                  <div className="flex w-full justify-end pt-2 border-t border-slate-100">
-                    <div className="relative">
+                  {/* Attended */}
+                  <div className="flex items-center gap-2 text-sm text-slate-600">
+                    <UserCheck className="w-4 h-4" />
+                    <span>
+                      {test.atendee ?? 0} student
+                      {(test.atendee ?? 0) !== 1 ? "s" : ""} attended
+                    </span>
+                  </div>
+
+                  <div className="flex w-full justify-between pt-2 items-center border-t border-slate-100">
+                    <span className="text-lg text-slate-600 min-w-[90px]">
+                      {test.otp ? `OTP: ${test.otp}` : "OTP: — — —"}
+                    </span>
+
+                    <div className="flex items-center gap-2">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setOpenMenuId(
-                            openMenuId === test.id ? null : test.id,
-                          );
+                          handleGenerateOtp(test.id);
                         }}
-                        className="hover:bg-slate-100 rounded-lg transition-colors p-2"
+                        disabled={!!test.otp || otpLoadingId === test.id}
+                        className="hover:bg-slate-100 rounded-lg transition-colors p-2 disabled:opacity-60"
+                        title={test.otp ? "OTP generated" : "Generate OTP"}
                       >
-                        <MoreVertical className="w-4 h-4 text-slate-600" />
+                        <RectangleEllipsis className="w-5 h-5 text-slate-600" />
                       </button>
 
-                      {openMenuId === test.id && (
-                        <div
-                          className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg border border-slate-200 shadow-lg z-10"
-                          onClick={(e) => e.stopPropagation()}
+                      <div className="relative">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(
+                              openMenuId === test.id ? null : test.id,
+                            );
+                          }}
+                          className="hover:bg-slate-100 rounded-lg transition-colors p-2"
                         >
-                          <button
-                            onClick={() =>
-                              router.push(
-                                `/dashboard/${slug}/tests/${test.id}/add-students`,
-                              )
-                            }
-                            className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-t-lg transition-colors"
+                          <MoreVertical className="w-5 h-5 text-slate-600" />
+                        </button>
+
+                        {openMenuId === test.id && (
+                          <div
+                            className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg border border-slate-200 shadow-lg z-10"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            <Users className="w-4 h-4" />
-                            Add Students
-                          </button>
-                          <button
-                            onClick={() =>
-                              router.push(
-                                `/dashboard/${slug}/create/test?edit=${test.id}`,
-                              )
-                            }
-                            className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 text-slate-700 text-sm font-medium transition-colors"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                            Edit
-                          </button>
-                          {test.status === "scheduled" && (
                             <button
-                              onClick={() => handleCancel(test.id)}
-                              className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-yellow-50 text-yellow-600 text-sm font-medium transition-colors border-t border-slate-200"
+                              onClick={() =>
+                                router.push(
+                                  `/dashboard/${slug}/tests/${test.id}/add-students`,
+                                )
+                              }
+                              className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-t-lg transition-colors"
                             >
-                              <X className="w-4 h-4" />
-                              Cancel
+                              <Users className="w-4 h-4" />
+                              Add Students
                             </button>
-                          )}
-                          <button
-                            onClick={() =>
-                              setDeleteConfirm({
-                                open: true,
-                                testId: test.id,
-                                testName: test.title,
-                              })
-                            }
-                            className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-red-50 text-red-600 text-sm font-medium rounded-b-lg transition-colors border-t border-slate-200"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            Delete
-                          </button>
-                        </div>
-                      )}
+                            <button
+                              onClick={() =>
+                                router.push(
+                                  `/dashboard/${slug}/create/test?edit=${test.id}`,
+                                )
+                              }
+                              className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 text-slate-700 text-sm font-medium transition-colors"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                              Edit
+                            </button>
+                            {test.status === "scheduled" && (
+                              <button
+                                onClick={() => handleCancel(test.id)}
+                                className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-yellow-50 text-yellow-600 text-sm font-medium transition-colors border-t border-slate-200"
+                              >
+                                <X className="w-4 h-4" />
+                                Cancel
+                              </button>
+                            )}
+                            <button
+                              onClick={() =>
+                                setDeleteConfirm({
+                                  open: true,
+                                  testId: test.id,
+                                  testName: test.title,
+                                })
+                              }
+                              className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-red-50 text-red-600 text-sm font-medium rounded-b-lg transition-colors border-t border-slate-200"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

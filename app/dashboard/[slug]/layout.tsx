@@ -147,7 +147,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         <header className="border-b border-slate-200 bg-white">
           <div className="flex items-center w-full px-8 py-2">
             {/* LEFT: Page Title */}
-            <div className="flex-1 flex justify-start">
+            <div className="flex-1 flex justify-start items-center gap-4">
               <h2 className="text-xl font-semibold text-slate-900">
                 {navigationItems.find(
                   (item) =>
@@ -156,6 +156,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                       pathname.startsWith(item.href)),
                 )?.label || "Dashboard"}
               </h2>
+              <div className="h-8 bg-slate-300 w-[2px]"></div>
+              <p className="text-sm text-gray-700 font-semibold">
+                Dashboard Portal
+              </p>
             </div>
 
             {/* RIGHT: Profile */}
