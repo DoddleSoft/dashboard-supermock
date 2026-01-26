@@ -354,6 +354,7 @@ async function createSubSectionsFromBlocks(
     sub_type: string;
     content_template: string;
     resource_url: string | null;
+    instruction: string | null;
   }> = [];
 
   const blockQuestionRefs: string[][] = [];
@@ -404,6 +405,7 @@ async function createSubSectionsFromBlocks(
       sub_type: block.type,
       content_template: contentTemplate,
       resource_url: resourceUrl,
+      instruction: block.instruction || null,
     });
   });
 

@@ -44,60 +44,10 @@ export default function ReadingModule({
   onUpdateRenderBlock,
   onDeleteRenderBlock,
 }: ReadingModuleProps) {
-  const [placeholderDrafts, setPlaceholderDrafts] = useState<
-    Record<string, { number: string; type: "blanks" | "dropdown" | "boolean" }>
-  >({});
-  const [compressingImages, setCompressingImages] = useState<Set<string>>(
-    new Set(),
-  );
-
   const blockTypes: RenderBlockType[] = ["text", "image"];
-
-  const getDraftKey = (sectionId: string, index: number) =>
-    `${sectionId}:${index}`;
-
-  const getDraft = (sectionId: string, index: number) => {
-    const key = getDraftKey(sectionId, index);
-    return placeholderDrafts[key] || { number: "", type: "blanks" as const };
-  };
-
-  const updateDraft = (
-    sectionId: string,
-    index: number,
-    updates: Partial<{
-      number: string;
-      type: "blanks" | "dropdown" | "boolean";
-    }>,
-  ) => {
-    const key = getDraftKey(sectionId, index);
-    setPlaceholderDrafts((prev) => ({
-      ...prev,
-      [key]: { ...getDraft(sectionId, index), ...updates },
-    }));
-  };
-
-  const insertPlaceholder = (
-    sectionId: string,
-    index: number,
-    block: RenderBlock,
-  ) => {
-    const draft = getDraft(sectionId, index);
-    if (!draft.number) return;
-    const placeholder = `⟦Q${draft.number}:${draft.type}⟧`;
-    const separator = block.content && !block.content.endsWith(" ") ? " " : "";
-    onUpdateRenderBlock(sectionId, index, {
-      ...block,
-      content: toStorageContent(
-        `${toDisplayContent(block.content)}${separator}${placeholder}`,
-      ),
-    });
-  };
 
   const toDisplayContent = (value: string) =>
     value.replace(/\{\{(\d+)\}(blanks|dropdown|boolean)\}\}/g, "⟦Q$1:$2⟧");
-
-  const toStorageContent = (value: string) =>
-    value.replace(/⟦Q(\d+):(blanks|dropdown|boolean)⟧/g, "{{$1}$2}");
 
   const handleImageFileChange = async (
     sectionId: string,
@@ -106,9 +56,6 @@ export default function ReadingModule({
     file?: File | null,
   ) => {
     if (!file) return;
-
-    const blockKey = `${sectionId}-${index}`;
-    setCompressingImages((prev) => new Set(prev).add(blockKey));
 
     try {
       // Compress the image first
@@ -121,20 +68,10 @@ export default function ReadingModule({
           ...block,
           content: reader.result as string,
         });
-        setCompressingImages((prev) => {
-          const next = new Set(prev);
-          next.delete(blockKey);
-          return next;
-        });
       };
       reader.readAsDataURL(compressedFile);
     } catch (error) {
       console.error("Failed to process image:", error);
-      setCompressingImages((prev) => {
-        const next = new Set(prev);
-        next.delete(blockKey);
-        return next;
-      });
     }
   };
 
