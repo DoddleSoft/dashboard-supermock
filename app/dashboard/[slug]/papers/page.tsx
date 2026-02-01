@@ -18,6 +18,7 @@ import { SmallLoader } from "@/components/ui/SmallLoader";
 import { useModuleContext } from "@/context/ModuleContext";
 import { CreatePaperModal } from "@/components/papers/CreatePaperModal";
 import { PaperCardWithModules } from "@/components/ui/PaperCardWithModules";
+import { toast } from "sonner";
 
 export default function PapersPage() {
   const params = useParams();
@@ -87,7 +88,7 @@ export default function PapersPage() {
 
   const handleCreatePaper = async () => {
     if (!paperTitle.trim()) {
-      alert("Please enter a paper title");
+      toast.error("Please enter a paper title");
       return;
     }
 
@@ -97,7 +98,7 @@ export default function PapersPage() {
       !selectedModules.writing &&
       !selectedModules.speaking
     ) {
-      alert("Please select at least one module");
+      toast.error("Please select at least one module");
       return;
     }
 

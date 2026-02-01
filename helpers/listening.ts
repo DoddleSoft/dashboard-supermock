@@ -4,6 +4,7 @@ import {
   QuestionDefinition,
 } from "@/context/ModuleContext";
 import { uploadMediaFile } from "@/helpers/modules";
+import { toast } from "sonner";
 
 interface ListeningModuleData {
   sections: ListeningSection[];
@@ -229,28 +230,63 @@ export const listeningHelpers = {
     sections: ListeningSection[],
   ): Promise<ListeningSection[]> => {
     const updatedSections: ListeningSection[] = [];
+    let uploadFailures = 0;
 
     for (const section of sections) {
       if (section.audioFile) {
-        const result = await uploadMediaFile(
-          centerId,
-          "listening",
-          section.audioFile,
-          "audio",
-        );
-        if (result.success && result.url) {
-          updatedSections.push({
-            ...section,
-            audioPath: result.url,
-            audioFile: null,
-          });
-        } else {
-          // Keep original path if upload fails
-          updatedSections.push(section);
+        try {
+          console.log(`Uploading audio for section: ${section.title}`);
+          const result = await uploadMediaFile(
+            centerId,
+            "listening",
+            section.audioFile,
+            "audio",
+          );
+
+          if (result.success && result.url) {
+            console.log(
+              `✓ Audio uploaded successfully for section: ${section.title}`,
+            );
+            updatedSections.push({
+              ...section,
+              audioPath: result.url,
+              audioFile: null,
+            });
+          } else {
+            // Upload failed - throw error to prevent database insertion without audio
+            uploadFailures++;
+            const errorMsg = result.error || "Unknown upload error";
+            console.error(
+              `✗ Audio upload failed for section "${section.title}":`,
+              errorMsg,
+            );
+            toast.error(
+              `Failed to upload audio for "${section.title}": ${errorMsg}`,
+            );
+            throw new Error(
+              `Audio upload failed for section "${section.title}": ${errorMsg}`,
+            );
+          }
+        } catch (error) {
+          // Re-throw to prevent module creation without audio
+          const errorMsg =
+            error instanceof Error ? error.message : "Audio upload failed";
+          console.error(
+            `Error uploading audio for section "${section.title}":`,
+            error,
+          );
+          throw new Error(errorMsg);
         }
       } else {
+        // No audio file to upload, keep section as is
         updatedSections.push(section);
       }
+    }
+
+    if (uploadFailures > 0) {
+      throw new Error(
+        `Failed to upload ${uploadFailures} audio file(s). Please check file sizes and try again.`,
+      );
     }
 
     return updatedSections;
@@ -264,6 +300,7 @@ export const listeningHelpers = {
     sections: ListeningSection[],
   ): Promise<ListeningSection[]> => {
     const updatedSections: ListeningSection[] = [];
+    let uploadFailures = 0;
 
     for (const section of sections) {
       const updatedBlocks: RenderBlock[] = [];
@@ -273,16 +310,18 @@ export const listeningHelpers = {
           // Check if content is a base64 data URL
           if (block.content.startsWith("data:image/")) {
             try {
+              console.log(`Processing image in section: ${section.title}`);
+
               // Convert base64 to File
               const response = await fetch(block.content);
               const blob = await response.blob();
               const file = new File(
                 [blob],
-                `image_${Date.now()}.${blob.type.split("/")[1]}`,
+                `image_${Date.now()}.${blob.type.split("/")[1] || "jpg"}`,
                 { type: blob.type },
               );
 
-              // Upload to storage
+              // Upload to storage (with compression and validation)
               const result = await uploadMediaFile(
                 centerId,
                 "listening",
@@ -291,17 +330,37 @@ export const listeningHelpers = {
               );
 
               if (result.success && result.url) {
+                console.log(
+                  `✓ Image uploaded successfully in section: ${section.title}`,
+                );
                 updatedBlocks.push({
                   ...block,
                   content: result.url,
                 });
               } else {
-                // Keep original if upload fails
-                updatedBlocks.push(block);
+                // Upload failed - throw error to prevent database insertion without image
+                uploadFailures++;
+                const errorMsg = result.error || "Unknown upload error";
+                console.error(
+                  `✗ Image upload failed in section "${section.title}":`,
+                  errorMsg,
+                );
+                toast.error(
+                  `Failed to upload image in "${section.title}": ${errorMsg}`,
+                );
+                throw new Error(
+                  `Image upload failed in section "${section.title}": ${errorMsg}`,
+                );
               }
             } catch (error) {
-              console.error("Error processing image:", error);
-              updatedBlocks.push(block);
+              // Re-throw to prevent module creation without image
+              const errorMsg =
+                error instanceof Error ? error.message : "Image upload failed";
+              console.error(
+                `Error processing image in section "${section.title}":`,
+                error,
+              );
+              throw new Error(errorMsg);
             }
           } else {
             // Already a URL or external path
@@ -316,6 +375,12 @@ export const listeningHelpers = {
         ...section,
         renderBlocks: updatedBlocks,
       });
+    }
+
+    if (uploadFailures > 0) {
+      throw new Error(
+        `Failed to upload ${uploadFailures} image(s). Please check file sizes and try again.`,
+      );
     }
 
     return updatedSections;

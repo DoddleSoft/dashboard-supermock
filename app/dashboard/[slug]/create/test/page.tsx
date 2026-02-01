@@ -26,6 +26,7 @@ import {
 } from "@/helpers/tests";
 import { SmallLoader } from "@/components/ui/SmallLoader";
 import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
 
 interface Paper {
   id: string;
@@ -236,7 +237,7 @@ export default function CreateTestPage() {
     e.preventDefault();
 
     if (!testTitle || !selectedPaper || !scheduledDate || !scheduledTime) {
-      alert("Please fill in all required fields");
+      toast.error("Please fill in all required fields");
       return;
     }
 

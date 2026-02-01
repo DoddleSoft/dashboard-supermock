@@ -287,6 +287,9 @@ function CreateModuleContent() {
   };
 
   const handleCreateModule = async () => {
+    // Prevent double submission
+    if (isSaving) return;
+
     const currentModuleTitle = moduleTitles[typeKey];
 
     if (!currentModuleTitle.trim()) {

@@ -1,5 +1,6 @@
 import { WritingSection, RenderBlock } from "@/context/ModuleContext";
 import { uploadMediaFile } from "@/helpers/modules";
+import { toast } from "sonner";
 
 interface WritingModuleData {
   sections: WritingSection[];
@@ -176,6 +177,7 @@ export const writingHelpers = {
     sections: WritingSection[],
   ): Promise<WritingSection[]> => {
     const updatedSections: WritingSection[] = [];
+    let uploadFailures = 0;
 
     for (const section of sections) {
       const updatedBlocks: RenderBlock[] = [];
@@ -185,16 +187,18 @@ export const writingHelpers = {
           // Check if content is a base64 data URL
           if (block.content.startsWith("data:image/")) {
             try {
+              console.log(`Processing image in section: ${section.heading}`);
+
               // Convert base64 to File
               const response = await fetch(block.content);
               const blob = await response.blob();
               const file = new File(
                 [blob],
-                `image_${Date.now()}.${blob.type.split("/")[1]}`,
+                `image_${Date.now()}.${blob.type.split("/")[1] || "jpg"}`,
                 { type: blob.type },
               );
 
-              // Upload to storage
+              // Upload to storage (with compression and validation)
               const result = await uploadMediaFile(
                 centerId,
                 "writing",
@@ -203,17 +207,37 @@ export const writingHelpers = {
               );
 
               if (result.success && result.url) {
+                console.log(
+                  `✓ Image uploaded successfully in section: ${section.heading}`,
+                );
                 updatedBlocks.push({
                   ...block,
                   content: result.url,
                 });
               } else {
-                // Keep original if upload fails
-                updatedBlocks.push(block);
+                // Upload failed - throw error to prevent database insertion without image
+                uploadFailures++;
+                const errorMsg = result.error || "Unknown upload error";
+                console.error(
+                  `✗ Image upload failed in section "${section.heading}":`,
+                  errorMsg,
+                );
+                toast.error(
+                  `Failed to upload image in "${section.heading}": ${errorMsg}`,
+                );
+                throw new Error(
+                  `Image upload failed in section "${section.heading}": ${errorMsg}`,
+                );
               }
             } catch (error) {
-              console.error("Error processing image:", error);
-              updatedBlocks.push(block);
+              // Re-throw to prevent module creation without image
+              const errorMsg =
+                error instanceof Error ? error.message : "Image upload failed";
+              console.error(
+                `Error processing image in section "${section.heading}":`,
+                error,
+              );
+              throw new Error(errorMsg);
             }
           } else {
             // Already a URL or external path
@@ -228,6 +252,12 @@ export const writingHelpers = {
         ...section,
         renderBlocks: updatedBlocks,
       });
+    }
+
+    if (uploadFailures > 0) {
+      throw new Error(
+        `Failed to upload ${uploadFailures} image(s). Please check file sizes and try again.`,
+      );
     }
 
     return updatedSections;

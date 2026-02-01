@@ -6,6 +6,8 @@ import {
   RenderBlock,
   QuestionDefinition,
 } from "@/context/ModuleContext";
+import { compressImage, compressAudio } from "@/lib/mediaCompression";
+import { toast } from "sonner";
 
 export type ModuleType = "reading" | "listening" | "writing" | "speaking";
 
@@ -112,9 +114,9 @@ export async function createModule(
         "[createModule] Module creation error:",
         formatSupabaseError(moduleError),
       );
-      throw new Error(
-        `Module creation failed: ${moduleError.message || "Unknown error"}`,
-      );
+      const errorMsg = `Module creation failed: ${moduleError.message || "Unknown error"}`;
+      toast.error(errorMsg);
+      throw new Error(errorMsg);
     }
 
     const moduleId = moduleData.id;
@@ -166,6 +168,7 @@ export async function createModule(
       console.log(
         `[createModule] Module created successfully with ID: ${moduleId}`,
       );
+      toast.success("Module created successfully!");
       return { success: true, moduleId, paperId: payload.paperId };
     } catch (subsectionError) {
       // If subsection creation fails, delete the module to maintain consistency
@@ -174,6 +177,8 @@ export async function createModule(
         formatSupabaseError(subsectionError),
       );
 
+      toast.error("Module creation failed. Rolling back changes...");
+
       const { error: deleteError } = await supabase
         .from("modules")
         .delete()
@@ -181,6 +186,7 @@ export async function createModule(
 
       if (deleteError) {
         console.error("[createModule] Failed to rollback module:", deleteError);
+        toast.error("Failed to rollback changes. Please contact support.");
       } else {
         console.log(
           `[createModule] Successfully rolled back module ${moduleId}`,
@@ -191,9 +197,16 @@ export async function createModule(
     }
   } catch (err) {
     console.error("[createModule] Error:", formatSupabaseError(err));
+    const errorMessage = formatSupabaseError(err);
+
+    // Only show toast if it's not already shown by child functions
+    if (!errorMessage.includes("upload") && !errorMessage.includes("size")) {
+      toast.error(`Module creation failed: ${errorMessage}`);
+    }
+
     return {
       success: false,
-      error: formatSupabaseError(err),
+      error: errorMessage,
     };
   }
 }
@@ -203,6 +216,15 @@ async function createReadingSections(
   moduleId: string,
   sections: ReadingSection[],
 ): Promise<void> {
+  if (!sections || sections.length === 0) {
+    console.log("[createReadingSections] No sections to create");
+    return;
+  }
+
+  console.log(
+    `[createReadingSections] Creating ${sections.length} sections for module ${moduleId}`,
+  );
+
   const sectionIds = sections.map(() => crypto.randomUUID());
   const sectionsToInsert = sections.map((section, sectionIndex) => ({
     id: sectionIds[sectionIndex],
@@ -212,7 +234,12 @@ async function createReadingSections(
     content_type: "text",
     content_text: section.passageText || null,
     instruction: section.instruction || null,
+    subtext: section.heading || null,
   }));
+
+  console.log(
+    `[createReadingSections] Inserting ${sectionsToInsert.length} section records`,
+  );
 
   const sectionChunks = chunkArray(sectionsToInsert, INSERT_CHUNK_SIZE);
   const sectionResults = await Promise.all(
@@ -240,6 +267,15 @@ async function createListeningSections(
   moduleId: string,
   sections: ListeningSection[],
 ): Promise<void> {
+  if (!sections || sections.length === 0) {
+    console.log("[createListeningSections] No sections to create");
+    return;
+  }
+
+  console.log(
+    `[createListeningSections] Creating ${sections.length} sections for module ${moduleId}`,
+  );
+
   const sectionIds = sections.map(() => crypto.randomUUID());
   const sectionsToInsert = sections.map((section, sectionIndex) => ({
     id: sectionIds[sectionIndex],
@@ -250,6 +286,10 @@ async function createListeningSections(
     resource_url: section.audioPath || null,
     instruction: section.instruction || null,
   }));
+
+  console.log(
+    `[createListeningSections] Inserting ${sectionsToInsert.length} section records`,
+  );
 
   const sectionChunks = chunkArray(sectionsToInsert, INSERT_CHUNK_SIZE);
   const sectionResults = await Promise.all(
@@ -277,6 +317,15 @@ async function createWritingSections(
   moduleId: string,
   sections: WritingSection[],
 ): Promise<void> {
+  if (!sections || sections.length === 0) {
+    console.log("[createWritingSections] No sections to create");
+    return;
+  }
+
+  console.log(
+    `[createWritingSections] Creating sections for ${sections.length} writing sections for module ${moduleId}`,
+  );
+
   // For writing module, each render block becomes a separate section row
   // All blocks from the same WritingSection share the same metadata (title, subheading, instruction, params)
 
@@ -329,6 +378,10 @@ async function createWritingSections(
   });
 
   if (sectionsToInsert.length > 0) {
+    console.log(
+      `[createWritingSections] Inserting ${sectionsToInsert.length} section records`,
+    );
+
     const sectionChunks = chunkArray(sectionsToInsert, INSERT_CHUNK_SIZE);
     const sectionResults = await Promise.all(
       sectionChunks.map((chunk) => supabase.from("sections").insert(chunk)),
@@ -355,6 +408,7 @@ async function createSubSectionsFromBlocks(
     content_template: string;
     resource_url: string | null;
     instruction: string | null;
+    sub_section_index: number;
   }> = [];
 
   const blockQuestionRefs: string[][] = [];
@@ -395,7 +449,8 @@ async function createSubSectionsFromBlocks(
     }
 
     const subSectionId = crypto.randomUUID();
-    subSectionIndexByKey.set(dedupeKey, subSectionsToInsert.length);
+    const currentIndex = subSectionsToInsert.length;
+    subSectionIndexByKey.set(dedupeKey, currentIndex);
     blockQuestionRefs.push(refs);
 
     subSectionsToInsert.push({
@@ -406,6 +461,7 @@ async function createSubSectionsFromBlocks(
       content_template: contentTemplate,
       resource_url: resourceUrl,
       instruction: block.instruction || null,
+      sub_section_index: currentIndex + 1,
     });
   });
 
@@ -414,6 +470,10 @@ async function createSubSectionsFromBlocks(
   );
 
   if (subSectionsToInsert.length > 0) {
+    console.log(
+      `[createSubSectionsFromBlocks] Inserting ${subSectionsToInsert.length} sub-section records for section ${sectionId}`,
+    );
+
     const subSectionChunks = chunkArray(subSectionsToInsert, INSERT_CHUNK_SIZE);
     const subSectionResults = await Promise.all(
       subSectionChunks.map((chunk) =>
@@ -631,10 +691,6 @@ export async function createCompletePaper(
   }
 }
 
-/**
- * Upload media file (image or audio) to Supabase storage
- * Path structure: {user_id}/{center_id}/{module_type}/{timestamp}_{filename}
- */
 export async function uploadMediaFile(
   centerId: string,
   moduleType: string,
@@ -649,43 +705,156 @@ export async function uploadMediaFile(
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
+      toast.error("Authentication required");
       return { success: false, error: "User not authenticated" };
+    }
+
+    let processedFile = file;
+    const MAX_AUDIO_SIZE_MB = 10;
+    const MAX_IMAGE_SIZE_MB = 3;
+
+    // Handle audio files
+    if (fileType === "audio") {
+      // Check initial size
+      const initialSizeMB = file.size / (1024 * 1024);
+
+      if (initialSizeMB > MAX_AUDIO_SIZE_MB) {
+        toast.error(
+          `Audio file is ${initialSizeMB.toFixed(2)}MB. Maximum size is ${MAX_AUDIO_SIZE_MB}MB`,
+        );
+        return {
+          success: false,
+          error: `Audio file must be under ${MAX_AUDIO_SIZE_MB}MB. Current size: ${initialSizeMB.toFixed(2)}MB`,
+        };
+      }
+
+      // Compress audio (handles format detection internally)
+      try {
+        processedFile = await compressAudio(file);
+        const compressedSizeMB = processedFile.size / (1024 * 1024);
+
+        // Verify compressed size is still within limit
+        if (compressedSizeMB > MAX_AUDIO_SIZE_MB) {
+          toast.error(
+            `Audio file is too large even after compression (${compressedSizeMB.toFixed(2)}MB). Maximum is ${MAX_AUDIO_SIZE_MB}MB`,
+          );
+          return {
+            success: false,
+            error: `Audio must be under ${MAX_AUDIO_SIZE_MB}MB after compression`,
+          };
+        }
+
+        if (compressedSizeMB < initialSizeMB) {
+          console.log(
+            `Audio compressed: ${initialSizeMB.toFixed(2)}MB → ${compressedSizeMB.toFixed(2)}MB`,
+          );
+        }
+      } catch (compressionError) {
+        console.error("Audio compression failed:", compressionError);
+        toast.warning("Audio compression failed, using original file");
+        // Continue with original file if compression fails
+      }
+    }
+
+    // Handle image files
+    if (fileType === "image") {
+      // Check initial size
+      const initialSizeMB = file.size / (1024 * 1024);
+
+      if (initialSizeMB > MAX_IMAGE_SIZE_MB) {
+        toast.error(
+          `Image file is ${initialSizeMB.toFixed(2)}MB. Maximum size is ${MAX_IMAGE_SIZE_MB}MB`,
+        );
+        return {
+          success: false,
+          error: `Image file must be under ${MAX_IMAGE_SIZE_MB}MB. Current size: ${initialSizeMB.toFixed(2)}MB`,
+        };
+      }
+
+      // Compress image
+      try {
+        processedFile = await compressImage(file);
+        const compressedSizeMB = processedFile.size / (1024 * 1024);
+
+        // Verify compressed size is still within limit
+        if (compressedSizeMB > MAX_IMAGE_SIZE_MB) {
+          toast.error(
+            `Image file is too large even after compression (${compressedSizeMB.toFixed(2)}MB). Maximum is ${MAX_IMAGE_SIZE_MB}MB`,
+          );
+          return {
+            success: false,
+            error: `Image must be under ${MAX_IMAGE_SIZE_MB}MB after compression`,
+          };
+        }
+
+        console.log(
+          `Image compressed: ${initialSizeMB.toFixed(2)}MB → ${compressedSizeMB.toFixed(2)}MB`,
+        );
+      } catch (compressionError) {
+        console.error("Image compression failed:", compressionError);
+        toast.warning("Image compression failed, using original file");
+        // Continue with original file if compression fails
+      }
     }
 
     // Construct file path: {user_id}/{center_id}/{module_type}/{type}/{timestamp}_{filename}
     const timestamp = Date.now();
-    const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+    const sanitizedFileName = processedFile.name.replace(
+      /[^a-zA-Z0-9.-]/g,
+      "_",
+    );
     const fileName = `${user.id}/${centerId}/${moduleType}/${fileType}/${timestamp}_${sanitizedFileName}`;
 
-    const { data, error } = await supabase.storage
-      .from("media_files")
-      .upload(fileName, file, {
-        cacheControl: "3600",
-        upsert: false,
-      });
+    // Upload to Supabase storage with retry logic
+    let uploadAttempts = 0;
+    const MAX_UPLOAD_ATTEMPTS = 3;
+    let uploadError: any = null;
 
-    if (error) throw error;
+    while (uploadAttempts < MAX_UPLOAD_ATTEMPTS) {
+      try {
+        const { data, error } = await supabase.storage
+          .from("media_files")
+          .upload(fileName, processedFile, {
+            cacheControl: "3600",
+            upsert: false,
+          });
 
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from("media_files").getPublicUrl(data.path);
+        if (error) throw error;
 
-    return { success: true, url: publicUrl };
-    return { success: true, url: publicUrl };
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("media_files").getPublicUrl(data.path);
+
+        console.log(`✓ ${fileType} uploaded successfully:`, publicUrl);
+        return { success: true, url: publicUrl };
+      } catch (err) {
+        uploadAttempts++;
+        uploadError = err;
+        console.error(`Upload attempt ${uploadAttempts} failed:`, err);
+
+        if (uploadAttempts < MAX_UPLOAD_ATTEMPTS) {
+          // Wait before retrying (exponential backoff)
+          await new Promise((resolve) =>
+            setTimeout(resolve, 1000 * uploadAttempts),
+          );
+        }
+      }
+    }
+
+    // All upload attempts failed
+    throw uploadError;
   } catch (err) {
     console.error(`Error uploading ${fileType} file:`, err);
+    const errorMessage =
+      err instanceof Error ? err.message : `Failed to upload ${fileType}`;
+    toast.error(`Upload failed: ${errorMessage}`);
     return {
       success: false,
-      error:
-        err instanceof Error ? err.message : `Failed to upload ${fileType}`,
+      error: errorMessage,
     };
   }
 }
 
-/**
- * Legacy function - redirects to uploadMediaFile
- * @deprecated Use uploadMediaFile instead
- */
 export async function uploadAudioFile(
   centerId: string,
   sectionId: string,
