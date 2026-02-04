@@ -55,14 +55,14 @@ export default function ReadingModule({
       /\{\{(\d+)\}(?:mcq|blanks|dropdown|boolean)\}\}/g,
       /⟦Q(\d+):(mcq|blanks|dropdown|boolean)⟧/g,
     ];
-    
+
     patterns.forEach((regex) => {
       let match: RegExpExecArray | null;
       while ((match = regex.exec(content)) !== null) {
         refs.add(match[1]);
       }
     });
-    
+
     return Array.from(refs).sort((a, b) => Number(a) - Number(b));
   };
 
@@ -359,9 +359,13 @@ export default function ReadingModule({
                           Answer Key for this Block
                         </label>
                         {(() => {
-                          const blockQuestionRefs = extractQuestionRefs(block.content);
-                          const blockQuestions = blockQuestionRefs.filter(ref => section.questions[ref]);
-                          
+                          const blockQuestionRefs = extractQuestionRefs(
+                            block.content,
+                          );
+                          const blockQuestions = blockQuestionRefs.filter(
+                            (ref) => section.questions[ref],
+                          );
+
                           return (
                             <>
                               {blockQuestions.length > 0 && (
@@ -374,7 +378,9 @@ export default function ReadingModule({
                                       <span>{ref}</span>
                                       <button
                                         type="button"
-                                        onClick={() => onDeleteQuestion(section.id, ref)}
+                                        onClick={() =>
+                                          onDeleteQuestion(section.id, ref)
+                                        }
                                         className="ml-1 p-0.5 rounded-full text-green-600 hover:text-green-900 hover:bg-green-200"
                                         aria-label={`Remove question ${ref}`}
                                       >

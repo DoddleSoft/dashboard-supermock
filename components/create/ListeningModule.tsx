@@ -66,14 +66,14 @@ export default function ListeningModule({
       /\{\{(\d+)\}(?:mcq|blanks|dropdown|boolean)\}\}/g,
       /⟦Q(\d+):(mcq|blanks|dropdown|boolean)⟧/g,
     ];
-    
+
     patterns.forEach((regex) => {
       let match: RegExpExecArray | null;
       while ((match = regex.exec(content)) !== null) {
         refs.add(match[1]);
       }
     });
-    
+
     return Array.from(refs).sort((a, b) => Number(a) - Number(b));
   };
 
@@ -526,9 +526,13 @@ export default function ListeningModule({
                           Answer Key for this Block
                         </label>
                         {(() => {
-                          const blockQuestionRefs = extractQuestionRefs(block.content);
-                          const blockQuestions = blockQuestionRefs.filter(ref => section.questions[ref]);
-                          
+                          const blockQuestionRefs = extractQuestionRefs(
+                            block.content,
+                          );
+                          const blockQuestions = blockQuestionRefs.filter(
+                            (ref) => section.questions[ref],
+                          );
+
                           return (
                             <>
                               {blockQuestions.length > 0 && (
@@ -541,7 +545,9 @@ export default function ListeningModule({
                                       <span>{ref}</span>
                                       <button
                                         type="button"
-                                        onClick={() => onDeleteQuestion(section.id, ref)}
+                                        onClick={() =>
+                                          onDeleteQuestion(section.id, ref)
+                                        }
                                         className="ml-1 p-0.5 rounded-full text-blue-600 hover:text-blue-900 hover:bg-blue-200"
                                         aria-label={`Remove question ${ref}`}
                                       >

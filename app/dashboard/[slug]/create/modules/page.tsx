@@ -82,7 +82,9 @@ function CreateModuleContent() {
 
   const [showQuestionModal, setShowQuestionModal] = useState(false);
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
-  const [currentBlockIndex, setCurrentBlockIndex] = useState<number | null>(null);
+  const [currentBlockIndex, setCurrentBlockIndex] = useState<number | null>(
+    null,
+  );
   const [currentModuleType, setCurrentModuleType] = useState<
     "reading" | "listening"
   >("reading");

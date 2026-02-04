@@ -540,10 +540,10 @@ async function createSubSectionsFromBlocks(
     console.log(
       `[createSubSectionsFromBlocks] Found ${orphanedQuestionRefs.length} orphaned questions (${orphanedQuestionRefs.join(", ")}) - creating dedicated sub_section`,
     );
-    
+
     // Create a dedicated sub_section for questions not embedded in render blocks
     const orphanedSubSectionId = crypto.randomUUID();
-    
+
     // Insert the orphaned questions sub_section
     const { error: orphanedSubError } = await supabase
       .from("sub_sections")
