@@ -82,6 +82,7 @@ function CreateModuleContent() {
 
   const [showQuestionModal, setShowQuestionModal] = useState(false);
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
+  const [currentBlockIndex, setCurrentBlockIndex] = useState<number | null>(null);
   const [currentModuleType, setCurrentModuleType] = useState<
     "reading" | "listening"
   >("reading");
@@ -97,8 +98,9 @@ function CreateModuleContent() {
     [readingSections, listeningSections],
   );
 
-  const addQuestion = (sectionId: string) => {
+  const addQuestion = (sectionId: string, blockIndex: number) => {
     setCurrentSectionId(sectionId);
+    setCurrentBlockIndex(blockIndex);
     setCurrentModuleType(type === "listening" ? "listening" : "reading");
     setShowQuestionModal(true);
   };
@@ -416,6 +418,7 @@ function CreateModuleContent() {
         onClose={() => {
           setShowQuestionModal(false);
           setCurrentSectionId(null);
+          setCurrentBlockIndex(null);
         }}
         onSave={handleSaveQuestion}
       />

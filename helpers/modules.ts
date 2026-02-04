@@ -412,7 +412,6 @@ async function createSubSectionsFromBlocks(
   }> = [];
 
   const blockQuestionRefs: string[][] = [];
-  const subSectionIndexByKey = new Map<string, number>();
 
   const hasMeaningfulContent = (block: RenderBlock) => {
     const content = (block.content || "").trim();
@@ -431,26 +430,19 @@ async function createSubSectionsFromBlocks(
     return;
   }
 
-  meaningfulBlocks.forEach((block) => {
+  // Create one sub_section per render block - NO deduplication
+  meaningfulBlocks.forEach((block, blockIndex) => {
     const boundaryText = block.questions || null;
     const contentTemplate = block.content || "";
     const resourceUrl = block.type === "image" ? block.content : null;
-    const dedupeKey = `${block.type}::${boundaryText ?? ""}::${contentTemplate}::${resourceUrl ?? ""}`;
+    const instruction = block.instruction || null;
 
+    // Extract question refs from this specific block
     const refs = extractQuestionRefs(block.content);
     refs.forEach((ref) => questionRefsInBlocks.add(ref));
 
-    const existingIndex = subSectionIndexByKey.get(dedupeKey);
-    if (existingIndex !== undefined) {
-      const mergedRefs = new Set(blockQuestionRefs[existingIndex] || []);
-      refs.forEach((ref) => mergedRefs.add(ref));
-      blockQuestionRefs[existingIndex] = Array.from(mergedRefs);
-      return;
-    }
-
+    // Create a unique sub_section for THIS render block
     const subSectionId = crypto.randomUUID();
-    const currentIndex = subSectionsToInsert.length;
-    subSectionIndexByKey.set(dedupeKey, currentIndex);
     blockQuestionRefs.push(refs);
 
     subSectionsToInsert.push({
@@ -460,9 +452,13 @@ async function createSubSectionsFromBlocks(
       sub_type: block.type,
       content_template: contentTemplate,
       resource_url: resourceUrl,
-      instruction: block.instruction || null,
-      sub_section_index: currentIndex + 1,
+      instruction: instruction,
+      sub_section_index: blockIndex + 1,
     });
+
+    console.log(
+      `[createSubSectionsFromBlocks] Created sub_section ${blockIndex + 1} for render block with ${refs.length} question refs: ${refs.join(", ") || "none"}`,
+    );
   });
 
   const orphanedQuestionRefs = Object.keys(questions).filter(
@@ -501,13 +497,28 @@ async function createSubSectionsFromBlocks(
     marks: number;
   }> = [];
 
-  blockQuestionRefs.forEach((refs, index) => {
-    const subSectionId = subSectionsToInsert[index]?.id;
-    if (!subSectionId) return;
+  // Link questions to their respective sub_sections based on render block index
+  blockQuestionRefs.forEach((refs, blockIndex) => {
+    const subSectionId = subSectionsToInsert[blockIndex]?.id;
+    if (!subSectionId) {
+      console.error(
+        `[createSubSectionsFromBlocks] CRITICAL: No sub_section found at block index ${blockIndex} for ${refs.length} questions!`,
+      );
+      return;
+    }
+
+    console.log(
+      `[createSubSectionsFromBlocks] Linking ${refs.length} questions to sub_section ${blockIndex + 1} (ID: ${subSectionId}): ${refs.join(", ") || "none"}`,
+    );
 
     refs.forEach((ref) => {
       const questionDef = questions[ref];
-      if (!questionDef) return;
+      if (!questionDef) {
+        console.warn(
+          `[createSubSectionsFromBlocks] Question ${ref} referenced in render block ${blockIndex + 1} but not defined in questions object`,
+        );
+        return;
+      }
 
       questionsToInsert.push({
         sub_section_id: subSectionId,
@@ -526,28 +537,54 @@ async function createSubSectionsFromBlocks(
   });
 
   if (orphanedQuestionRefs.length > 0) {
-    const fallbackSubSectionId = subSectionsToInsert[0]?.id || null;
-
-    if (fallbackSubSectionId) {
-      orphanedQuestionRefs.forEach((ref) => {
-        const questionDef = questions[ref];
-        if (!questionDef) return;
-
-        questionsToInsert.push({
-          sub_section_id: fallbackSubSectionId,
-          question_ref: ref,
-          correct_answers:
-            questionDef.correctAnswers && questionDef.correctAnswers.length
-              ? questionDef.correctAnswers
-              : questionDef.answer
-                ? [questionDef.answer]
-                : null,
-          options: questionDef.options ?? null,
-          explanation: questionDef.explanation || null,
-          marks: 1.0,
-        });
+    console.log(
+      `[createSubSectionsFromBlocks] Found ${orphanedQuestionRefs.length} orphaned questions (${orphanedQuestionRefs.join(", ")}) - creating dedicated sub_section`,
+    );
+    
+    // Create a dedicated sub_section for questions not embedded in render blocks
+    const orphanedSubSectionId = crypto.randomUUID();
+    
+    // Insert the orphaned questions sub_section
+    const { error: orphanedSubError } = await supabase
+      .from("sub_sections")
+      .insert({
+        id: orphanedSubSectionId,
+        section_id: sectionId,
+        boundary_text: "Questions",
+        sub_type: "text",
+        content_template: "",
+        resource_url: null,
+        instruction: null,
+        sub_section_index: subSectionsToInsert.length + 1,
       });
+
+    if (orphanedSubError) {
+      console.error(
+        "[createSubSectionsFromBlocks] Orphaned sub_section insert error:",
+        orphanedSubError,
+      );
+      throw orphanedSubError;
     }
+
+    // Add orphaned questions to the dedicated sub_section
+    orphanedQuestionRefs.forEach((ref) => {
+      const questionDef = questions[ref];
+      if (!questionDef) return;
+
+      questionsToInsert.push({
+        sub_section_id: orphanedSubSectionId,
+        question_ref: ref,
+        correct_answers:
+          questionDef.correctAnswers && questionDef.correctAnswers.length
+            ? questionDef.correctAnswers
+            : questionDef.answer
+              ? [questionDef.answer]
+              : null,
+        options: questionDef.options ?? null,
+        explanation: questionDef.explanation || null,
+        marks: 1.0,
+      });
+    });
   }
 
   if (questionsToInsert.length > 0) {

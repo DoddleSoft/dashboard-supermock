@@ -283,6 +283,11 @@ export const createScheduledTest = async (
       duration_minutes: payload.durationMinutes || 180,
     });
 
+    // Calculate ended_at based on scheduled_at and duration
+    const durationMinutes = payload.durationMinutes || 180;
+    const scheduledDate = new Date(payload.scheduledAt);
+    const endedDate = new Date(scheduledDate.getTime() + durationMinutes * 60000);
+
     // Create the test
     const { data: test, error: testError } = await supabase
       .from("scheduled_tests")
@@ -291,7 +296,8 @@ export const createScheduledTest = async (
         paper_id: payload.paperId,
         title: payload.title,
         scheduled_at: payload.scheduledAt,
-        duration_minutes: payload.durationMinutes || 180,
+        ended_at: endedDate.toISOString(),
+        duration_minutes: durationMinutes,
         status: "scheduled",
       })
       .select()
@@ -353,6 +359,25 @@ export const updateScheduledTest = async (
       updateData.duration_minutes = updates.durationMinutes;
     if (updates.paperId) updateData.paper_id = updates.paperId;
     if (updates.status) updateData.status = updates.status;
+
+    // Calculate ended_at whenever scheduled_at or duration changes
+    if (updates.scheduledAt || updates.durationMinutes) {
+      // Fetch current test data to get missing values
+      const { data: currentTest } = await supabase
+        .from("scheduled_tests")
+        .select("scheduled_at, duration_minutes")
+        .eq("id", testId)
+        .single();
+
+      const scheduledAt = updates.scheduledAt || currentTest?.scheduled_at;
+      const durationMinutes = updates.durationMinutes || currentTest?.duration_minutes || 180;
+
+      if (scheduledAt) {
+        const scheduledDate = new Date(scheduledAt);
+        const endedDate = new Date(scheduledDate.getTime() + durationMinutes * 60000);
+        updateData.ended_at = endedDate.toISOString();
+      }
+    }
 
     const { error: testError } = await supabase
       .from("scheduled_tests")

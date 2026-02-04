@@ -1,20 +1,69 @@
-const RenderBlock = ({
+"use client";
+
+import React from "react";
+
+export type ThemeColor = "green" | "blue" | "purple";
+
+export interface RenderBlockProps {
+  block: {
+    type: string;
+    content?: string;
+    alt?: string;
+    label?: string;
+    placeholder?: string;
+    min_words?: number;
+  };
+  theme?: ThemeColor;
+  showQuestionNumbers?: boolean;
+  questions?: Record<string, { answer: string; options?: any[] }>;
+  answers?: Record<string, string>;
+  onAnswerChange?: (qNum: string, value: string) => void;
+}
+
+const themeColors = {
+  green: {
+    instruction: "bg-blue-50 text-blue-900",
+    box: "border-gray-200 bg-gray-50",
+    boxBorder: "",
+    focus: "focus:border-green-600 focus:ring-green-600",
+    radio: "text-green-600 focus:ring-green-500",
+  },
+  blue: {
+    instruction: "bg-blue-50 text-blue-900",
+    box: "border-gray-200 bg-gray-50",
+    boxBorder: "",
+    focus: "focus:border-blue-600 focus:ring-blue-600",
+    radio: "text-blue-600 focus:ring-blue-500",
+  },
+  purple: {
+    instruction: "bg-purple-50 text-purple-900",
+    box: "bg-gray-50",
+    boxBorder: "border-l-4 border-purple-600",
+    focus: "focus:border-purple-600 focus:ring-purple-600",
+    radio: "text-purple-600 focus:ring-purple-500",
+  },
+};
+
+export const RenderBlockView: React.FC<RenderBlockProps> = ({
   block,
-  questions,
-  answers,
+  theme = "green",
+  showQuestionNumbers = false,
+  questions = {},
+  answers = {},
   onAnswerChange,
-}: {
-  block: { type: string; content: string };
-  questions: Record<string, { answer: string; options?: string[] }>;
-  answers: Record<string, string>;
-  onAnswerChange: (qNum: string, value: string) => void;
 }) => {
   const { type, content } = block;
+  const colors = themeColors[theme];
 
-  // Parse placeholders like {{1}boolean}, {{8}blanks}, {{14}dropdown}, {{3}mcq}, {{5}true-false-not-given}, {{2}true-false}
   const renderContent = (text: string) => {
-    const regex =
-      /{{(\d+)}(boolean|blanks|dropdown|mcq|true-false-not-given|true-false|fill-blank)}/g;
+    if (!onAnswerChange) {
+      return <>{text}</>;
+    }
+
+    // 1. IMPROVED REGEX: Allows optional spaces around braces and inputs
+    // Matches: {{ 14 } blanks }, {{14}blanks}, {{14} blanks}
+    const regex = /{{\s*(\d+)\s*}\s*(blanks|true-false|mcq)\s*}/g;
+
     const parts: React.ReactElement[] = [];
     let lastIndex = 0;
     let match;
@@ -31,71 +80,76 @@ const RenderBlock = ({
 
       const qNum = match[1];
       const inputType = match[2];
-      const normalizedType =
-        inputType === "mcq"
-          ? "dropdown"
-          : inputType === "true-false-not-given"
-            ? "boolean"
-            : inputType === "true-false"
-              ? "boolean"
-              : inputType === "fill-blank"
-                ? "blanks"
-                : inputType;
       const qData = questions[qNum];
 
-      const resolvedOptions =
-        qData?.options && qData.options.length > 0
-          ? qData.options
-          : normalizedType === "boolean"
-            ? ["TRUE", "FALSE", "NOT GIVEN"]
-            : [];
+      if (inputType === "true-false") {
+        const options = qData?.options ?? ["TRUE", "FALSE", "NOT GIVEN"];
+        parts.push(
+          <span
+            key={`q-${qNum}`}
+            className="inline-flex items-center gap-1 mx-1 align-middle"
+          >
+            {showQuestionNumbers && (
+              <span className="text-xs font-bold text-gray-500 mr-1">
+                {qNum}.
+              </span>
+            )}
+            <select
+              value={answers[qNum] || ""}
+              onChange={(e) => onAnswerChange(qNum, e.target.value)}
+              className={`rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-1 ${colors.focus}`}
+            >
+              <option value="">Select...</option>
+              {options.map((opt: any) => {
+                const val = typeof opt === "string" ? opt : opt.label;
+                return (
+                  <option key={val} value={val}>
+                    {val}
+                  </option>
+                );
+              })}
+            </select>
+          </span>,
+        );
+      } else if (inputType === "mcq") {
+        // ... (MCQ logic same as before, shortened for brevity)
+        const options = qData?.options || [];
+        const hasOptions = options.length > 0;
 
-      if (normalizedType === "boolean") {
-        // Render dropdown for TRUE/FALSE/NOT GIVEN
+        // Simplified dropdown render for preview
         parts.push(
-          <span key={`q-${qNum}`} className="inline-flex items-center gap-1">
-            <span className="text-xs font-semibold text-gray-600">{qNum}.</span>
+          <span
+            key={`q-${qNum}`}
+            className="inline-flex items-center gap-1 mx-1 align-middle"
+          >
+            {showQuestionNumbers && (
+              <span className="text-xs font-bold text-gray-500 mr-1">
+                {qNum}.
+              </span>
+            )}
             <select
               value={answers[qNum] || ""}
               onChange={(e) => onAnswerChange(qNum, e.target.value)}
-              className="mx-1 inline-block min-w-[140px] rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
-              disabled={resolvedOptions.length === 0}
+              className={`rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-1 ${colors.focus}`}
             >
-              <option value="">
-                {resolvedOptions.length === 0 ? "No options" : "Select..."}
-              </option>
-              {resolvedOptions.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
+              <option value="">Select Option...</option>
+              {hasOptions ? (
+                options.map((opt: any) => {
+                  const val = typeof opt === "string" ? opt : opt.label;
+                  return (
+                    <option key={val} value={val}>
+                      {val}
+                    </option>
+                  );
+                })
+              ) : (
+                <option disabled>No options</option>
+              )}
             </select>
           </span>,
         );
-      } else if (normalizedType === "dropdown") {
-        // Render dropdown for MCQ options (i, ii, iii, A, B, C, etc.)
-        parts.push(
-          <span key={`q-${qNum}`} className="inline-flex items-center gap-1">
-            <span className="text-xs font-semibold text-gray-600">{qNum}.</span>
-            <select
-              value={answers[qNum] || ""}
-              onChange={(e) => onAnswerChange(qNum, e.target.value)}
-              className="mx-1 inline-block min-w-[100px] rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
-              disabled={resolvedOptions.length === 0}
-            >
-              <option value="">
-                {resolvedOptions.length === 0 ? "No options" : "Select..."}
-              </option>
-              {resolvedOptions.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
-          </span>,
-        );
-      } else if (normalizedType === "blanks") {
-        // Render text input for fill-in-the-blank with question number
+      } else if (inputType === "blanks") {
+        // --- BLANKS RENDERING ---
         parts.push(
           <span key={`q-${qNum}`} className="inline-flex items-center gap-1">
             <span className="text-xs font-semibold text-gray-600">{qNum}.</span>
@@ -104,7 +158,7 @@ const RenderBlock = ({
               value={answers[qNum] || ""}
               onChange={(e) => onAnswerChange(qNum, e.target.value)}
               placeholder="___"
-              className="inline-block w-32 rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+              className={`inline-block w-32 rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 focus:outline-none focus:ring-1 ${colors.focus}`}
             />
           </span>,
         );
@@ -113,68 +167,69 @@ const RenderBlock = ({
       lastIndex = regex.lastIndex;
     }
 
-    // Add remaining text after the last match
     if (lastIndex < text.length) {
       parts.push(
         <span key={`text-${lastIndex}`}>{text.substring(lastIndex)}</span>,
       );
     }
 
-    return parts;
+    return parts.length > 0 ? parts : <>{text}</>;
   };
 
   switch (type) {
-    case "header":
+    case "text":
+    case "html": // Fallback for html types to try parsing blanks too
+      if (content && onAnswerChange) {
+        return (
+          <div className="mb-4 text-sm leading-8 text-gray-800 whitespace-pre-wrap">
+            {renderContent(content)}
+          </div>
+        );
+      }
       return (
-        <h3 className="mt-4 mb-3 text-base font-bold text-gray-900">
-          {content}
-        </h3>
+        <div
+          className="mb-4 text-sm leading-relaxed text-gray-700 whitespace-pre-wrap"
+          dangerouslySetInnerHTML={{ __html: content || "" }}
+        />
       );
+
     case "instruction":
       return (
-        <p className="mb-4 rounded-lg bg-blue-50 p-3 text-xs italic text-blue-900">
+        <div
+          className={`mb-4 rounded-lg p-3 text-sm italic font-medium ${colors.instruction}`}
+        >
           {content}
-        </p>
+        </div>
       );
-    case "title":
-      return (
-        <h4 className="mt-4 mb-2 text-xs font-bold uppercase tracking-wide text-gray-800">
-          {content}
-        </h4>
-      );
-    case "subtitle":
-      return (
-        <h5 className="mt-3 mb-2 text-xs font-semibold text-gray-700">
-          {content}
-        </h5>
-      );
+
     case "box":
       return (
-        <div className="my-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-          <pre className="whitespace-pre-wrap text-xs leading-relaxed text-gray-700">
-            {content}
+        <div
+          className={`my-4 rounded-lg border p-4 ${colors.box} ${theme === "purple" ? colors.boxBorder : ""}`}
+        >
+          <pre className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 font-sans">
+            {renderContent(content || "")}
           </pre>
         </div>
       );
-    case "text":
+
+    case "header":
       return (
-        <div className="mb-2 text-xs leading-7 text-gray-800 whitespace-pre-wrap">
-          {renderContent(content)}
-        </div>
+        <h3 className="mt-6 mb-3 text-lg font-bold text-gray-900">{content}</h3>
       );
+
     case "image":
       return (
         <div className="my-6 flex justify-center">
           <img
-            src={block.content}
-            alt={"Diagram"}
-            className="max-h-96 w-auto rounded-lg border shadow-sm object-contain"
+            src={content}
+            alt={block.alt}
+            className="max-h-96 rounded-lg border shadow-sm object-contain"
           />
         </div>
       );
+
     default:
       return null;
   }
 };
-
-export default RenderBlock;

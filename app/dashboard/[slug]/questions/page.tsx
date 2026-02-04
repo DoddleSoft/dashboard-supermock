@@ -151,7 +151,7 @@ export default function PapersPage() {
 
   const handleViewModule = (moduleId: string, moduleType: string) => {
     router.push(
-      `/dashboard/${slug}/create/modules/preview?type=${moduleType.toLowerCase()}&moduleId=${moduleId}`,
+      `/dashboard/${slug}/questions/preview?type=${moduleType.toLowerCase()}&moduleId=${moduleId}`,
     );
     setActiveMenu(null);
   };
@@ -188,7 +188,6 @@ export default function PapersPage() {
 
   return (
     <div className="max-w-7xl mx-auto flex flex-col gap-6">
-      {/* Filters */}
       <div className="flex items-center gap-4">
         <div className="flex items-center w-180 gap-3 flex-1">
           <div className="flex-1 max-w-sm relative">

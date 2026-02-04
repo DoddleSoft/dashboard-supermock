@@ -80,23 +80,18 @@ export function ModuleCard({
 
       <div className="py-2 px-4">
         {/* Header: Icon & Menu */}
-        <div className="flex justify-between items-start mb-4">
+        <div className="flex justify-between items-start mb-2 ">
           <div className="flex items-center gap-4 flex-1">
             <div
-              className={`w-14 h-14 rounded-md flex items-center justify-center text-2xl shadow-sm ${getModuleColor(normalizedType).replace("border-", "bg-opacity-10 bg-")}`}
+              className={`w-10 h-10 rounded-md flex items-center justify-center text-2xl shadow-sm ${getModuleColor(normalizedType).replace("border-", "bg-opacity-10 bg-")}`}
             >
               {getModuleIcon(normalizedType)}
             </div>
 
             <div className="flex-1">
-              <h3 className="text-lg font-bold text-slate-900 mb-2 leading-tight line-clamp-1 group-hover:text-indigo-600 transition-colors">
+              <h3 className="text-md font-bold text-slate-900 leading-tight line-clamp-1 group-hover:text-indigo-600 transition-colors">
                 {module.heading}
               </h3>
-              <span
-                className={`inline-flex items-center px-3 py-1 rounded-full text-xs tracking-wide bg-opacity-10 ${getModuleColor(normalizedType).replace("border-", "bg-")}`}
-              >
-                {normalizedType}
-              </span>
             </div>
           </div>
 

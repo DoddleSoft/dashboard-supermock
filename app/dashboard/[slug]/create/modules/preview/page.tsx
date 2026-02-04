@@ -19,9 +19,8 @@ import {
   useModuleContext,
   StoredModule,
 } from "@/context/ModuleContext";
-import RenderBlockView from "@/components/ui/RenderBlock";
 import { Loader } from "@/components/ui/Loader";
-import { createClient } from "@/lib/supabase/client";
+import { RenderBlockView } from "@/components/ui/RenderBlock";
 
 type ModuleType = "reading" | "writing" | "listening" | "speaking";
 

@@ -13,7 +13,7 @@ interface ReadingModuleProps {
   onToggleSection: (sectionId: string) => void;
   onAddSection: () => void;
   onDeleteSection: (sectionId: string) => void;
-  onAddQuestion: (sectionId: string) => void;
+  onAddQuestion: (sectionId: string, blockIndex: number) => void;
   onDeleteQuestion: (sectionId: string, questionRef: string) => void;
   onUpdateSectionTitle: (sectionId: string, newTitle: string) => void;
   onUpdateSectionHeading: (sectionId: string, heading: string) => void;
@@ -27,6 +27,8 @@ interface ReadingModuleProps {
   ) => void;
   onDeleteRenderBlock: (sectionId: string, blockIndex: number) => void;
 }
+
+const placeholders = ["{{X}mcq}", "{{X}blanks}", "{{X}true-false}"];
 
 export default function ReadingModule({
   sections,
@@ -45,6 +47,24 @@ export default function ReadingModule({
   onDeleteRenderBlock,
 }: ReadingModuleProps) {
   const blockTypes: RenderBlockType[] = ["text", "image"];
+
+  // Extract question refs from block content
+  const extractQuestionRefs = (content: string): string[] => {
+    const refs = new Set<string>();
+    const patterns = [
+      /\{\{(\d+)\}(?:mcq|blanks|dropdown|boolean)\}\}/g,
+      /⟦Q(\d+):(mcq|blanks|dropdown|boolean)⟧/g,
+    ];
+    
+    patterns.forEach((regex) => {
+      let match: RegExpExecArray | null;
+      while ((match = regex.exec(content)) !== null) {
+        refs.add(match[1]);
+      }
+    });
+    
+    return Array.from(refs).sort((a, b) => Number(a) - Number(b));
+  };
 
   const toDisplayContent = (value: string) =>
     value.replace(/\{\{(\d+)\}(blanks|dropdown|boolean)\}\}/g, "⟦Q$1:$2⟧");
@@ -73,6 +93,10 @@ export default function ReadingModule({
     } catch (error) {
       console.error("Failed to process image:", error);
     }
+  };
+
+  const copyToClipboard = async (text: string) => {
+    await navigator.clipboard.writeText(text);
   };
 
   return (
@@ -199,10 +223,30 @@ export default function ReadingModule({
                             </option>
                           ))}
                         </select>
-                        <span className="text-md text-slate-900">
-                          For question placeholder use{" "}
-                          {"{{X}mcq}, {{X}blanks}, or {{X}true-false}"} format
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-md font-semibold text-slate-700">
+                            For question placeholder use:
+                          </span>
+
+                          <div className="flex flex-wrap gap-2">
+                            {placeholders.map((item) => (
+                              <button
+                                key={item}
+                                onClick={() => copyToClipboard(item)}
+                                className="
+              rounded-lg border border-slate-300 
+              bg-slate-50 px-3 py-1.5 
+              text-sm font-mono text-slate-900
+              hover:bg-slate-100 hover:border-slate-400
+              active:scale-95 transition
+            "
+                              >
+                                {item}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
                         <button
                           onClick={() => onDeleteRenderBlock(section.id, index)}
                           className="ml-auto p-2 text-red-600 hover:bg-red-50 rounded-lg"
@@ -308,6 +352,49 @@ export default function ReadingModule({
                           </div>
                         </div>
                       )}
+
+                      {/* Answer Key for this Render Block */}
+                      <div className="mt-4 pt-4 border-t border-slate-200">
+                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+                          Answer Key for this Block
+                        </label>
+                        {(() => {
+                          const blockQuestionRefs = extractQuestionRefs(block.content);
+                          const blockQuestions = blockQuestionRefs.filter(ref => section.questions[ref]);
+                          
+                          return (
+                            <>
+                              {blockQuestions.length > 0 && (
+                                <div className="flex flex-wrap gap-2 mb-3">
+                                  {blockQuestions.map((ref) => (
+                                    <div
+                                      key={ref}
+                                      className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 text-green-800 text-xs font-semibold"
+                                    >
+                                      <span>{ref}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => onDeleteQuestion(section.id, ref)}
+                                        className="ml-1 p-0.5 rounded-full text-green-600 hover:text-green-900 hover:bg-green-200"
+                                        aria-label={`Remove question ${ref}`}
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              <button
+                                onClick={() => onAddQuestion(section.id, index)}
+                                className="w-full px-4 py-2.5 border-2 border-dashed border-slate-300 text-slate-600 rounded-lg hover:border-green-300 hover:bg-green-50 transition-colors flex items-center justify-center gap-2 font-medium text-xs"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                Add Answer for Block Questions
+                              </button>
+                            </>
+                          );
+                        })()}
+                      </div>
                     </div>
                   ))}
 
@@ -319,42 +406,6 @@ export default function ReadingModule({
                     Add Block
                   </button>
                 </div>
-              </div>
-
-              {/* Answer Key */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
-                  Answer Key
-                </label>
-                {Object.keys(section.questions).length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {Object.keys(section.questions)
-                      .sort((a, b) => Number(a) - Number(b))
-                      .map((ref) => (
-                        <div
-                          key={ref}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold"
-                        >
-                          <span>{ref}</span>
-                          <button
-                            type="button"
-                            onClick={() => onDeleteQuestion(section.id, ref)}
-                            className="ml-1 p-0.5 rounded-full text-slate-500 hover:text-slate-700 hover:bg-slate-200"
-                            aria-label={`Remove question ${ref}`}
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
-                  </div>
-                )}
-                <button
-                  onClick={() => onAddQuestion(section.id)}
-                  className="w-full px-4 py-4 border-2 border-dashed border-slate-300 text-slate-600 rounded-xl hover:border-red-300 hover:bg-red-50 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Questions Answer
-                </button>
               </div>
             </div>
           )}
