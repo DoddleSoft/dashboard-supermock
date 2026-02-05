@@ -1,4 +1,12 @@
-import { Plus, Upload, Trash2, ChevronDown, ChevronUp, X } from "lucide-react";
+import {
+  Plus,
+  Upload,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  X,
+  Save,
+} from "lucide-react";
 import { useRef, useEffect, useState } from "react";
 import {
   RenderBlock,
@@ -15,6 +23,7 @@ interface ListeningModuleProps {
   onDeleteSection: (sectionId: string) => void;
   onAddQuestion: (sectionId: string, blockIndex: number) => void;
   onDeleteQuestion: (sectionId: string, questionRef: string) => void;
+  onUpdateQuestion: (sectionId: string, questionRef: string, data: any) => void;
   onUpdateSectionTitle: (sectionId: string, newTitle: string) => void;
   onUpdateSectionInstruction: (sectionId: string, instruction: string) => void;
   onUpdateSectionAudioPath: (sectionId: string, path: string) => void;
@@ -38,6 +47,7 @@ export default function ListeningModule({
   onDeleteSection,
   onAddQuestion,
   onDeleteQuestion,
+  onUpdateQuestion,
   onUpdateSectionTitle,
   onUpdateSectionInstruction,
   onUpdateSectionAudioPath,
@@ -56,6 +66,13 @@ export default function ListeningModule({
   const [compressingAudio, setCompressingAudio] = useState<Set<string>>(
     new Set(),
   );
+
+  // Modal State
+  const [editingQuestion, setEditingQuestion] = useState<{
+    sectionId: string;
+    ref: string;
+    data: any;
+  } | null>(null);
 
   const blockTypes: RenderBlockType[] = ["text", "image"];
 
@@ -94,15 +111,11 @@ export default function ListeningModule({
     file?: File | null,
   ) => {
     if (!file) return;
-
     const blockKey = `${sectionId}-${index}`;
     setCompressingImages((prev) => new Set(prev).add(blockKey));
 
     try {
-      // Compress the image first
       const compressedFile = await compressImage(file);
-
-      // Convert compressed file to data URL
       const reader = new FileReader();
       reader.onload = () => {
         onUpdateRenderBlock(sectionId, index, {
@@ -134,12 +147,10 @@ export default function ListeningModule({
     if (file) {
       setCompressingAudio((prev) => new Set(prev).add(sectionId));
       try {
-        // Compress the audio first
         const compressedFile = await compressAudio(file);
         onUpdateSectionAudio(sectionId, compressedFile);
       } catch (error) {
         console.error("Failed to process audio:", error);
-        // Fallback to original file if compression fails
         onUpdateSectionAudio(sectionId, file);
       } finally {
         setCompressingAudio((prev) => {
@@ -154,42 +165,32 @@ export default function ListeningModule({
   const startDummyWaveform = (sectionId: string) => {
     const canvas = canvasRefs.current[sectionId];
     if (!canvas) return;
-
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return;
-
     if (animationRefs.current[sectionId]) {
       cancelAnimationFrame(animationRefs.current[sectionId]!);
     }
-
     let frame = 0;
-
     const draw = () => {
       const animId = requestAnimationFrame(draw);
       animationRefs.current[sectionId] = animId;
-
       const width = canvas.width;
       const height = canvas.height;
       ctx.fillStyle = "rgb(15 23 42)";
       ctx.fillRect(0, 0, width, height);
-
       const segments = Math.floor(width / 6);
       const slice = width / segments;
-
       for (let i = 0; i < segments; i++) {
         const progress = (i + frame * 0.02) % segments;
         const amplitude = 0.3 + Math.abs(Math.sin(progress * 0.3)) * 0.7;
         const barHeight = amplitude * height;
         const x = i * slice;
         const hue = 190 - (i / segments) * 80;
-
         ctx.fillStyle = `hsl(${hue}, 100%, 60%)`;
         ctx.fillRect(x, height - barHeight, slice - 1, barHeight);
       }
-
       frame += 1;
     };
-
     draw();
   };
 
@@ -202,20 +203,14 @@ export default function ListeningModule({
 
   useEffect(() => {
     const audioElements = Object.entries(audioRefs.current);
-
     audioElements.forEach(([sectionId, audio]) => {
       if (!audio) return;
-
-      const handlePlay = () => {
-        startDummyWaveform(sectionId);
-      };
+      const handlePlay = () => startDummyWaveform(sectionId);
       const handlePause = () => stopDummyWaveform(sectionId);
       const handleEnded = () => stopDummyWaveform(sectionId);
-
       audio.addEventListener("play", handlePlay);
       audio.addEventListener("pause", handlePause);
       audio.addEventListener("ended", handleEnded);
-
       return () => {
         audio.removeEventListener("play", handlePlay);
         audio.removeEventListener("pause", handlePause);
@@ -224,8 +219,134 @@ export default function ListeningModule({
     });
   }, []);
 
+  const handleEditClick = (
+    sectionId: string,
+    ref: string,
+    questionData: any,
+  ) => {
+    setEditingQuestion({
+      sectionId,
+      ref,
+      data: JSON.parse(JSON.stringify(questionData)),
+    });
+  };
+
+  const handleModalSave = () => {
+    if (editingQuestion) {
+      onUpdateQuestion(
+        editingQuestion.sectionId,
+        editingQuestion.ref,
+        editingQuestion.data,
+      );
+      setEditingQuestion(null);
+    }
+  };
+
   return (
-    <div className="space-y-6 pb-4">
+    <div className="space-y-6 pb-4 relative">
+      {/* Edit Modal */}
+      {editingQuestion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900">
+                Edit Question {editingQuestion.ref}
+              </h3>
+              <button
+                onClick={() => setEditingQuestion(null)}
+                className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">
+                  Correct Answer
+                </label>
+                <input
+                  type="text"
+                  value={editingQuestion.data?.answer || ""}
+                  onChange={(e) =>
+                    setEditingQuestion((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            data: { ...prev.data, answer: e.target.value },
+                          }
+                        : null,
+                    )
+                  }
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                  placeholder="Enter expected answer..."
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">
+                  Question Type
+                </label>
+                <select
+                  value={editingQuestion.data?.type || "mcq"}
+                  onChange={(e) =>
+                    setEditingQuestion((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            data: { ...prev.data, type: e.target.value },
+                          }
+                        : null,
+                    )
+                  }
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm bg-white"
+                >
+                  <option value="mcq">Multiple Choice</option>
+                  <option value="blanks">Fill in Blanks</option>
+                  <option value="true-false">True / False</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">
+                  Points
+                </label>
+                <input
+                  type="number"
+                  value={editingQuestion.data?.points || 1}
+                  onChange={(e) =>
+                    setEditingQuestion((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            data: {
+                              ...prev.data,
+                              points: Number(e.target.value),
+                            },
+                          }
+                        : null,
+                    )
+                  }
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                />
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+              <button
+                onClick={() => setEditingQuestion(null)}
+                className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleModalSave}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm flex items-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {sections.map((section) => (
         <div
           key={section.id}
@@ -289,14 +410,12 @@ export default function ListeningModule({
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
                   Section Audio
                 </label>
-
                 {compressingAudio.has(section.id) && (
                   <div className="mb-3 flex items-center gap-2 text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
                     <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                     <span>Compressing audio...</span>
                   </div>
                 )}
-
                 {section.audioFile ? (
                   <div className="border-2 border-slate-300 rounded-xl overflow-hidden">
                     <div className="bg-slate-50 p-4 border-b border-slate-200">
@@ -395,19 +514,12 @@ export default function ListeningModule({
                           <span className="text-md font-semibold text-slate-700">
                             For question placeholder use:
                           </span>
-
                           <div className="flex flex-wrap gap-2">
                             {placeholders.map((item) => (
                               <button
                                 key={item}
                                 onClick={() => copyToClipboard(item)}
-                                className="
-              rounded-lg border border-slate-300 
-              bg-slate-50 px-3 py-1.5 
-              text-sm font-mono text-slate-900
-              hover:bg-slate-100 hover:border-slate-400
-              active:scale-95 transition
-            "
+                                className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-sm font-mono text-slate-900 hover:bg-slate-100 hover:border-slate-400 active:scale-95 transition"
                               >
                                 {item}
                               </button>
@@ -435,7 +547,6 @@ export default function ListeningModule({
                           rows={3}
                           className="w-full p-3 border border-slate-200 rounded-lg text-gray-700 text-sm"
                         />
-
                         <textarea
                           value={block.instruction || ""}
                           onChange={(e) =>
@@ -451,20 +562,18 @@ export default function ListeningModule({
                       </div>
 
                       {block.type === "text" && (
-                        <>
-                          <textarea
-                            value={toDisplayContent(block.content)}
-                            onChange={(e) =>
-                              onUpdateRenderBlock(section.id, index, {
-                                ...block,
-                                content: toStorageContent(e.target.value),
-                              })
-                            }
-                            placeholder="Write the passage text or questions here..."
-                            rows={5}
-                            className="w-full p-3 border border-slate-200 rounded-lg text-gray-700 text-sm"
-                          />
-                        </>
+                        <textarea
+                          value={toDisplayContent(block.content)}
+                          onChange={(e) =>
+                            onUpdateRenderBlock(section.id, index, {
+                              ...block,
+                              content: toStorageContent(e.target.value),
+                            })
+                          }
+                          placeholder="Write the passage text or questions here..."
+                          rows={5}
+                          className="w-full p-3 border border-slate-200 rounded-lg text-gray-700 text-sm"
+                        />
                       )}
 
                       {block.type === "image" && (
@@ -503,7 +612,6 @@ export default function ListeningModule({
                                 Choose Image
                               </label>
                             </div>
-
                             <textarea
                               value={block.label || ""}
                               onChange={(e) =>
@@ -520,53 +628,88 @@ export default function ListeningModule({
                         </div>
                       )}
 
-                      {/* Answer Key for this Render Block */}
+                      {/* --- ANSWER KEY ROW (Visible for this specific block only) --- */}
                       <div className="mt-4 pt-4 border-t border-slate-200">
-                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
-                          Answer Key for this Block
-                        </label>
-                        {(() => {
-                          const blockQuestionRefs = extractQuestionRefs(
-                            block.content,
-                          );
-                          const blockQuestions = blockQuestionRefs.filter(
-                            (ref) => section.questions[ref],
-                          );
+                        <div className="flex flex-wrap items-center gap-4">
+                          <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                            Answer Key
+                          </label>
 
-                          return (
-                            <>
-                              {blockQuestions.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mb-3">
-                                  {blockQuestions.map((ref) => (
-                                    <div
-                                      key={ref}
-                                      className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold"
-                                    >
-                                      <span>{ref}</span>
+                          {/* Show questions for THIS block */}
+                          {(() => {
+                            // Get questions referenced in this block's content via placeholders
+                            const blockQuestionRefs = extractQuestionRefs(
+                              block.content,
+                            );
+
+                            // Get questions created in THIS specific block
+                            const questionsCreatedHere = Object.keys(
+                              section.questions || {},
+                            ).filter((ref) => {
+                              const q = section.questions[ref];
+                              return q?.createdInBlockIndex === index;
+                            });
+
+                            // Combine: questions referenced here OR created here
+                            const questionsToShow = [
+                              ...new Set([
+                                ...blockQuestionRefs,
+                                ...questionsCreatedHere,
+                              ]),
+                            ];
+
+                            const finalQuestions = questionsToShow
+                              .filter((ref) => section.questions[ref])
+                              .sort((a, b) => Number(a) - Number(b));
+
+                            return (
+                              <>
+                                {finalQuestions.map((ref) => {
+                                  const data = section.questions[ref];
+
+                                  return (
+                                    <div key={ref} className="relative group">
+                                      {/* Card Body */}
                                       <button
                                         type="button"
                                         onClick={() =>
-                                          onDeleteQuestion(section.id, ref)
+                                          handleEditClick(section.id, ref, data)
                                         }
-                                        className="ml-1 p-0.5 rounded-full text-blue-600 hover:text-blue-900 hover:bg-blue-200"
-                                        aria-label={`Remove question ${ref}`}
+                                        className="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold shadow-sm transition-all border bg-white border-slate-200 text-slate-700 hover:border-blue-400 hover:text-blue-600"
+                                      >
+                                        {ref}
+                                      </button>
+
+                                      {/* Delete X Button */}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onDeleteQuestion(section.id, ref);
+                                        }}
+                                        className="absolute -top-2 -right-2 w-5 h-5 bg-red-100 border border-red-200 text-red-600 rounded-full flex items-center justify-center shadow-sm z-10 hover:bg-red-500 hover:text-white transition-colors"
+                                        title={`Remove Question ${ref}`}
                                       >
                                         <X className="w-3 h-3" />
                                       </button>
                                     </div>
-                                  ))}
-                                </div>
-                              )}
-                              <button
-                                onClick={() => onAddQuestion(section.id, index)}
-                                className="w-full px-4 py-2.5 border-2 border-dashed border-slate-300 text-slate-600 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 font-medium text-xs"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                                Add Answer for Block Questions
-                              </button>
-                            </>
-                          );
-                        })()}
+                                  );
+                                })}
+
+                                {/* Generic Add Button */}
+                                <button
+                                  onClick={() =>
+                                    onAddQuestion(section.id, index)
+                                  }
+                                  className="w-8 h-8 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                  title="Add Another Answer"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                </button>
+                              </>
+                            );
+                          })()}
+                        </div>
                       </div>
                     </div>
                   ))}

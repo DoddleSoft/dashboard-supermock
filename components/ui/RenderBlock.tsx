@@ -59,9 +59,6 @@ export const RenderBlockView: React.FC<RenderBlockProps> = ({
     if (!onAnswerChange) {
       return <>{text}</>;
     }
-
-    // 1. IMPROVED REGEX: Allows optional spaces around braces and inputs
-    // Matches: {{ 14 } blanks }, {{14}blanks}, {{14} blanks}
     const regex = /{{\s*(\d+)\s*}\s*(blanks|true-false|mcq)\s*}/g;
 
     const parts: React.ReactElement[] = [];
@@ -69,7 +66,6 @@ export const RenderBlockView: React.FC<RenderBlockProps> = ({
     let match;
 
     while ((match = regex.exec(text)) !== null) {
-      // Add text before the match
       if (match.index > lastIndex) {
         parts.push(
           <span key={`text-${lastIndex}`}>
@@ -196,7 +192,7 @@ export const RenderBlockView: React.FC<RenderBlockProps> = ({
     case "instruction":
       return (
         <div
-          className={`mb-4 rounded-lg p-3 text-sm italic font-medium ${colors.instruction}`}
+          className={`mb-4 rounded-lg p-3 text-xs italic font-medium ${colors.instruction}`}
         >
           {content}
         </div>

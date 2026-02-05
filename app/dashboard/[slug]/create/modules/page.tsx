@@ -144,6 +144,7 @@ function CreateModuleContent() {
       correctAnswers: normalizedCorrectAnswers,
       options: normalizedOptions,
       explanation: questionData.explanation,
+      createdInBlockIndex: currentBlockIndex ?? 0,
     };
 
     if (currentModuleType === "reading") {
@@ -221,6 +222,7 @@ function CreateModuleContent() {
             onDeleteSection={deleteReadingSection}
             onAddQuestion={addQuestion}
             onDeleteQuestion={deleteReadingQuestion}
+            onUpdateQuestion={updateReadingQuestion}
             onUpdateSectionTitle={updateReadingSectionTitle}
             onUpdateSectionHeading={updateReadingSectionHeading}
             onUpdateSectionInstruction={updateReadingSectionInstruction}
@@ -262,6 +264,7 @@ function CreateModuleContent() {
             onDeleteSection={deleteListeningSection}
             onAddQuestion={addQuestion}
             onDeleteQuestion={deleteListeningQuestion}
+            onUpdateQuestion={updateListeningQuestion}
             onUpdateSectionTitle={updateListeningSectionTitle}
             onUpdateSectionInstruction={updateListeningSectionInstruction}
             onUpdateSectionAudioPath={updateListeningSectionAudioPath}
@@ -312,8 +315,7 @@ function CreateModuleContent() {
       setToastMessage(
         `${typeKey.charAt(0).toUpperCase() + typeKey.slice(1)} module created successfully!`,
       );
-      setToastType("success");
-      setShowToast(true);
+
       setTimeout(() => setShowToast(false), 3000);
 
       // Clear the module title after successful creation

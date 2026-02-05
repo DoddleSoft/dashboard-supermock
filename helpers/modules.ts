@@ -165,9 +165,6 @@ export async function createModule(
         );
       }
 
-      console.log(
-        `[createModule] Module created successfully with ID: ${moduleId}`,
-      );
       toast.success("Module created successfully!");
       return { success: true, moduleId, paperId: payload.paperId };
     } catch (subsectionError) {
@@ -399,7 +396,6 @@ async function createSubSectionsFromBlocks(
   renderBlocks: RenderBlock[],
   questions: Record<string, QuestionDefinition>,
 ): Promise<void> {
-  const questionRefsInBlocks = new Set<string>();
   const subSectionsToInsert: Array<{
     id: string;
     section_id: string;
@@ -410,8 +406,6 @@ async function createSubSectionsFromBlocks(
     instruction: string | null;
     sub_section_index: number;
   }> = [];
-
-  const blockQuestionRefs: string[][] = [];
 
   const hasMeaningfulContent = (block: RenderBlock) => {
     const content = (block.content || "").trim();
@@ -437,13 +431,8 @@ async function createSubSectionsFromBlocks(
     const resourceUrl = block.type === "image" ? block.content : null;
     const instruction = block.instruction || null;
 
-    // Extract question refs from this specific block
-    const refs = extractQuestionRefs(block.content);
-    refs.forEach((ref) => questionRefsInBlocks.add(ref));
-
     // Create a unique sub_section for THIS render block
     const subSectionId = crypto.randomUUID();
-    blockQuestionRefs.push(refs);
 
     subSectionsToInsert.push({
       id: subSectionId,
@@ -457,13 +446,9 @@ async function createSubSectionsFromBlocks(
     });
 
     console.log(
-      `[createSubSectionsFromBlocks] Created sub_section ${blockIndex + 1} for render block with ${refs.length} question refs: ${refs.join(", ") || "none"}`,
+      `[createSubSectionsFromBlocks] Created sub_section ${blockIndex + 1} for render block`,
     );
   });
-
-  const orphanedQuestionRefs = Object.keys(questions).filter(
-    (ref) => !questionRefsInBlocks.has(ref),
-  );
 
   if (subSectionsToInsert.length > 0) {
     console.log(
@@ -497,95 +482,39 @@ async function createSubSectionsFromBlocks(
     marks: number;
   }> = [];
 
-  // Link questions to their respective sub_sections based on render block index
-  blockQuestionRefs.forEach((refs, blockIndex) => {
+  // Process all questions and assign them to sub_sections based on createdInBlockIndex
+  Object.entries(questions).forEach(([ref, questionDef]) => {
+    if (!questionDef) return;
+
+    // Determine which block this question belongs to
+    const blockIndex = questionDef.createdInBlockIndex ?? 0;
     const subSectionId = subSectionsToInsert[blockIndex]?.id;
+
     if (!subSectionId) {
       console.error(
-        `[createSubSectionsFromBlocks] CRITICAL: No sub_section found at block index ${blockIndex} for ${refs.length} questions!`,
+        `[createSubSectionsFromBlocks] CRITICAL: No sub_section found at block index ${blockIndex} for question ${ref}!`,
       );
       return;
     }
 
     console.log(
-      `[createSubSectionsFromBlocks] Linking ${refs.length} questions to sub_section ${blockIndex + 1} (ID: ${subSectionId}): ${refs.join(", ") || "none"}`,
+      `[createSubSectionsFromBlocks] Assigning question ${ref} to block ${blockIndex + 1} (sub_section: ${subSectionId})`,
     );
 
-    refs.forEach((ref) => {
-      const questionDef = questions[ref];
-      if (!questionDef) {
-        console.warn(
-          `[createSubSectionsFromBlocks] Question ${ref} referenced in render block ${blockIndex + 1} but not defined in questions object`,
-        );
-        return;
-      }
-
-      questionsToInsert.push({
-        sub_section_id: subSectionId,
-        question_ref: ref,
-        correct_answers:
-          questionDef.correctAnswers && questionDef.correctAnswers.length
-            ? questionDef.correctAnswers
-            : questionDef.answer
-              ? [questionDef.answer]
-              : null,
-        options: questionDef.options ?? null,
-        explanation: questionDef.explanation || null,
-        marks: 1.0,
-      });
+    questionsToInsert.push({
+      sub_section_id: subSectionId,
+      question_ref: ref,
+      correct_answers:
+        questionDef.correctAnswers && questionDef.correctAnswers.length
+          ? questionDef.correctAnswers
+          : questionDef.answer
+            ? [questionDef.answer]
+            : null,
+      options: questionDef.options ?? null,
+      explanation: questionDef.explanation || null,
+      marks: 1.0,
     });
   });
-
-  if (orphanedQuestionRefs.length > 0) {
-    console.log(
-      `[createSubSectionsFromBlocks] Found ${orphanedQuestionRefs.length} orphaned questions (${orphanedQuestionRefs.join(", ")}) - creating dedicated sub_section`,
-    );
-
-    // Create a dedicated sub_section for questions not embedded in render blocks
-    const orphanedSubSectionId = crypto.randomUUID();
-
-    // Insert the orphaned questions sub_section
-    const { error: orphanedSubError } = await supabase
-      .from("sub_sections")
-      .insert({
-        id: orphanedSubSectionId,
-        section_id: sectionId,
-        boundary_text: "Questions",
-        sub_type: "text",
-        content_template: "",
-        resource_url: null,
-        instruction: null,
-        sub_section_index: subSectionsToInsert.length + 1,
-      });
-
-    if (orphanedSubError) {
-      console.error(
-        "[createSubSectionsFromBlocks] Orphaned sub_section insert error:",
-        orphanedSubError,
-      );
-      throw orphanedSubError;
-    }
-
-    // Add orphaned questions to the dedicated sub_section
-    orphanedQuestionRefs.forEach((ref) => {
-      const questionDef = questions[ref];
-      if (!questionDef) return;
-
-      questionsToInsert.push({
-        sub_section_id: orphanedSubSectionId,
-        question_ref: ref,
-        correct_answers:
-          questionDef.correctAnswers && questionDef.correctAnswers.length
-            ? questionDef.correctAnswers
-            : questionDef.answer
-              ? [questionDef.answer]
-              : null,
-        options: questionDef.options ?? null,
-        explanation: questionDef.explanation || null,
-        marks: 1.0,
-      });
-    });
-  }
 
   if (questionsToInsert.length > 0) {
     const questionChunks = chunkArray(questionsToInsert, INSERT_CHUNK_SIZE);

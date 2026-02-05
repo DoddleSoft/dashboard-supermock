@@ -101,9 +101,6 @@ export default function Onboarding() {
         throw new Error("Failed to create center - no data returned");
       }
 
-      console.log("Created center:", centerData);
-      toast.success("Center created successfully!");
-
       // Step 2: Redirect to dashboard with center slug
       toast.success(`Redirecting to ${centerData.name}...`);
       router.push(`/dashboard/${centerData.slug}`);
@@ -115,7 +112,7 @@ export default function Onboarding() {
 
       if (
         error?.message?.includes(
-          "duplicate key value violates unique constraint"
+          "duplicate key value violates unique constraint",
         )
       ) {
         if (error.message.includes("slug")) {

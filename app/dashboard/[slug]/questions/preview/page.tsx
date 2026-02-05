@@ -43,6 +43,8 @@ interface SubSection {
 interface Section {
   id: string;
   section_title: string;
+  title?: string;
+  subtext?: string;
   heading?: string;
   resource_url?: string;
   content_text?: string;
@@ -244,31 +246,51 @@ export default function PreviewPage() {
       <div className="h-full overflow-y-auto p-6 bg-white border-r border-slate-200 scrollbar-thin scrollbar-thumb-slate-200">
         <div className="max-w-3xl mx-auto space-y-6">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">
-              {currentSection.section_title ||
-                currentSection.heading ||
-                "Section"}
-            </h2>
+            {/* Display title at the top for all modules */}
+            {currentSection.title && (
+              <h2 className="text-xl font-bold text-slate-900 mb-2">
+                {currentSection.title}
+              </h2>
+            )}
+
+            {/* For reading: subtext is the heading of the passage */}
+            {data.module_type === "reading" && currentSection.subtext && (
+              <h3 className="text-lg font-semibold text-slate-700 mb-3">
+                {currentSection.subtext}
+              </h3>
+            )}
+
             {currentSection.instruction && (
-              <div className="mt-2 p-3 bg-purple-50 text-purple-900 text-sm rounded-lg border border-purple-100 italic">
+              <div className="mt-2 p-3 bg-purple-50 text-purple-900 text-xs rounded-lg border border-purple-100 italic">
                 {currentSection.instruction}
               </div>
             )}
           </div>
 
+          {/* Listening Audio Section */}
           {currentSection.resource_url && data.module_type === "listening" && (
-            <div className="flex flex-col items-center justify-center p-8 bg-slate-50 rounded-xl border border-slate-100">
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4 animate-pulse">
-                <Headphones className="w-6 h-6 text-blue-600" />
+            <div className="space-y-4">
+              {/* Subtext as title for audio */}
+              {currentSection.subtext && (
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-slate-800 mb-1">
+                    {currentSection.subtext}
+                  </h3>
+                </div>
+              )}
+              <div className="flex flex-col items-center justify-center p-8 bg-slate-50 rounded-xl border border-slate-100">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4 animate-pulse">
+                  <Headphones className="w-6 h-6 text-blue-600" />
+                </div>
+                <div className="bg-blue-600 text-white px-4 py-1.5 rounded-full text-xs font-medium mb-4">
+                  Audio Player
+                </div>
+                <audio
+                  controls
+                  className="w-full max-w-sm"
+                  src={getAudioUrl(currentSection.resource_url)}
+                />
               </div>
-              <div className="bg-blue-600 text-white px-4 py-1.5 rounded-full text-xs font-medium mb-4">
-                Audio Player
-              </div>
-              <audio
-                controls
-                className="w-full max-w-sm"
-                src={getAudioUrl(currentSection.resource_url)}
-              />
             </div>
           )}
 
@@ -293,6 +315,36 @@ export default function PreviewPage() {
                   theme={theme}
                 />
               ) : null}
+            </div>
+          )}
+
+          {/* For writing: subtext shown as professional cue card below content_text */}
+          {data.module_type === "writing" && currentSection.subtext && (
+            <div className="relative mt-6">
+              <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-2xl border-2 border-purple-200 shadow-lg overflow-hidden">
+                <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3">
+                  <div className="flex items-center gap-2 text-white">
+                    <PenTool className="w-4 h-4" />
+                    <span className="text-xs font-bold uppercase tracking-wider">
+                      Writing Task
+                    </span>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <div className="bg-white rounded-lg p-5 shadow-sm border border-purple-100">
+                    <p className="text-slate-800 text-base leading-relaxed font-medium">
+                      {currentSection.subtext}
+                    </p>
+                  </div>
+                  <div className="mt-4 flex items-center gap-2 text-xs text-purple-600">
+                    <Info className="w-3.5 h-3.5" />
+                    <span className="font-medium">
+                      Write your response addressing all parts of the question
+                      above
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -465,16 +517,12 @@ export default function PreviewPage() {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div>
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="bg-slate-900 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded flex items-center gap-1">
-                <ModuleIcon type={data.module_type} /> {data.module_type}
-              </span>
-              <span className="text-xs text-slate-400 uppercase font-bold tracking-wider">
-                Preview Mode
-              </span>
-            </div>
-            <h1 className="text-sm font-bold text-slate-800">{data.heading}</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-md font-bold text-slate-800">{data.heading}</h1>
+
+            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+              Preview
+            </span>
           </div>
         </div>
 

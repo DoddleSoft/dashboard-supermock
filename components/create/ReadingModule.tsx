@@ -1,4 +1,4 @@
-import { Plus, Trash2, ChevronDown, ChevronUp, X } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronUp, X, Save } from "lucide-react";
 import { useState } from "react";
 import {
   RenderBlock,
@@ -15,6 +15,7 @@ interface ReadingModuleProps {
   onDeleteSection: (sectionId: string) => void;
   onAddQuestion: (sectionId: string, blockIndex: number) => void;
   onDeleteQuestion: (sectionId: string, questionRef: string) => void;
+  onUpdateQuestion: (sectionId: string, questionRef: string, data: any) => void;
   onUpdateSectionTitle: (sectionId: string, newTitle: string) => void;
   onUpdateSectionHeading: (sectionId: string, heading: string) => void;
   onUpdateSectionInstruction: (sectionId: string, instruction: string) => void;
@@ -38,6 +39,7 @@ export default function ReadingModule({
   onDeleteSection,
   onAddQuestion,
   onDeleteQuestion,
+  onUpdateQuestion,
   onUpdateSectionTitle,
   onUpdateSectionHeading,
   onUpdateSectionInstruction,
@@ -47,6 +49,13 @@ export default function ReadingModule({
   onDeleteRenderBlock,
 }: ReadingModuleProps) {
   const blockTypes: RenderBlockType[] = ["text", "image"];
+
+  // Modal State
+  const [editingQuestion, setEditingQuestion] = useState<{
+    sectionId: string;
+    ref: string;
+    data: any;
+  } | null>(null);
 
   // Extract question refs from block content
   const extractQuestionRefs = (content: string): string[] => {
@@ -99,8 +108,134 @@ export default function ReadingModule({
     await navigator.clipboard.writeText(text);
   };
 
+  const handleEditClick = (
+    sectionId: string,
+    ref: string,
+    questionData: any,
+  ) => {
+    setEditingQuestion({
+      sectionId,
+      ref,
+      data: JSON.parse(JSON.stringify(questionData)),
+    });
+  };
+
+  const handleModalSave = () => {
+    if (editingQuestion) {
+      onUpdateQuestion(
+        editingQuestion.sectionId,
+        editingQuestion.ref,
+        editingQuestion.data,
+      );
+      setEditingQuestion(null);
+    }
+  };
+
   return (
-    <div className="space-y-4 pb-4">
+    <div className="space-y-4 pb-4 relative">
+      {/* Edit Modal */}
+      {editingQuestion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900">
+                Edit Question {editingQuestion.ref}
+              </h3>
+              <button
+                onClick={() => setEditingQuestion(null)}
+                className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">
+                  Correct Answer
+                </label>
+                <input
+                  type="text"
+                  value={editingQuestion.data?.answer || ""}
+                  onChange={(e) =>
+                    setEditingQuestion((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            data: { ...prev.data, answer: e.target.value },
+                          }
+                        : null,
+                    )
+                  }
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none text-sm"
+                  placeholder="Enter expected answer..."
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">
+                  Question Type
+                </label>
+                <select
+                  value={editingQuestion.data?.type || "mcq"}
+                  onChange={(e) =>
+                    setEditingQuestion((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            data: { ...prev.data, type: e.target.value },
+                          }
+                        : null,
+                    )
+                  }
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none text-sm bg-white"
+                >
+                  <option value="mcq">Multiple Choice</option>
+                  <option value="blanks">Fill in Blanks</option>
+                  <option value="true-false">True / False</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">
+                  Points
+                </label>
+                <input
+                  type="number"
+                  value={editingQuestion.data?.points || 1}
+                  onChange={(e) =>
+                    setEditingQuestion((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            data: {
+                              ...prev.data,
+                              points: Number(e.target.value),
+                            },
+                          }
+                        : null,
+                    )
+                  }
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none text-sm"
+                />
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+              <button
+                onClick={() => setEditingQuestion(null)}
+                className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleModalSave}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors text-sm flex items-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {sections.map((section) => (
         <div
           key={section.id}
@@ -353,53 +488,88 @@ export default function ReadingModule({
                         </div>
                       )}
 
-                      {/* Answer Key for this Render Block */}
+                      {/* --- ANSWER KEY ROW (Visible for this specific block only) --- */}
                       <div className="mt-4 pt-4 border-t border-slate-200">
-                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
-                          Answer Key for this Block
-                        </label>
-                        {(() => {
-                          const blockQuestionRefs = extractQuestionRefs(
-                            block.content,
-                          );
-                          const blockQuestions = blockQuestionRefs.filter(
-                            (ref) => section.questions[ref],
-                          );
+                        <div className="flex flex-wrap items-center gap-4">
+                          <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                            Answer Key
+                          </label>
 
-                          return (
-                            <>
-                              {blockQuestions.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mb-3">
-                                  {blockQuestions.map((ref) => (
-                                    <div
-                                      key={ref}
-                                      className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 text-green-800 text-xs font-semibold"
-                                    >
-                                      <span>{ref}</span>
+                          {/* Show questions for THIS block */}
+                          {(() => {
+                            // Get questions referenced in this block's content via placeholders
+                            const blockQuestionRefs = extractQuestionRefs(
+                              block.content,
+                            );
+
+                            // Get questions created in THIS specific block
+                            const questionsCreatedHere = Object.keys(
+                              section.questions || {},
+                            ).filter((ref) => {
+                              const q = section.questions[ref];
+                              return q?.createdInBlockIndex === index;
+                            });
+
+                            // Combine: questions referenced here OR created here
+                            const questionsToShow = [
+                              ...new Set([
+                                ...blockQuestionRefs,
+                                ...questionsCreatedHere,
+                              ]),
+                            ];
+
+                            const finalQuestions = questionsToShow
+                              .filter((ref) => section.questions[ref])
+                              .sort((a, b) => Number(a) - Number(b));
+
+                            return (
+                              <>
+                                {finalQuestions.map((ref) => {
+                                  const data = section.questions[ref];
+
+                                  return (
+                                    <div key={ref} className="relative group">
+                                      {/* Card Body */}
                                       <button
                                         type="button"
                                         onClick={() =>
-                                          onDeleteQuestion(section.id, ref)
+                                          handleEditClick(section.id, ref, data)
                                         }
-                                        className="ml-1 p-0.5 rounded-full text-green-600 hover:text-green-900 hover:bg-green-200"
-                                        aria-label={`Remove question ${ref}`}
+                                        className="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold shadow-sm transition-all border bg-white border-slate-200 text-slate-700 hover:border-green-400 hover:text-green-600"
+                                      >
+                                        {ref}
+                                      </button>
+
+                                      {/* Delete X Button */}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onDeleteQuestion(section.id, ref);
+                                        }}
+                                        className="absolute -top-2 -right-2 w-5 h-5 bg-red-100 border border-red-200 text-red-600 rounded-full flex items-center justify-center shadow-sm z-10 hover:bg-red-500 hover:text-white transition-colors"
+                                        title={`Remove Question ${ref}`}
                                       >
                                         <X className="w-3 h-3" />
                                       </button>
                                     </div>
-                                  ))}
-                                </div>
-                              )}
-                              <button
-                                onClick={() => onAddQuestion(section.id, index)}
-                                className="w-full px-4 py-2.5 border-2 border-dashed border-slate-300 text-slate-600 rounded-lg hover:border-green-300 hover:bg-green-50 transition-colors flex items-center justify-center gap-2 font-medium text-xs"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                                Add Answer for Block Questions
-                              </button>
-                            </>
-                          );
-                        })()}
+                                  );
+                                })}
+
+                                {/* Generic Add Button */}
+                                <button
+                                  onClick={() =>
+                                    onAddQuestion(section.id, index)
+                                  }
+                                  className="w-8 h-8 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400 hover:border-green-400 hover:text-green-600 hover:bg-green-50 transition-colors"
+                                  title="Add Another Answer"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                </button>
+                              </>
+                            );
+                          })()}
+                        </div>
                       </div>
                     </div>
                   ))}

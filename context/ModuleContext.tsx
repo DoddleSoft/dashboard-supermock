@@ -44,6 +44,7 @@ export interface QuestionDefinition {
   correctAnswers?: string[];
   options?: string[];
   explanation?: string;
+  createdInBlockIndex?: number;
 }
 
 export interface ReadingSection {
