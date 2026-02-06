@@ -1,16 +1,18 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
-import { Filter, MoreVertical, Search } from "lucide-react";
+import { Fragment, useEffect, useMemo, useState, useRef } from "react";
+import { Filter, MoreVertical, Search, Eye, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useCentre } from "@/context/CentreContext";
 import { SmallLoader } from "@/components/ui/SmallLoader";
 import { toast } from "sonner";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 
 type AnswerItem = {
   id: string;
   attempt_module_id: string;
-  sub_section_id: string;
+  reference_id: string;
   question_ref: string;
   student_response: string | null;
   is_correct: boolean | null;
@@ -67,44 +69,196 @@ type AttemptReview = {
 
 export default function ReviewPage() {
   const { currentCenter } = useCentre();
+  const params = useParams();
+  const router = useRouter();
+  const slug = params.slug as string;
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedModule, setSelectedModule] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState<AttemptReview[]>([]);
-  const [expandedAttemptId, setExpandedAttemptId] = useState<string | null>(
-    null,
-  );
-  const [savingMarks, setSavingMarks] = useState<Record<string, boolean>>({});
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!currentCenter?.center_id) return;
     void fetchReviews();
   }, [currentCenter?.center_id]);
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setOpenDropdown(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleDeleteAttempt = async (attemptId: string) => {
+    if (!confirm("Are you sure you want to delete this attempt?")) return;
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("mock_attempts")
+        .delete()
+        .eq("id", attemptId);
+      if (error) throw error;
+      toast.success("Attempt deleted successfully");
+      await fetchReviews();
+    } catch (error: any) {
+      console.error("Error deleting attempt:", error);
+      toast.error("Failed to delete attempt");
+    }
+  };
+
   const fetchReviews = async () => {
     try {
       setLoading(true);
       const supabase = createClient();
 
-      const { error } = await supabase
-        .from("student_answers")
+      // First, get all attempt_modules for this center
+      const { data: attemptModulesData, error: amError } = await supabase
+        .from("attempt_modules")
         .select(
-          `id,attempt_module_id,sub_section_id,question_ref,student_response,is_correct,marks_awarded,created_at,
-          attempt_modules!inner (
-            id,attempt_id,status,score_obtained,band_score,time_spent_seconds,completed_at,module_id,
-            modules!inner (id,module_type,heading,paper_id,center_id),
-            mock_attempts (id,student_id,status,created_at,completed_at)
-          )`,
+          `id,attempt_id,status,score_obtained,band_score,time_spent_seconds,completed_at,module_id,module_type,
+          modules!inner (id,module_type,heading,paper_id,center_id),
+          mock_attempts (id,student_id,status,created_at,completed_at)`,
         )
-        .eq("attempt_modules.modules.center_id", currentCenter!.center_id)
+        .eq("modules.center_id", currentCenter!.center_id)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (amError) throw amError;
+
+      if (!attemptModulesData || attemptModulesData.length === 0) {
+        setReviews([]);
+        return;
+      }
+
+      // Get all attempt_module IDs
+      const attemptModuleIds = attemptModulesData.map((am: any) => am.id);
+
+      // Fetch all student answers for these modules
+      const { data: answersData, error: answersError } = await supabase
+        .from("student_answers")
+        .select(
+          "id,attempt_module_id,reference_id,question_ref,student_response,is_correct,marks_awarded,created_at",
+        )
+        .in("attempt_module_id", attemptModuleIds)
+        .order("created_at", { ascending: false });
+
+      if (answersError) throw answersError;
 
       const attemptMap = new Map<string, AttemptReview>();
       const studentIds = new Set<string>();
       const paperIds = new Set<string>();
+      const moduleMap = new Map<string, any>(); // Map attempt_module_id to module data
+
+      // First, process attempt modules to build the structure
+      (attemptModulesData || []).forEach((attemptModule: any) => {
+        const attemptId = attemptModule.attempt_id;
+        const mockAttempt = Array.isArray(attemptModule.mock_attempts)
+          ? attemptModule.mock_attempts[0]
+          : attemptModule.mock_attempts;
+        const moduleInfo = Array.isArray(attemptModule.modules)
+          ? attemptModule.modules[0]
+          : attemptModule.modules;
+
+        if (!attemptId || !moduleInfo) return;
+
+        // Store module info for later
+        moduleMap.set(attemptModule.id, {
+          attemptModule,
+          mockAttempt,
+          moduleInfo,
+        });
+
+        // Collect IDs for batch fetching
+        if (mockAttempt?.student_id) {
+          studentIds.add(mockAttempt.student_id);
+        }
+        if (moduleInfo?.paper_id) {
+          paperIds.add(moduleInfo.paper_id);
+        }
+
+        // Get or create attempt entry
+        if (!attemptMap.has(attemptId)) {
+          attemptMap.set(attemptId, {
+            attemptId: attemptId,
+            studentId: mockAttempt?.student_id || null,
+            studentName: "Loading...",
+            studentEmail: "",
+            paperTitle: "Loading...",
+            status: mockAttempt?.status || "unknown",
+            createdAt: mockAttempt?.created_at || null,
+            modules: [],
+          });
+        }
+
+        const attempt = attemptMap.get(attemptId)!;
+
+        // Add module entry
+        const moduleEntry: ModuleReview = {
+          attemptModuleId: attemptModule.id,
+          moduleType:
+            attemptModule.module_type || moduleInfo.module_type || "unknown",
+          heading: moduleInfo.heading,
+          status: attemptModule.status,
+          score: attemptModule.score_obtained,
+          band: attemptModule.band_score,
+          timeSpentSeconds: attemptModule.time_spent_seconds,
+          completedAt: attemptModule.completed_at,
+          answers: [],
+        };
+        attempt.modules.push(moduleEntry);
+      });
+
+      // Now process answers and add them to the correct modules
+      (answersData || []).forEach((answer: any) => {
+        const moduleData = moduleMap.get(answer.attempt_module_id);
+        if (!moduleData) return;
+
+        const { attemptModule, mockAttempt, moduleInfo } = moduleData;
+        const attemptId = attemptModule.attempt_id;
+
+        const attempt = attemptMap.get(attemptId);
+        if (!attempt) return;
+
+        // Find the module entry
+        const moduleEntry = attempt.modules.find(
+          (m) => m.attemptModuleId === answer.attempt_module_id,
+        );
+
+        if (!moduleEntry) return;
+
+        // Add answer to module
+        const answerItem: AnswerItem = {
+          id: answer.id,
+          attempt_module_id: answer.attempt_module_id,
+          reference_id: answer.reference_id,
+          question_ref: answer.question_ref,
+          student_response: answer.student_response,
+          is_correct: answer.is_correct,
+          marks_awarded: answer.marks_awarded,
+          created_at: answer.created_at,
+          attempt_modules: {
+            id: attemptModule.id,
+            attempt_id: attemptModule.attempt_id,
+            status: attemptModule.status,
+            score_obtained: attemptModule.score_obtained,
+            band_score: attemptModule.band_score,
+            time_spent_seconds: attemptModule.time_spent_seconds,
+            completed_at: attemptModule.completed_at,
+            module_id: attemptModule.module_id,
+            modules: [moduleInfo],
+            mock_attempts: mockAttempt ? [mockAttempt] : [],
+          },
+        };
+        moduleEntry.answers.push(answerItem);
+      });
 
       let studentProfileMap = new Map<
         string,
@@ -148,8 +302,9 @@ export default function ReviewPage() {
         let resolvedTitle: string | undefined;
         for (const module of attempt.modules) {
           if (module.answers.length > 0) {
-            const paperId =
-              module.answers[0].attempt_modules.modules[0]?.paper_id;
+            const paperId = (
+              module.answers[0].attempt_modules.modules as any
+            )?.[0]?.paper_id;
             if (paperId) {
               resolvedTitle = paperTitleMap.get(paperId);
               if (resolvedTitle) break;
@@ -223,52 +378,6 @@ export default function ReviewPage() {
         return "bg-amber-100 text-amber-700 border-amber-200";
       default:
         return "bg-slate-100 text-slate-700 border-slate-200";
-    }
-  };
-
-  const handleMarkChange = (
-    attemptId: string,
-    moduleId: string,
-    answerId: string,
-    value: number,
-  ) => {
-    setReviews((prev) =>
-      prev.map((attempt) => {
-        if (attempt.attemptId !== attemptId) return attempt;
-        return {
-          ...attempt,
-          modules: attempt.modules.map((module) => {
-            if (module.attemptModuleId !== moduleId) return module;
-            return {
-              ...module,
-              answers: module.answers.map((answer) =>
-                answer.id === answerId
-                  ? { ...answer, marks_awarded: value }
-                  : answer,
-              ),
-            };
-          }),
-        };
-      }),
-    );
-  };
-
-  const updateMark = async (answerId: string, marks: number | null) => {
-    try {
-      setSavingMarks((prev) => ({ ...prev, [answerId]: true }));
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("student_answers")
-        .update({ marks_awarded: marks ?? 0 })
-        .eq("id", answerId);
-
-      if (error) throw error;
-      toast.success("Marks updated");
-    } catch (error: any) {
-      console.error("Error updating marks:", error);
-      toast.error("Failed to update marks");
-    } finally {
-      setSavingMarks((prev) => ({ ...prev, [answerId]: false }));
     }
   };
 
@@ -387,139 +496,57 @@ export default function ReviewPage() {
                       {formatDate(attempt.createdAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setExpandedAttemptId((prev) =>
-                            prev === attempt.attemptId
-                              ? null
-                              : attempt.attemptId,
-                          )
+                      <div
+                        className="relative"
+                        ref={
+                          openDropdown === attempt.attemptId
+                            ? dropdownRef
+                            : null
                         }
-                        className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors"
-                        aria-label="Toggle answers"
                       >
-                        <MoreVertical className="w-4 h-4 text-slate-600" />
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setOpenDropdown((prev) =>
+                              prev === attempt.attemptId
+                                ? null
+                                : attempt.attemptId,
+                            )
+                          }
+                          className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors"
+                          aria-label="Actions"
+                        >
+                          <MoreVertical className="w-4 h-4 text-slate-600" />
+                        </button>
+                        {openDropdown === attempt.attemptId && (
+                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-10">
+                            <button
+                              onClick={() => {
+                                router.push(
+                                  `/dashboard/${slug}/reviews/preview?attemptId=${attempt.attemptId}`,
+                                );
+                                setOpenDropdown(null);
+                              }}
+                              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                            >
+                              <Eye className="w-4 h-4 text-slate-500" />
+                              Preview
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleDeleteAttempt(attempt.attemptId);
+                                setOpenDropdown(null);
+                              }}
+                              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
-
-                  {expandedAttemptId === attempt.attemptId && (
-                    <tr className="bg-slate-50">
-                      <td colSpan={6} className="px-6 py-5">
-                        <div className="space-y-4">
-                          {attempt.modules.map((module) => (
-                            <div
-                              key={module.attemptModuleId}
-                              className="bg-white rounded-xl border border-slate-200 p-4"
-                            >
-                              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                                <div>
-                                  <p className="text-sm font-semibold text-slate-700 uppercase">
-                                    {module.moduleType}
-                                  </p>
-                                  <p className="text-base font-semibold text-slate-900">
-                                    {module.heading || "Module"}
-                                  </p>
-                                </div>
-                                <div className="flex flex-wrap gap-3 text-sm text-slate-600">
-                                  <span>
-                                    Status:{" "}
-                                    {module.status?.replace(/_/g, " ") || "-"}
-                                  </span>
-                                  <span>
-                                    Duration:{" "}
-                                    {formatDuration(module.timeSpentSeconds)}
-                                  </span>
-                                  <span>
-                                    Completed: {formatDate(module.completedAt)}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="space-y-3">
-                                {module.answers.map((answer) => {
-                                  const maxMarks =
-                                    module.moduleType === "writing" ? 9 : 1;
-                                  const isWriting =
-                                    module.moduleType === "writing";
-                                  const answerMarks = answer.marks_awarded ?? 0;
-
-                                  return (
-                                    <div
-                                      key={answer.id}
-                                      className="border border-slate-200 rounded-lg p-4"
-                                    >
-                                      <div className="flex flex-wrap items-start justify-between gap-4">
-                                        <div className="flex-1 min-w-[260px]">
-                                          <p className="text-sm font-semibold text-slate-700">
-                                            Question: {answer.question_ref}
-                                          </p>
-                                          <div
-                                            className={`mt-2 text-sm text-slate-700 rounded-lg border border-slate-100 bg-slate-50 p-3 ${
-                                              isWriting
-                                                ? "whitespace-pre-line"
-                                                : ""
-                                            }`}
-                                          >
-                                            {answer.student_response ||
-                                              "No response"}
-                                          </div>
-                                        </div>
-
-                                        <div className="w-full sm:w-56">
-                                          <label className="block text-xs font-semibold text-slate-600 uppercase mb-2">
-                                            Marks (max {maxMarks})
-                                          </label>
-                                          <div className="flex items-center gap-2">
-                                            <input
-                                              type="number"
-                                              min={0}
-                                              max={maxMarks}
-                                              step={
-                                                module.moduleType === "writing"
-                                                  ? 0.5
-                                                  : 1
-                                              }
-                                              value={answerMarks}
-                                              onChange={(e) =>
-                                                handleMarkChange(
-                                                  attempt.attemptId,
-                                                  module.attemptModuleId,
-                                                  answer.id,
-                                                  Number(e.target.value),
-                                                )
-                                              }
-                                              className="w-24 px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 text-sm"
-                                            />
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                updateMark(
-                                                  answer.id,
-                                                  answer.marks_awarded,
-                                                )
-                                              }
-                                              disabled={savingMarks[answer.id]}
-                                              className="px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
-                                            >
-                                              {savingMarks[answer.id]
-                                                ? "Saving..."
-                                                : "Save"}
-                                            </button>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
                 </Fragment>
               ))}
             </tbody>

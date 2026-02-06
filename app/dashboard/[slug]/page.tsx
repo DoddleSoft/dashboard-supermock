@@ -32,30 +32,20 @@ export default function DashboardPage() {
 
   const stats = [
     {
-      label: "Registered Students",
-      value: dashboardStats?.totalStudents ?? 0,
-      change: `${dashboardStats?.totalStudents ?? 0} active students`,
-      trend: "up" as const,
-      color: "bg-blue-100 text-blue-600",
-    },
-    {
       label: "Completed Tests",
       value: dashboardStats?.completedTests ?? 0,
-      change: `Total attempts completed`,
       trend: "up" as const,
       color: "bg-green-100 text-green-600",
     },
     {
       label: "Test Papers",
       value: dashboardStats?.totalPapers ?? 0,
-      change: `${dashboardStats?.totalPapers ?? 0} papers available`,
       trend: "neutral" as const,
       color: "bg-purple-100 text-purple-600",
     },
     {
       label: "Mock Registered",
       value: dashboardStats?.totalMockTestRegistered ?? 0,
-      change: `${dashboardStats?.totalMockTestRegistered ?? 0} active students`,
       trend: "up" as const,
       color: "bg-blue-100 text-blue-600",
     },
@@ -78,9 +68,6 @@ export default function DashboardPage() {
                     {stat.value}
                   </p>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-slate-600">{stat.change}</p>
               </div>
             </div>
           );
