@@ -229,18 +229,9 @@ export default function PreviewPage() {
     return {};
   };
 
-  const handleDummyChange = (qNum: string, val: string) => {
-    // No-op for preview mode, or you could add local state to make them interactive
-    console.log(`Question ${qNum} changed to ${val}`);
-  };
-
   // --- Left Panel Content Renderer ---
   const renderLeftPanel = () => {
     if (!currentSection) return null;
-
-    // Determine theme based on module type
-    const theme: ThemeColor =
-      data.module_type === "writing" ? "purple" : "green";
 
     return (
       <div className="h-full overflow-y-auto p-6 bg-white border-r border-slate-200 scrollbar-thin scrollbar-thumb-slate-200">
@@ -294,6 +285,18 @@ export default function PreviewPage() {
             </div>
           )}
 
+          {/* Render Text Passage using RenderBlock if it's structured, or raw HTML if text */}
+          {(currentSection.content_text ||
+            currentSection.content_type === "text") && (
+            <div className="text-lg max-w-none text-slate-800">
+              {currentSection.content_text ? (
+                <h2 className="text-md text-slate-900 mb-2">
+                  {currentSection.content_text}
+                </h2>
+              ) : null}
+            </div>
+          )}
+
           {currentSection.resource_url && data.module_type !== "listening" && (
             <div className="border border-slate-200 rounded-lg overflow-hidden shadow-sm">
               <img
@@ -304,46 +307,13 @@ export default function PreviewPage() {
             </div>
           )}
 
-          {/* Render Text Passage using RenderBlock if it's structured, or raw HTML if text */}
-          {(currentSection.content_text ||
-            currentSection.content_type === "text") && (
-            <div className="prose prose-sm max-w-none text-slate-800">
-              {currentSection.content_text ? (
-                // Use RenderBlock for the passage text to ensure consistent styling
-                <RenderBlockView
-                  block={{ type: "text", content: currentSection.content_text }}
-                  theme={theme}
-                />
-              ) : null}
-            </div>
-          )}
-
           {/* For writing: subtext shown as professional cue card below content_text */}
           {data.module_type === "writing" && currentSection.subtext && (
             <div className="relative mt-6">
-              <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-2xl border-2 border-purple-200 shadow-lg overflow-hidden">
-                <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3">
-                  <div className="flex items-center gap-2 text-white">
-                    <PenTool className="w-4 h-4" />
-                    <span className="text-xs font-bold uppercase tracking-wider">
-                      Writing Task
-                    </span>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <div className="bg-white rounded-lg p-5 shadow-sm border border-purple-100">
-                    <p className="text-slate-800 text-base leading-relaxed font-medium">
-                      {currentSection.subtext}
-                    </p>
-                  </div>
-                  <div className="mt-4 flex items-center gap-2 text-xs text-purple-600">
-                    <Info className="w-3.5 h-3.5" />
-                    <span className="font-medium">
-                      Write your response addressing all parts of the question
-                      above
-                    </span>
-                  </div>
-                </div>
+              <div className="bg-white rounded-lg p-5 shadow-sm border border-purple-100">
+                <p className="text-slate-800 text-base leading-relaxed font-medium">
+                  {currentSection.subtext}
+                </p>
               </div>
             </div>
           )}
@@ -433,7 +403,7 @@ export default function PreviewPage() {
 
                       {/* Content Template (The text with {{X}mcq} placeholders) */}
                       {sub.content_template && (
-                        <div className="mb-6 prose prose-sm max-w-none text-slate-700 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                        <div className="mb-6 max-w-none text-slate-700 bg-slate-50 p-4 rounded-lg border border-slate-100">
                           {getRenderBlocks(sub.content_template).map(
                             (block, i) => (
                               <RenderBlockView
@@ -443,7 +413,6 @@ export default function PreviewPage() {
                                 showQuestionNumbers={true}
                                 questions={questionMap}
                                 answers={answerMap}
-                                onAnswerChange={handleDummyChange}
                               />
                             ),
                           )}

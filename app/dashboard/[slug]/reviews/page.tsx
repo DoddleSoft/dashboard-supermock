@@ -61,7 +61,6 @@ type AttemptReview = {
   studentId: string | null;
   studentName: string;
   studentEmail: string;
-  paperTitle: string;
   status: string;
   createdAt: string | null;
   modules: ModuleReview[];
@@ -191,7 +190,6 @@ export default function ReviewPage() {
             studentId: mockAttempt?.student_id || null,
             studentName: "Loading...",
             studentEmail: "",
-            paperTitle: "Loading...",
             status: mockAttempt?.status || "unknown",
             createdAt: mockAttempt?.created_at || null,
             modules: [],
@@ -316,7 +314,6 @@ export default function ReviewPage() {
           ...attempt,
           studentName: profile?.name || "Student",
           studentEmail: profile?.email || "",
-          paperTitle: resolvedTitle || attempt.paperTitle || "Untitled",
         };
       });
 
@@ -333,10 +330,7 @@ export default function ReviewPage() {
     return reviews.filter((attempt) => {
       const matchesSearch =
         attempt.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        attempt.studentEmail
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()) ||
-        attempt.paperTitle.toLowerCase().includes(searchQuery.toLowerCase());
+        attempt.studentEmail.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesModule =
         selectedModule === "all" ||
@@ -432,9 +426,7 @@ export default function ReviewPage() {
                 <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                   Student
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                  Test Paper
-                </th>
+
                 <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                   Modules
                 </th>
@@ -468,9 +460,7 @@ export default function ReviewPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-slate-900">
-                      {attempt.paperTitle}
-                    </td>
+
                     <td className="px-6 py-4 whitespace-nowrap text-slate-900">
                       <div className="flex flex-wrap gap-2">
                         {attempt.modules.map((mod) => (
