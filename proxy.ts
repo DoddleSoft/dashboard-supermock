@@ -34,7 +34,13 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  const publicRoutes = ["/auth/login", "/auth/register", "/auth/callback", "/"];
+  const publicRoutes = [
+    "/auth/login",
+    "/auth/register",
+    "/auth/callback",
+    "/auth/onboarding",
+    "/",
+  ];
   const isPublic = publicRoutes.some((route) => pathname.startsWith(route));
 
   if (!user && !isPublic) {
@@ -89,10 +95,7 @@ export async function proxy(request: NextRequest) {
       }
     }
 
-    // Fallback to generic dashboard if no center found
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard/";
-    return NextResponse.redirect(url);
+    // If no center found, allow them to stay on login/register page
   }
 
   return response;
