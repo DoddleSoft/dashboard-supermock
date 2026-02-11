@@ -112,16 +112,6 @@ export function LoginForm() {
 
         {/* Form Container */}
         <div>
-          {successMessage && (
-            <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm text-green-600">{successMessage}</p>
-            </div>
-          )}
-          {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
-          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email Input */}
             <div>
