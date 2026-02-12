@@ -396,39 +396,37 @@ export default function GradePage() {
 
       if (isWriting) {
         // Handle writing module with weighted band calculation
-        // Task 1 and Task 2 should be in the answers
-        const task1Answer = moduleDetail.answers.find(
-          (a) =>
-            a.question_ref.toLowerCase().includes("task 1") ||
-            a.question_ref === "1",
-        );
-        const task2Answer = moduleDetail.answers.find(
-          (a) =>
-            a.question_ref.toLowerCase().includes("task 2") ||
-            a.question_ref === "2",
-        );
+        // Sort answers and take first two (Task 1 and Task 2)
+        const sortedAnswers = [...moduleDetail.answers].sort((a, b) => {
+          const numA = parseInt(a.question_ref.replace(/\D/g, ""), 10) || 0;
+          const numB = parseInt(b.question_ref.replace(/\D/g, ""), 10) || 0;
+          return numA - numB;
+        });
 
-        const task1Decision = task1Answer
-          ? gradingDecisions.get(task1Answer.id)
-          : null;
-        const task2Decision = task2Answer
-          ? gradingDecisions.get(task2Answer.id)
-          : null;
+        const task1Answer = sortedAnswers[0];
+        const task2Answer = sortedAnswers[1];
 
-        const task1Score =
-          task1Decision?.marksAwarded ?? task1Answer?.marks_awarded ?? 0;
-        const task2Score =
-          task2Decision?.marksAwarded ?? task2Answer?.marks_awarded ?? 0;
-
-        // Calculate weighted band: (Task1 + 2×Task2) / 3, rounded to nearest 0.5
-        const rawBand = (task1Score + 2 * task2Score) / 3;
-        const calculatedBand = Math.round(rawBand * 2) / 2; // Round to nearest 0.5
+        if (!task1Answer || !task2Answer) {
+          console.error(
+            "Available answers:",
+            moduleDetail.answers.map((a) => ({
+              id: a.id,
+              question_ref: a.question_ref,
+            })),
+          );
+          throw new Error(
+            `Could not find both tasks. Found ${moduleDetail.answers.length} answer(s)`,
+          );
+        }
 
         console.log(
-          `Writing Band Calculation: (${task1Score} + 2×${task2Score}) / 3 = ${rawBand.toFixed(2)} → ${calculatedBand}`,
+          "Task 1:",
+          task1Answer.question_ref,
+          "Task 2:",
+          task2Answer.question_ref,
         );
 
-        // Update individual task scores in student_answers
+        // Update individual task scores in student_answers first
         for (const answer of answersToUpdate) {
           const { error: updateError } = await supabase
             .from("student_answers")
@@ -438,23 +436,58 @@ export default function GradePage() {
             })
             .eq("id", answer.id);
 
-          if (updateError) throw updateError;
+          if (updateError) {
+            console.error("Error updating student answer:", updateError);
+            throw updateError;
+          }
         }
+
+        // Get the latest scores (after update)
+        const { data: updatedAnswers, error: fetchError } = await supabase
+          .from("student_answers")
+          .select("id, question_ref, marks_awarded")
+          .in("id", [task1Answer.id, task2Answer.id]);
+
+        if (fetchError) throw fetchError;
+
+        const updatedTask1 = updatedAnswers?.find(
+          (a) => a.id === task1Answer.id,
+        );
+        const updatedTask2 = updatedAnswers?.find(
+          (a) => a.id === task2Answer.id,
+        );
+
+        const task1Score = updatedTask1?.marks_awarded ?? 0;
+        const task2Score = updatedTask2?.marks_awarded ?? 0;
+
+        // Calculate weighted band: (Task1 × 1 + Task2 × 2) / 3, rounded to nearest 0.5
+        const rawBand = (task1Score * 1 + task2Score * 2) / 3;
+        const calculatedBand = Math.round(rawBand * 2) / 2; // Round to nearest 0.5
+
+        console.log(
+          `Writing Band Calculation: (${task1Score} × 1 + ${task2Score} × 2) / 3 = ${rawBand.toFixed(2)} → ${calculatedBand}`,
+        );
 
         // Update module with calculated band score
         const { error: moduleError } = await supabase
           .from("attempt_modules")
           .update({
             band_score: calculatedBand,
-            score_obtained: task1Score + task2Score, // Total raw score
+            score_obtained: rawBand, // Store the exact weighted score
             feedback: feedback || null,
-            status: "graded",
+            status: "completed",
           })
           .eq("id", moduleId);
 
-        if (moduleError) throw moduleError;
+        if (moduleError) {
+          console.error("Error updating attempt_modules:", moduleError);
+          throw moduleError;
+        }
 
         console.log("✓ Writing module graded successfully");
+        console.log(
+          `Updated band_score: ${calculatedBand}, score_obtained: ${rawBand.toFixed(2)}`,
+        );
         toast.success(
           `Saved! Task 1: ${task1Score}, Task 2: ${task2Score} | Band: ${calculatedBand}`,
         );

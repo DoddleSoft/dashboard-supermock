@@ -286,7 +286,9 @@ export const createScheduledTest = async (
     // Calculate ended_at based on scheduled_at and duration
     const durationMinutes = payload.durationMinutes || 180;
     const scheduledDate = new Date(payload.scheduledAt);
-    const endedDate = new Date(scheduledDate.getTime() + durationMinutes * 60000);
+    const endedDate = new Date(
+      scheduledDate.getTime() + durationMinutes * 60000,
+    );
 
     // Create the test
     const { data: test, error: testError } = await supabase
@@ -370,11 +372,14 @@ export const updateScheduledTest = async (
         .single();
 
       const scheduledAt = updates.scheduledAt || currentTest?.scheduled_at;
-      const durationMinutes = updates.durationMinutes || currentTest?.duration_minutes || 180;
+      const durationMinutes =
+        updates.durationMinutes || currentTest?.duration_minutes || 180;
 
       if (scheduledAt) {
         const scheduledDate = new Date(scheduledAt);
-        const endedDate = new Date(scheduledDate.getTime() + durationMinutes * 60000);
+        const endedDate = new Date(
+          scheduledDate.getTime() + durationMinutes * 60000,
+        );
         updateData.ended_at = endedDate.toISOString();
       }
     }
@@ -469,7 +474,6 @@ export const generateScheduledTestOtp = async (
       throw new Error(data.error);
     }
 
-    toast.success("OTP generated successfully!");
     return { success: true, otp: data.otp };
   } catch (error: any) {
     console.error("Error generating OTP:", error);
