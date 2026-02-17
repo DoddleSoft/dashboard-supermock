@@ -20,6 +20,8 @@ export interface Center {
   user_id: string;
   created_at: string;
   updated_at: string;
+  status: "pending" | "verified" | "rejected";
+  verified_at?: string | null;
 }
 
 export interface DashboardStats {
