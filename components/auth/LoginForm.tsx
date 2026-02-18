@@ -25,7 +25,7 @@ export function LoginForm() {
     const registered = searchParams.get("registered");
     if (registered === "true") {
       toast.success(
-        "Account created successfully! Please check your email to verify your account, then sign in.",
+        "Account created successfully! Please check your email to verify your account.",
       );
     }
   }, [searchParams]);
@@ -61,7 +61,7 @@ export function LoginForm() {
       return;
     }
 
-    const loadingToastId = toast.loading("Signing in...");
+    const loadingToastId = "";
 
     try {
       const result = await signIn(formData.email, formData.password);
