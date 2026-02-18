@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -12,7 +13,6 @@ export function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -27,39 +27,42 @@ export function RegisterForm() {
       ...prev,
       [name]: value,
     }));
-    setError("");
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError("");
+
+    const fail = (message: string) => {
+      toast.error(message);
+    };
 
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
+      fail("Passwords do not match");
       return;
     }
 
     // Validate password length
     if (formData.password.length < 8) {
-      setError("Password must be at least 8 characters");
+      fail("Password must be at least 8 characters");
       return;
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      setError("Please enter a valid email address");
+      fail("Please enter a valid email address");
       return;
     }
 
     // Validate full name
     if (formData.fullName.trim().length < 2) {
-      setError("Full name must be at least 2 characters");
+      fail("Full name must be at least 2 characters");
       return;
     }
 
     setIsLoading(true);
+    const loadingToastId = "";
 
     try {
       const result = await signUp(
@@ -69,14 +72,25 @@ export function RegisterForm() {
       );
 
       if (!result.success) {
-        setError(result.error || "Registration failed. Please try again.");
+        toast.error(result.error || "Registration failed. Please try again.", {
+          id: loadingToastId,
+        });
         return;
       }
+
+      toast.success(
+        "Account created successfully! Redirecting to verification...",
+        {
+          id: loadingToastId,
+        },
+      );
 
       // Redirect to callback which will handle verification and onboarding
       router.push("/auth/callback");
     } catch (error) {
-      setError("An unexpected error occurred. Please try again.");
+      toast.error("An unexpected error occurred. Please try again.", {
+        id: loadingToastId,
+      });
       console.error("Registration error:", error);
     } finally {
       setIsLoading(false);
@@ -104,11 +118,6 @@ export function RegisterForm() {
 
         {/* Form Container */}
         <div>
-          {error && (
-            <div className="mb-4 p-4 border rounded-lg bg-red-50 border-red-200">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
-          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Full Name Input */}
             <div>

@@ -9,7 +9,6 @@ import {
   BarChart3,
   LogOut,
   Layers,
-  Building2,
   NotepadText,
   Handshake,
   UserStar,
@@ -22,6 +21,7 @@ import {
   type NavItem,
 } from "../../../components/dashboard/SidebarItem";
 import { Loader } from "../../../components/ui/Loader";
+import Image from "next/image";
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -140,16 +140,23 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     );
   }
   return (
-    <div className="flex h-screen bg-white">
+    <div className="flex h-screen bg-slate-800">
       {/* Sidebar */}
       <aside
         className={`border-r border-slate-200 flex flex-col transition-all duration-300 ${
-          isCollapsed ? "w-28" : "w-56"
+          isCollapsed ? "w-24" : "w-52"
         }`}
       >
-        <div className="py-3 px-4 border-b border-slate-200">
+        <div className="flex items-center gap-2 p-4">
+          <Image
+            src="/supermock-logo.png"
+            alt="SuperMock Logo"
+            width={30}
+            height={30}
+          />
+
           {/* Logo */}
-          <h1 className="text-2xl font-bold text-slate-900 whitespace-nowrap">
+          <h1 className="text-xl font-bold text-white-900 whitespace-nowrap">
             {!isCollapsed && (
               <>
                 Super<span className="text-red-600">Mock</span>
@@ -195,14 +202,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Logout Button at Bottom */}
-        <div className="p-3 border-t border-slate-200">
+        <div className="p-3 border-t border-slate-500">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 hover:bg-red-50 hover:text-red-600 transition-colors duration-200 group"
+            className="text-slate-100 hover:text-slate-300 bg-red-600 hover:bg-red-700 w-full flex items-center rounded-md font-medium transition-all duration-200 ease-in-out px-4 py-2 gap-3"
           >
-            <LogOut className="h-5 w-5" />
+            <LogOut className="h-4 w-4 flex-shrink-0" />
             {!isCollapsed && (
-              <span className="text-sm font-medium">Logout</span>
+              <span className="whitespace-nowrap text-md">Logout</span>
             )}
           </button>
         </div>
@@ -215,7 +222,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           <div className="flex items-center w-full px-8 py-2">
             {/* LEFT: Page Title */}
             <div className="flex-1 flex justify-start items-center gap-4">
-              <h2 className="text-xl font-semibold text-slate-900">
+              <h2 className="text-lg font-semibold text-slate-900">
                 {navigationItems.find(
                   (item) =>
                     pathname === item.href ||
@@ -223,10 +230,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                       pathname.startsWith(item.href)),
                 )?.label || "Dashboard"}
               </h2>
-              <div className="h-8 bg-slate-300 w-[2px]"></div>
-              <p className="text-sm text-gray-700 font-semibold">
-                Dashboard Portal
-              </p>
             </div>
 
             {/* RIGHT: Profile */}
@@ -246,7 +249,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
 
-              <div className="bg-red-50 px-5 py-1 rounded-md border border-slate-200 shadow-inner">
+              <div className="bg-white px-3 py-1 rounded-md border border-slate-200 shadow-sm shadow-red-200">
                 <p
                   className="font-radeil text-2xl uppercase text-slate-700 tracking-tighter"
                   style={{ fontFamily: "var(--font-radeil)" }}

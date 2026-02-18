@@ -24,15 +24,15 @@ export function SidebarItem({ item, isCollapsed, isActive }: SidebarItemProps) {
       <div
         className={cn(
           "flex items-center rounded-md font-medium transition-all duration-200 ease-in-out",
-          "px-4 py-2.5 gap-3",
+          "px-4 py-2 gap-3",
           isActive
-            ? "bg-red-50 text-red-600 shadow-sm"
-            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+            ? "bg-gray-700 text-red-500 shadow-sm"
+            : "text-gray-50 hover:bg-gray-50 hover:text-red-700",
         )}
       >
-        <Icon className="h-5 w-5 flex-shrink-0" />
+        <Icon className="h-4 w-4 flex-shrink-0" />
         {!isCollapsed && (
-          <span className="whitespace-nowrap text-sm">{label}</span>
+          <span className="whitespace-nowrap text-md">{label}</span>
         )}
       </div>
     </Link>

@@ -3,18 +3,17 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Lock, Eye, EyeOff, ArrowLeft, Mail } from "lucide-react";
+import { Lock, Eye, EyeOff, Mail } from "lucide-react";
 import { authService } from "@/helpers/auth";
 import { toast } from "sonner";
 
 export function ResetPasswordForm() {
   const router = useRouter();
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showConfirmCurrentPassword, setShowConfirmCurrentPassword] =
-    useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showNewPasswords, setShowNewPasswords] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const [formData, setFormData] = useState({
     email: "",
@@ -29,45 +28,48 @@ export function ResetPasswordForm() {
       ...prev,
       [name]: value,
     }));
-    setError("");
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError("");
+
+    const fail = (message: string) => {
+      toast.error(message);
+    };
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      setError("Please enter a valid email address");
+      fail("Please enter a valid email address");
       return;
     }
 
     // Validate current password length
     if (formData.currentPassword.length < 6) {
-      setError("Current password must be at least 6 characters");
+      fail("Current password must be at least 6 characters");
       return;
     }
 
     // Validate current passwords match
     if (formData.currentPassword !== formData.confirmCurrentPassword) {
-      setError("Current passwords do not match");
+      fail("Current passwords do not match");
       return;
     }
 
     // Validate new password length
     if (formData.newPassword.length < 8) {
-      setError("New password must be at least 8 characters");
+      fail("New password must be at least 8 characters");
       return;
     }
 
     // Validate that new password is different from current
     if (formData.currentPassword === formData.newPassword) {
-      setError("New password must be different from current password");
+      fail("New password must be different from current password");
       return;
     }
 
     setIsLoading(true);
+    const loadingToastId = "";
 
     try {
       // First, authenticate the user with their email and current password
@@ -77,11 +79,10 @@ export function ResetPasswordForm() {
       });
 
       if (!signInResult.success) {
-        setError(
-          "Invalid email or current password. Please check your credentials.",
-        );
-        toast.error("Invalid email or current password");
-        setIsLoading(false);
+        const message =
+          signInResult.error ||
+          "Invalid email or current password. Please check your credentials.";
+        toast.error(message, { id: loadingToastId });
         return;
       }
 
@@ -91,17 +92,11 @@ export function ResetPasswordForm() {
       );
 
       if (!updateResult.success) {
-        setError(
-          updateResult.error || "Failed to update password. Please try again.",
-        );
-        toast.error(updateResult.error || "Failed to update password");
-        setIsLoading(false);
+        const message =
+          updateResult.error || "Failed to update password. Please try again.";
+        toast.error(message, { id: loadingToastId });
         return;
       }
-
-      toast.success(
-        "Password updated successfully! Please login with your new password.",
-      );
 
       // Clear form
       setFormData({
@@ -112,16 +107,30 @@ export function ResetPasswordForm() {
       });
 
       // Sign out the user and redirect to login
-      await authService.signOut();
+      const signOutResult = await authService.signOut();
+
+      if (!signOutResult.success) {
+        toast.error(
+          signOutResult.error || "Password updated, but sign out failed.",
+          {
+            id: loadingToastId,
+          },
+        );
+        return;
+      }
+
+      toast.success("Password updated. Redirecting to login...", {
+        id: loadingToastId,
+      });
 
       setTimeout(() => {
         router.push("/auth/login");
       }, 2000);
     } catch (error) {
       const errorMsg = "An unexpected error occurred. Please try again.";
-      setError(errorMsg);
-      toast.error(errorMsg);
+      toast.error(errorMsg, { id: loadingToastId });
       console.error("Password reset error:", error);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -198,7 +207,7 @@ export function ResetPasswordForm() {
               <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
               <input
                 name="confirmCurrentPassword"
-                type={showConfirmCurrentPassword ? "text" : "password"}
+                type={showConfirmPassword ? "text" : "password"}
                 placeholder="Re-enter your current password"
                 value={formData.confirmCurrentPassword}
                 onChange={handleInputChange}
@@ -207,16 +216,10 @@ export function ResetPasswordForm() {
               />
               <button
                 type="button"
-                onClick={() =>
-                  setShowConfirmCurrentPassword(!showConfirmCurrentPassword)
-                }
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 className="absolute right-3 top-3 text-gray-400"
               >
-                {showConfirmCurrentPassword ? (
-                  <EyeOff size={18} />
-                ) : (
-                  <Eye size={18} />
-                )}
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>
@@ -230,7 +233,7 @@ export function ResetPasswordForm() {
               <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
               <input
                 name="newPassword"
-                type={showNewPassword ? "text" : "password"}
+                type={showNewPasswords ? "text" : "password"}
                 placeholder="Enter your new password"
                 value={formData.newPassword}
                 onChange={handleInputChange}
@@ -239,10 +242,10 @@ export function ResetPasswordForm() {
               />
               <button
                 type="button"
-                onClick={() => setShowNewPassword(!showNewPassword)}
+                onClick={() => setShowNewPasswords(!showNewPasswords)}
                 className="absolute right-3 top-3 text-gray-400"
               >
-                {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                {showNewPasswords ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
             <p className="mt-1 text-xs text-gray-500">
@@ -253,7 +256,7 @@ export function ResetPasswordForm() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg disabled:opacity-50"
+            className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? "Updating Password..." : "Update Password"}
           </button>

@@ -19,12 +19,10 @@ export async function GET(request: NextRequest) {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, options),
             );
           } catch {
-            // The `setAll` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
+            // Handle cookie setting errors if necessary {not catching cookies so no worry}
           }
         },
       },
@@ -33,6 +31,13 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error && data.session) {
+      const user = data.session.user;
+      if (!user.email_confirmed_at) {
+        return NextResponse.redirect(
+          new URL("/auth/login?error=unverified_email", request.url),
+        );
+      }
+
       // Check if user profile exists in users table
       const { data: existingUser } = await supabase
         .from("users")
@@ -48,17 +53,17 @@ export async function GET(request: NextRequest) {
           .eq("user_id", data.session.user.id)
           .limit(1);
 
+        const origin = new URL(request.url).origin;
+
         if (centers && centers.length > 0) {
           // User has centers, redirect to first center's dashboard
           const center = centers[0];
           return NextResponse.redirect(
-            new URL(`/dashboard/${center.slug}`, request.url)
+            `${origin}/dashboard/${centers[0].slug}`,
           );
         } else {
           // User profile exists but no centers - redirect to onboarding to create one
-          return NextResponse.redirect(
-            new URL("/auth/onboarding", request.url)
-          );
+          return NextResponse.redirect(`${origin}/auth/onboarding`);
         }
       } else {
         // No user profile - redirect to onboarding
@@ -66,12 +71,10 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(new URL("/auth/onboarding", request.url));
       }
     }
-
-    console.error("Error exchanging code:", error);
   }
 
   // Redirect to login with error
   return NextResponse.redirect(
-    new URL("/auth/login?error=verification_failed", request.url)
+    new URL("/auth/login?error=verification_failed", request.url),
   );
 }

@@ -14,8 +14,6 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
 
   const [formData, setFormData] = useState({
     email: "",
@@ -26,7 +24,7 @@ export function LoginForm() {
   useEffect(() => {
     const registered = searchParams.get("registered");
     if (registered === "true") {
-      setSuccessMessage(
+      toast.success(
         "Account created successfully! Please check your email to verify your account, then sign in.",
       );
     }
@@ -38,28 +36,32 @@ export function LoginForm() {
       ...prev,
       [name]: value,
     }));
-    setError("");
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
-    setError("");
+
+    const fail = (message: string) => {
+      toast.error(message);
+    };
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      setError("Please enter a valid email address");
+      fail("Please enter a valid email address");
       setIsLoading(false);
       return;
     }
 
     // Validate password
     if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters");
+      fail("Password must be at least 6 characters");
       setIsLoading(false);
       return;
     }
+
+    const loadingToastId = toast.loading("Signing in...");
 
     try {
       const result = await signIn(formData.email, formData.password);
@@ -67,8 +69,7 @@ export function LoginForm() {
       if (!result.success) {
         const errorMsg =
           result.error || "Login failed. Please check your credentials.";
-        setError(errorMsg);
-        toast.error(errorMsg);
+        toast.error(errorMsg, { id: loadingToastId });
         setIsLoading(false);
         return;
       }
@@ -76,17 +77,24 @@ export function LoginForm() {
       // Redirect based on path
       if (result.path) {
         if (result.centerName) {
-          toast.success(`Welcome back to ${result.centerName}!`);
+          toast.success(`Welcome back to ${result.centerName}!`, {
+            id: loadingToastId,
+          });
         } else {
-          toast.info("Let's set up your first center!");
+          toast.info("Let's set up your first center!", {
+            id: loadingToastId,
+          });
         }
         router.push(result.path);
+      } else {
+        toast.success("Signed in successfully.", { id: loadingToastId });
       }
     } catch (error) {
       const errorMsg = "An unexpected error occurred. Please try again.";
-      setError(errorMsg);
-      toast.error(errorMsg);
+      toast.error(errorMsg, { id: loadingToastId });
       console.error("Login error:", error);
+      setIsLoading(false);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -149,7 +157,7 @@ export function LoginForm() {
                   href="/auth/reset-password"
                   className="text-sm text-red-600 hover:text-red-700 font-medium transition-colors"
                 >
-                  Forgot?
+                  Forgot Password?
                 </Link>
               </div>
               <div className="relative">

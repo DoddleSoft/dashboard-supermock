@@ -47,7 +47,7 @@ class AuthService {
     opts?: {
       fullName?: string;
       role?: "student" | "examiner" | "admin";
-    }
+    },
   ) {
     try {
       const user = session?.user;
@@ -109,7 +109,7 @@ class AuthService {
                 full_name,
                 is_active: true,
               },
-              { onConflict: "user_id" }
+              { onConflict: "user_id" },
             );
 
           if (upsertError) {
@@ -128,12 +128,18 @@ class AuthService {
   async register(data: RegisterData): Promise<AuthResponse> {
     try {
       // Attempt to sign up with Supabase Auth
+      // Use NEXT_PUBLIC_SITE_URL when set (production subdomain) so the
+      // verification email always links back to app.supermock.net/auth/callback.
+      const siteUrl =
+        process.env.NEXT_PUBLIC_SITE_URL ??
+        (typeof window !== "undefined" ? window.location.origin : "");
+
       const { data: authData, error: authError } =
         await this.supabase.auth.signUp({
           email: data.email,
           password: data.password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            emailRedirectTo: `${siteUrl}/auth/callback`,
             data: {
               full_name: data.fullName,
               role: data.role || "admin",
@@ -380,7 +386,7 @@ class AuthService {
    * Sign in with Google OAuth
    */
   async signInWithGoogle(
-    redirectPath: string = "/dashboard"
+    redirectPath: string = "/dashboard",
   ): Promise<AuthResponse> {
     try {
       const origin = window.location.origin;
@@ -492,7 +498,7 @@ class AuthService {
   async changePassword(
     currentPassword: string,
     newPassword: string,
-    confirmPassword: string
+    confirmPassword: string,
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const { data: sessionData } = await this.supabase.auth.getSession();
@@ -539,7 +545,7 @@ class AuthService {
     userId: string,
     email: string,
     fullName: string,
-    role: "student" | "examiner" | "admin" = "admin"
+    role: "student" | "examiner" | "admin" = "admin",
   ): Promise<AuthResponse> {
     try {
       const { data, error } = await this.supabase
@@ -579,7 +585,7 @@ class AuthService {
    * Get user profile from public.users table
    */
   async getUserProfile(
-    userId: string
+    userId: string,
   ): Promise<{ success: boolean; profile?: UserProfile; error?: string }> {
     try {
       const { data, error } = await this.supabase
@@ -732,7 +738,7 @@ export const signInWithEmail = (email: string, password: string) =>
 export const signUpWithEmail = (
   email: string,
   password: string,
-  fullName: string
+  fullName: string,
 ) => authService.register({ email, password, fullName });
 
 export const signInWithGoogle = (redirectPath?: string) =>
@@ -751,5 +757,5 @@ export const updatePassword = (newPassword: string) =>
 export const changePassword = (
   currentPassword: string,
   newPassword: string,
-  confirmPassword: string
+  confirmPassword: string,
 ) => authService.changePassword(currentPassword, newPassword, confirmPassword);
