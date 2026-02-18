@@ -3,9 +3,29 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Mail, Lock, User, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff, ChevronDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+
+const ROLES = [
+  {
+    value: "owner",
+    label: "Owner",
+    description: "Create and manage your own centre",
+  },
+  {
+    value: "admin",
+    label: "Admin",
+    description: "Manage an existing centre with an invite code",
+  },
+  {
+    value: "examiner",
+    label: "Examiner",
+    description: "Grade and review tests with an invite code",
+  },
+] as const;
+
+type Role = (typeof ROLES)[number]["value"];
 
 export function RegisterForm() {
   const router = useRouter();
@@ -19,56 +39,46 @@ export function RegisterForm() {
     email: "",
     password: "",
     confirmPassword: "",
+    role: "owner" as Role,
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    const fail = (message: string) => {
-      toast.error(message);
-    };
+    const fail = (message: string) => toast.error(message);
 
-    // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
       fail("Passwords do not match");
       return;
     }
-
-    // Validate password length
     if (formData.password.length < 8) {
       fail("Password must be at least 8 characters");
       return;
     }
-
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       fail("Please enter a valid email address");
       return;
     }
-
-    // Validate full name
     if (formData.fullName.trim().length < 2) {
       fail("Full name must be at least 2 characters");
       return;
     }
 
     setIsLoading(true);
-    const loadingToastId = "";
+    const loadingToastId = toast.loading("Creating your account...");
 
     try {
       const result = await signUp(
         formData.email,
         formData.password,
         formData.fullName.trim(),
+        formData.role,
       );
 
       if (!result.success) {
@@ -79,14 +89,9 @@ export function RegisterForm() {
       }
 
       toast.success(
-        "Account created successfully! Redirecting to verification...",
-        {
-          id: loadingToastId,
-        },
+        "Check your email for a verification link to activate your account.",
+        { id: loadingToastId },
       );
-
-      // Redirect to callback which will handle verification and onboarding
-      router.push("/auth/callback");
     } catch (error) {
       toast.error("An unexpected error occurred. Please try again.", {
         id: loadingToastId,
@@ -230,6 +235,45 @@ export function RegisterForm() {
                     <Eye className="h-5 w-5" />
                   )}
                 </button>
+              </div>
+            </div>
+
+            {/* Role Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                I am registering as
+              </label>
+              <div className="grid grid-cols-1 gap-2">
+                {ROLES.map((r) => (
+                  <button
+                    key={r.value}
+                    type="button"
+                    onClick={() =>
+                      setFormData((prev) => ({ ...prev, role: r.value }))
+                    }
+                    className={`flex items-start gap-3 px-4 py-3 rounded-lg border text-left transition-all ${
+                      formData.role === r.value
+                        ? "border-red-500 bg-red-50 text-red-700"
+                        : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+                    }`}
+                  >
+                    <span
+                      className={`mt-0.5 h-4 w-4 rounded-full border-2 flex-shrink-0 ${
+                        formData.role === r.value
+                          ? "border-red-500 bg-red-500"
+                          : "border-gray-400"
+                      }`}
+                    />
+                    <span>
+                      <span className="block text-sm font-semibold">
+                        {r.label}
+                      </span>
+                      <span className="block text-xs text-gray-500">
+                        {r.description}
+                      </span>
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
 

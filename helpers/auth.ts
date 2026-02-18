@@ -329,56 +329,70 @@ class AuthService {
         };
       }
 
-      // Check if user profile exists in users table
+      // Get user profile including role
       const { data: userProfile, error: profileError } = await this.supabase
         .from("users")
-        .select("user_id, full_name")
-        .eq("user_id", authUser.id);
-
-      if (profileError || !userProfile || userProfile.length === 0) {
-        // No user profile found - redirect to onboarding
-        return {
-          success: true,
-          path: "/auth/onboarding",
-        };
-      }
-
-      // User has a profile - check if they have any centers
-      const { data: centers, error: centersError } = await this.supabase
-        .from("centers")
-        .select("slug, name, center_id")
+        .select("user_id, full_name, role")
         .eq("user_id", authUser.id)
-        .order("created_at", { ascending: false })
-        .limit(1);
+        .single();
 
-      if (centersError) {
-        console.error("Error fetching centers:", centersError);
-        return {
-          success: true,
-          path: "/auth/onboarding",
-        };
+      if (profileError || !userProfile) {
+        // No profile yet → onboarding (owner registers and verifies)
+        return { success: true, path: "/auth/onboarding" };
       }
 
-      // If user has centers, redirect to first one
-      if (centers && centers.length > 0) {
-        return {
-          success: true,
-          path: `/dashboard/${centers[0].slug}`,
-          centerName: centers[0].name,
-        };
+      const role = userProfile.role as string;
+
+      // ── Owner flow ─────────────────────────────────────────────
+      if (role === "owner") {
+        const { data: centers } = await this.supabase
+          .from("centers")
+          .select("slug, name")
+          .eq("user_id", authUser.id)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (centers && centers.length > 0) {
+          return {
+            success: true,
+            path: `/dashboard/${centers[0].slug}`,
+            centerName: centers[0].name,
+          };
+        }
+        return { success: true, path: "/auth/onboarding" };
       }
 
-      // User has profile but no centers - redirect to onboarding
-      return {
-        success: true,
-        path: "/auth/onboarding",
-      };
+      // ── Admin / Examiner flow ───────────────────────────────────
+      if (role === "admin" || role === "examiner") {
+        // Check if they are already in a center
+        const { data: membership } = await this.supabase
+          .from("center_members")
+          .select("center_id, centers(slug, name)")
+          .eq("user_id", authUser.id)
+          .limit(1)
+          .single();
+
+        if (membership && (membership.centers as any)) {
+          const c = membership.centers as unknown as {
+            slug: string;
+            name: string;
+          };
+          return {
+            success: true,
+            path: `/dashboard/${c.slug}`,
+            centerName: c.name,
+          };
+        }
+
+        // Not yet in a centre → go to exchange code page
+        return { success: true, path: "/auth/exchange-code" };
+      }
+
+      // Fallback
+      return { success: true, path: "/auth/onboarding" };
     } catch (error) {
       console.error("Error determining redirect path:", error);
-      return {
-        success: false,
-        error: "Failed to determine redirect path",
-      };
+      return { success: false, error: "Failed to determine redirect path" };
     }
   }
 

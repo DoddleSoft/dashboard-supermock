@@ -19,15 +19,25 @@ export interface AuthContextType {
     email: string,
     password: string,
     fullName: string,
-    role?: "student" | "examiner" | "admin"
+    role?: "student" | "examiner" | "admin" | "owner",
   ) => Promise<{ success: boolean; error?: string }>;
   signIn: (
     email: string,
-    password: string
-  ) => Promise<{ success: boolean; error?: string; path?: string; centerName?: string }>;
+    password: string,
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+    path?: string;
+    centerName?: string;
+  }>;
   signOut: () => Promise<void>;
   refreshUserProfile: () => Promise<void>;
-  getUserRedirect: () => Promise<{ success: boolean; path?: string; centerName?: string; error?: string }>;
+  getUserRedirect: () => Promise<{
+    success: boolean;
+    path?: string;
+    centerName?: string;
+    error?: string;
+  }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -88,9 +98,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Load user profile from public.users table
   const loadUserProfile = async (userId: string) => {
     try {
-      const { success, profile, error } = await authService.getUserProfile(
-        userId
-      );
+      const { success, profile, error } =
+        await authService.getUserProfile(userId);
 
       if (success && profile) {
         setUserProfile(profile);
@@ -109,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     password: string,
     fullName: string,
-    role?: "student" | "examiner" | "admin"
+    role?: "student" | "examiner" | "admin" | "owner",
   ) => {
     try {
       setLoading(true);
@@ -119,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password,
         fullName,
-        role: role || "admin",
+        role: (role as any) || "admin",
       });
 
       if (!authResult.success) {
@@ -189,7 +198,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to get redirect",
+        error:
+          error instanceof Error ? error.message : "Failed to get redirect",
       };
     }
   };

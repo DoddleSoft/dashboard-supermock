@@ -14,13 +14,6 @@ const hashPasscode = async (passcode: string) => {
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 };
 
-const buildUserId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-
-  return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}-${Math.random().toString(16).slice(2, 10)}`;
-};
 
 export const fetchCenterMembers = async (
   centerId: string,
@@ -106,63 +99,32 @@ export const createCenterMember = async (
   try {
     const code_hash = await hashPasscode(data.passcode);
 
-    let userId: string | null = null;
-
-    const { data: existingUser, error: findError } = await supabase
-      .from("users")
-      .select("user_id, full_name")
-      .ilike("email", data.email)
-      .maybeSingle();
-
-    if (findError) throw findError;
-
-    if (existingUser) {
-      userId = existingUser.user_id;
-
-      const { error: updateError } = await supabase
-        .from("users")
-        .update({
-          full_name: data.full_name || existingUser.full_name,
+    // Upsert into exchange_codes — the user will join via the exchange-code page.
+    // We no longer pre-create a fake user_id or insert directly into center_members.
+    const { error: codeError } = await supabase
+      .from("exchange_codes")
+      .upsert(
+        {
+          email: data.email,
           role: data.role,
-          is_active: true,
-        })
-        .eq("user_id", userId);
+          passcode_hash: code_hash,
+          center_id: centerId,
+        },
+        { onConflict: "email" },
+      );
 
-      if (updateError) throw updateError;
-    } else {
-      userId = buildUserId();
+    if (codeError) throw codeError;
 
-      const { error: insertUserError } = await supabase.from("users").insert({
-        user_id: userId,
-        email: data.email,
-        role: data.role,
-        full_name: data.full_name,
-        is_active: true,
-      });
-
-      if (insertUserError) throw insertUserError;
-    }
-
-    const { error: memberError } = await supabase
-      .from("center_members")
-      .insert({
-        center_id: centerId,
-        user_id: userId,
-        code_hash,
-      });
-
-    if (memberError) throw memberError;
-
-    toast.success("Member added successfully!");
+    toast.success(
+      `Invite created for ${data.email}. They can now register and use this passcode to join.`,
+    );
   } catch (error: any) {
-    console.error("Error creating member:", error);
+    console.error("Error creating member invite:", error);
 
     if (error.message?.includes("duplicate key")) {
-      toast.error("This member is already assigned to the center");
-    } else if (error.message?.includes("violates")) {
-      toast.error("Please check all required fields");
+      toast.error("An invite already exists for this email");
     } else {
-      toast.error("Failed to add member");
+      toast.error("Failed to create invite");
     }
 
     throw error;
