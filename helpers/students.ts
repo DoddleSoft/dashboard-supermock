@@ -46,10 +46,12 @@ export const fetchStudents = async (centerId: string): Promise<Student[]> => {
 
 /**
  * Create a new student
+ * student_id must be the uid from auth_user_table (looked up before calling this)
  */
 export const createStudent = async (
   centerId: string,
   studentData: {
+    student_id: string;
     name: string;
     email: string;
     phone?: string;
@@ -61,34 +63,26 @@ export const createStudent = async (
   },
 ) => {
   try {
-    const trimmedEmail = studentData.email.trim();
-
-    // First, look up the uid from auth_user_table using the email
-    const { data: authUser, error: authError } = await supabase
-      .from("auth_user_table")
-      .select("uid")
-      .eq("email", trimmedEmail)
-      .single();
-
-    if (authError || !authUser) {
-      toast.error("Email not found in system. Please ensure the user exists in the system first.");
-      throw new Error(`User with email ${trimmedEmail} not found in auth_user_table`);
+    if (!studentData.student_id) {
+      toast.error(
+        "Could not resolve student ID. Please search for the student email first.",
+      );
+      throw new Error("student_id is required");
     }
 
-    const studentId = authUser.uid;
-
-    // Determine enrollment_type based on guardian presence
-    const enrollmentType = (
+    // Enforce guardian requirement for regular enrollment at DB constraint level
+    const enrollmentType =
       studentData.enrollment_type === "regular" && !studentData.guardian?.trim()
-    ) ? "mock_only" : (studentData.enrollment_type || "regular");
+        ? "mock_only"
+        : studentData.enrollment_type || "regular";
 
     const { data, error } = await supabase
       .from("student_profiles")
       .insert({
-        student_id: studentId,
+        student_id: studentData.student_id,
         center_id: centerId,
         name: studentData.name.trim(),
-        email: trimmedEmail,
+        email: studentData.email.trim(),
         phone: studentData.phone?.trim() || null,
         guardian: studentData.guardian?.trim() || null,
         guardian_phone: studentData.guardian_phone?.trim() || null,
@@ -108,16 +102,19 @@ export const createStudent = async (
   } catch (error: any) {
     console.error("Error creating student:", error);
 
-    if (error.message?.includes("not found in auth_user_table")) {
-      // Already handled above
-    } else if (error.message?.includes("duplicate key")) {
-      toast.error("A student with this email already exists");
-    } else if (error.message?.includes("violates")) {
-      toast.error("Please check all required fields");
+    if (error.message === "student_id is required") {
+      // Already toasted above
+    } else if (
+      error.code === "23505" ||
+      error.message?.includes("duplicate key")
+    ) {
+      toast.error("This student is already enrolled in this center.");
     } else if (error.code === "23502") {
-      toast.error("Missing required field");
+      toast.error("Missing required field. Please fill all required fields.");
+    } else if (error.message?.includes("violates")) {
+      toast.error("Please check all required fields.");
     } else {
-      toast.error("Failed to create student");
+      toast.error("Failed to create student.");
     }
     throw error;
   }

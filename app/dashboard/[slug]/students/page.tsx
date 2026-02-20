@@ -41,6 +41,7 @@ export default function StudentsPage() {
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
 
   const [formData, setFormData] = useState({
+    student_id: "",
     name: "",
     email: "",
     phone: "",
@@ -100,17 +101,14 @@ export default function StudentsPage() {
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate required fields
+    if (!formData.student_id) {
+      toast.error("Please search and select a student email first.");
+      return;
+    }
     if (!formData.name?.trim()) {
       toast.error("Student name is required");
       return;
     }
-
-    if (!formData.email?.trim()) {
-      toast.error("Student email is required");
-      return;
-    }
-
     if (!currentCenter?.center_id) {
       toast.error("Center information is missing. Please refresh the page.");
       return;
@@ -228,6 +226,7 @@ export default function StudentsPage() {
   const handleCloseCreateModal = () => {
     setShowCreateModal(false);
     setFormData({
+      student_id: "",
       name: "",
       email: "",
       phone: "",
