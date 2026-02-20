@@ -12,11 +12,13 @@ export interface RegisterData {
   password: string;
   fullName: string;
   role?: "student" | "examiner" | "admin";
+  captchaToken?: string;
 }
 
 export interface LoginData {
   email: string;
   password: string;
+  captchaToken?: string;
 }
 
 export interface AuthResponse {
@@ -144,6 +146,7 @@ class AuthService {
               full_name: data.fullName,
               role: data.role || "admin",
             },
+            captchaToken: data.captchaToken,
           },
         });
 
@@ -176,7 +179,7 @@ class AuthService {
             break;
           case "Error sending confirmation email":
             errorMessage =
-              "Your account was created successfully! However, we couldn't send the confirmation email. Please contact support to verify your account, or try signing in.";
+              "There was an unexpected error. Please contact support to verify your account, or try signing in.";
             break;
           default:
             if (
@@ -185,7 +188,7 @@ class AuthService {
               authError.message.includes("mail")
             ) {
               errorMessage =
-                "Your account was created successfully! However, we couldn't send the confirmation email. Please contact support to verify your account, or try signing in.";
+                "There was an unexpected error. Please contact support to verify your account, or try signing in.";
             } else if (authError.message.includes("email")) {
               errorMessage =
                 "Please check that your email address is valid and not already in use.";
@@ -256,6 +259,7 @@ class AuthService {
         await this.supabase.auth.signInWithPassword({
           email: data.email,
           password: data.password,
+          options: { captchaToken: data.captchaToken },
         });
 
       if (error) {

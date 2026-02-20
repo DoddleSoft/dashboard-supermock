@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, Globe } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
 import { createClient } from "@/lib/supabase/client";
 import { Loader } from "@/components/ui/Loader";
 import { toast } from "sonner";
+import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile";
 
 export default function Onboarding() {
   const router = useRouter();
@@ -14,6 +15,8 @@ export default function Onboarding() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const supabase = createClient();
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileInstance>(null);
 
   // Redirect to login if not authenticated (only after loading completes)
   if (!authLoading && !user) {
@@ -75,6 +78,11 @@ export default function Onboarding() {
     if (!user) {
       setError("Authentication expired. Please login again.");
       router.push("/auth/login");
+      return;
+    }
+
+    if (!captchaToken) {
+      setError("Please complete the CAPTCHA verification.");
       return;
     }
 
@@ -219,6 +227,14 @@ export default function Onboarding() {
                   Activate center immediately
                 </label>
               </div>
+
+              <Turnstile
+                ref={turnstileRef}
+                siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+                onSuccess={(token) => setCaptchaToken(token)}
+                onExpire={() => setCaptchaToken(null)}
+                onError={() => setCaptchaToken(null)}
+              />
 
               <button
                 type="submit"

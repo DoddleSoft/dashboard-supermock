@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Lock, Eye, EyeOff, Mail } from "lucide-react";
 import { authService } from "@/helpers/auth";
 import { toast } from "sonner";
+import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile";
 
 export function ResetPasswordForm() {
   const router = useRouter();
@@ -14,6 +15,8 @@ export function ResetPasswordForm() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileInstance>(null);
 
   const [formData, setFormData] = useState({
     email: "",
@@ -68,6 +71,11 @@ export function ResetPasswordForm() {
       return;
     }
 
+    if (!captchaToken) {
+      fail("Please complete the CAPTCHA verification.");
+      return;
+    }
+
     setIsLoading(true);
     const loadingToastId = "";
 
@@ -76,6 +84,7 @@ export function ResetPasswordForm() {
       const signInResult = await authService.login({
         email: formData.email,
         password: formData.currentPassword,
+        captchaToken: captchaToken ?? undefined,
       });
 
       if (!signInResult.success) {
@@ -83,6 +92,8 @@ export function ResetPasswordForm() {
           signInResult.error ||
           "Invalid email or current password. Please check your credentials.";
         toast.error(message, { id: loadingToastId });
+        turnstileRef.current?.reset();
+        setCaptchaToken(null);
         return;
       }
 
@@ -252,6 +263,14 @@ export function ResetPasswordForm() {
               Must be at least 8 characters
             </p>
           </div>
+
+          <Turnstile
+            ref={turnstileRef}
+            siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+            onSuccess={(token) => setCaptchaToken(token)}
+            onExpire={() => setCaptchaToken(null)}
+            onError={() => setCaptchaToken(null)}
+          />
 
           <button
             type="submit"

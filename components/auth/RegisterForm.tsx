@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, User, Eye, EyeOff, ChevronDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile";
 
 const ROLES = [
   {
@@ -33,6 +34,8 @@ export function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileInstance>(null);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -70,6 +73,11 @@ export function RegisterForm() {
       return;
     }
 
+    if (!captchaToken) {
+      fail("Please complete the CAPTCHA verification.");
+      return;
+    }
+
     setIsLoading(true);
     const loadingToastId = toast.loading("Creating your account...");
 
@@ -79,12 +87,15 @@ export function RegisterForm() {
         formData.password,
         formData.fullName.trim(),
         formData.role,
+        captchaToken ?? undefined,
       );
 
       if (!result.success) {
         toast.error(result.error || "Registration failed. Please try again.", {
           id: loadingToastId,
         });
+        turnstileRef.current?.reset();
+        setCaptchaToken(null);
         return;
       }
 
@@ -276,6 +287,14 @@ export function RegisterForm() {
                 ))}
               </div>
             </div>
+
+            <Turnstile
+              ref={turnstileRef}
+              siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+              onSuccess={(token) => setCaptchaToken(token)}
+              onExpire={() => setCaptchaToken(null)}
+              onError={() => setCaptchaToken(null)}
+            />
 
             {/* Submit Button */}
             <button

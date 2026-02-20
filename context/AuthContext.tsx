@@ -20,10 +20,12 @@ export interface AuthContextType {
     password: string,
     fullName: string,
     role?: "student" | "examiner" | "admin" | "owner",
+    captchaToken?: string,
   ) => Promise<{ success: boolean; error?: string }>;
   signIn: (
     email: string,
     password: string,
+    captchaToken?: string,
   ) => Promise<{
     success: boolean;
     error?: string;
@@ -119,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     fullName: string,
     role?: "student" | "examiner" | "admin" | "owner",
+    captchaToken?: string,
   ) => {
     try {
       setLoading(true);
@@ -129,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
         fullName,
         role: (role as any) || "admin",
+        captchaToken,
       });
 
       if (!authResult.success) {
@@ -150,11 +154,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Sign in function
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, captchaToken?: string) => {
     try {
       setLoading(true);
 
-      const result = await authService.login({ email, password });
+      const result = await authService.login({ email, password, captchaToken });
 
       if (!result.success) {
         return {
