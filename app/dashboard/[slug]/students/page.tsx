@@ -220,7 +220,7 @@ export default function StudentsPage() {
   };
 
   const handleCreateChange = (field: string, value: string) => {
-    setFormData({ ...formData, [field]: value });
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleCloseCreateModal = () => {
