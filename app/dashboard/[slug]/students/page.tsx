@@ -10,6 +10,7 @@ import { CreateStudentModal } from "@/components/students/CreateStudentModal";
 import { DeleteConfirmDialog } from "@/components/students/DeleteConfirmDialog";
 import { formatLocalTime, getRelativeTime } from "@/lib/utils";
 import { SmallLoader } from "@/components/ui/SmallLoader";
+import { toast } from "sonner";
 import {
   fetchStudents,
   createStudent,
@@ -26,7 +27,8 @@ export default function StudentsPage() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
-  const [selectedEnrollmentType, setSelectedEnrollmentType] = useState<string>("regular");
+  const [selectedEnrollmentType, setSelectedEnrollmentType] =
+    useState<string>("regular");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -90,14 +92,27 @@ export default function StudentsPage() {
     const matchesStatus =
       selectedStatus === "all" || student.status === selectedStatus;
     const matchesEnrollmentType =
-      selectedEnrollmentType === "all" || student.enrollment_type === selectedEnrollmentType;
+      selectedEnrollmentType === "all" ||
+      student.enrollment_type === selectedEnrollmentType;
     return matchesSearch && matchesStatus && matchesEnrollmentType;
   });
 
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate required fields
+    if (!formData.name?.trim()) {
+      toast.error("Student name is required");
+      return;
+    }
+
+    if (!formData.email?.trim()) {
+      toast.error("Student email is required");
+      return;
+    }
+
     if (!currentCenter?.center_id) {
+      toast.error("Center information is missing. Please refresh the page.");
       return;
     }
 

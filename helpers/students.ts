@@ -57,6 +57,7 @@ export const createStudent = async (
     guardian_phone?: string;
     date_of_birth?: string;
     address?: string;
+    enrollment_type?: string;
   },
 ) => {
   try {
@@ -64,13 +65,14 @@ export const createStudent = async (
       .from("student_profiles")
       .insert({
         center_id: centerId,
-        name: studentData.name,
-        email: studentData.email,
-        phone: studentData.phone || null,
-        guardian: studentData.guardian || null,
-        guardian_phone: studentData.guardian_phone || null,
-        date_of_birth: studentData.date_of_birth || null,
-        address: studentData.address || null,
+        name: studentData.name.trim(),
+        email: studentData.email.trim(),
+        phone: studentData.phone?.trim() || null,
+        guardian: studentData.guardian?.trim() || null,
+        guardian_phone: studentData.guardian_phone?.trim() || null,
+        date_of_birth: studentData.date_of_birth?.trim() || null,
+        address: studentData.address?.trim() || null,
+        enrollment_type: studentData.enrollment_type || "regular",
       })
       .select()
       .single();

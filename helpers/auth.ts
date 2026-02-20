@@ -129,9 +129,6 @@ class AuthService {
    */
   async register(data: RegisterData): Promise<AuthResponse> {
     try {
-      // Attempt to sign up with Supabase Auth
-      // Use NEXT_PUBLIC_SITE_URL when set (production subdomain) so the
-      // verification email always links back to app.supermock.net/auth/callback.
       const siteUrl =
         process.env.NEXT_PUBLIC_SITE_URL ??
         (typeof window !== "undefined" ? window.location.origin : "");
