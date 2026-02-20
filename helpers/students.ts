@@ -46,12 +46,11 @@ export const fetchStudents = async (centerId: string): Promise<Student[]> => {
 
 /**
  * Create a new student
- * student_id must be the uid from auth_user_table (looked up before calling this)
+ * Looks up the student uid from auth_user_table by email, then inserts into student_profiles
  */
 export const createStudent = async (
   centerId: string,
   studentData: {
-    student_id: string;
     name: string;
     email: string;
     phone?: string;
@@ -63,11 +62,23 @@ export const createStudent = async (
   },
 ) => {
   try {
-    if (!studentData.student_id) {
+    if (!studentData.email?.trim()) {
+      toast.error("Student email is required.");
+      throw new Error("email is required");
+    }
+
+    // Look up the uid from auth_user_table by email
+    const { data: authUser, error: lookupError } = await supabase
+      .from("auth_user_table")
+      .select("uid")
+      .ilike("email", studentData.email.trim())
+      .single();
+
+    if (lookupError || !authUser?.uid) {
       toast.error(
-        "Could not resolve student ID. Please search for the student email first.",
+        "No registered account found for this email. The student must sign up first.",
       );
-      throw new Error("student_id is required");
+      throw new Error("student not found in auth_user_table");
     }
 
     // Enforce guardian requirement for regular enrollment at DB constraint level
@@ -79,7 +90,7 @@ export const createStudent = async (
     const { data, error } = await supabase
       .from("student_profiles")
       .insert({
-        student_id: studentData.student_id,
+        student_id: authUser.uid,
         center_id: centerId,
         name: studentData.name.trim(),
         email: studentData.email.trim(),
@@ -102,7 +113,10 @@ export const createStudent = async (
   } catch (error: any) {
     console.error("Error creating student:", error);
 
-    if (error.message === "student_id is required") {
+    if (
+      error.message === "email is required" ||
+      error.message === "student not found in auth_user_table"
+    ) {
       // Already toasted above
     } else if (
       error.code === "23505" ||
