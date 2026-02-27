@@ -11,22 +11,23 @@ import { Loader } from "@/components/ui/Loader";
 export default function DashboardPage() {
   const params = useParams();
   const slug = params.slug as string;
-  const { dashboardStats, loading, isValidCenter, isOwner } = useCentre();
+  const { dashboardStats, loading, isValidCenter } = useCentre();
 
-  // If validation fails or center doesn't exist, show 404
+  // Only 404 if the center genuinely doesn't exist or user has no access at all.
+  // isOwner=false is fine — admin/examiner members are also valid.
   useEffect(() => {
-    if (!loading && (!isValidCenter || !isOwner)) {
+    if (!loading && !isValidCenter) {
       notFound();
     }
-  }, [loading, isValidCenter, isOwner]);
+  }, [loading, isValidCenter]);
 
   // Show loading state
   if (loading) {
     return <Loader />;
   }
 
-  // Safety check - should not reach here if notFound() was called
-  if (!isValidCenter || !isOwner) {
+  // Safety check
+  if (!isValidCenter) {
     return null;
   }
 

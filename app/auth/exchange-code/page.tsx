@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { KeyRound, Mail, LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BrandedSection } from "@/components/auth/BrandedSection";

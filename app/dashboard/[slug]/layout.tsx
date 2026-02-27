@@ -16,6 +16,7 @@ import {
 import { useAuth } from "../../../context/AuthContext";
 import { CentreProvider, useCentre } from "../../../context/CentreContext";
 import { ModuleProvider } from "../../../context/ModuleContext";
+import { AccessProvider, useAccess } from "../../../context/AccessContext";
 import {
   SidebarItem,
   type NavItem,
@@ -30,6 +31,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { user, userProfile, signOut, loading } = useAuth();
   const { currentCenter } = useCentre();
+  const { role, loading: accessLoading, canAccess } = useAccess();
   const [mounted, setMounted] = useState(false);
   const [usage, setUsage] = useState<CenterUsage | null>(null);
   const [usageLoaded, setUsageLoaded] = useState(false);
@@ -54,21 +56,21 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   };
   const isSupportActive = pathname === supportItem.href;
 
-  // navigation items
-  const navigationItems: NavItem[] = [
+  // All possible navigation items
+  const allNavigationItems: NavItem[] = [
     { label: "Overview", href: `/dashboard/${slug}`, icon: LayoutDashboard },
     { label: "Tests", href: `/dashboard/${slug}/tests`, icon: FileText },
     { label: "Questions", href: `/dashboard/${slug}/questions`, icon: Layers },
     { label: "Papers", href: `/dashboard/${slug}/papers`, icon: NotepadText },
-
-    {
-      label: "Reviews",
-      href: `/dashboard/${slug}/reviews`,
-      icon: BarChart3,
-    },
+    { label: "Reviews", href: `/dashboard/${slug}/reviews`, icon: BarChart3 },
     { label: "Students", href: `/dashboard/${slug}/students`, icon: Users },
     { label: "Members", href: `/dashboard/${slug}/members`, icon: UserStar },
   ];
+
+  // Filter nav items based on the current user's role
+  const navigationItems = allNavigationItems.filter((item) =>
+    canAccess(item.href),
+  );
 
   // Set mounted after initial render
   useEffect(() => {
@@ -79,8 +81,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     await signOut();
   };
 
-  // Show loading only for first 2 seconds or until user state is determined
-  if (!mounted || (loading && !user)) {
+  // Show loader until auth, access role, and mount are all ready
+  if (!mounted || (loading && !user) || accessLoading) {
     return <Loader />;
   }
 
@@ -341,9 +343,11 @@ export default function DashboardLayout({
 }) {
   return (
     <CentreProvider>
-      <ModuleProvider>
-        <DashboardLayoutContent>{children}</DashboardLayoutContent>
-      </ModuleProvider>
+      <AccessProvider>
+        <ModuleProvider>
+          <DashboardLayoutContent>{children}</DashboardLayoutContent>
+        </ModuleProvider>
+      </AccessProvider>
     </CentreProvider>
   );
 }

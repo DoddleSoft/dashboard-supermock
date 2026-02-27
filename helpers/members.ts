@@ -4,17 +4,6 @@ import { toast } from "sonner";
 
 const supabase = createClient();
 
-const hashPasscode = async (passcode: string) => {
-  if (!passcode) return "";
-
-  const encoder = new TextEncoder();
-  const data = encoder.encode(passcode);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(digest));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-};
-
-
 export const fetchCenterMembers = async (
   centerId: string,
   ownerId: string,
@@ -93,40 +82,53 @@ export const createCenterMember = async (
     full_name: string;
     email: string;
     role: "admin" | "examiner";
-    passcode: string;
+    password: string;
   },
 ) => {
   try {
-    const code_hash = await hashPasscode(data.passcode);
-
-    // Upsert into exchange_codes — the user will join via the exchange-code page.
-    // We no longer pre-create a fake user_id or insert directly into center_members.
-    const { error: codeError } = await supabase
-      .from("exchange_codes")
-      .upsert(
-        {
-          email: data.email,
-          role: data.role,
-          passcode_hash: code_hash,
-          center_id: centerId,
-        },
-        { onConflict: "email" },
+    // Client-side pre-validation (mirrors server)
+    if (!data.full_name?.trim()) {
+      toast.error("Full name is required.");
+      throw new Error("validation");
+    }
+    const emailRe = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRe.test(data.email?.trim() ?? "")) {
+      toast.error("Please enter a valid email address.");
+      throw new Error("validation");
+    }
+    const passwordRe = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    if (!passwordRe.test(data.password)) {
+      toast.error(
+        "Password must be at least 8 characters and include uppercase, lowercase, and a number.",
       );
-
-    if (codeError) throw codeError;
-
-    toast.success(
-      `Invite created for ${data.email}. They can now register and use this passcode to join.`,
-    );
-  } catch (error: any) {
-    console.error("Error creating member invite:", error);
-
-    if (error.message?.includes("duplicate key")) {
-      toast.error("An invite already exists for this email");
-    } else {
-      toast.error("Failed to create invite");
+      throw new Error("validation");
     }
 
+    const res = await fetch("/api/create/members", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        center_id: centerId,
+        full_name: data.full_name.trim(),
+        email: data.email.trim().toLowerCase(),
+        password: data.password,
+        role: data.role,
+      }),
+    });
+
+    const json = await res.json();
+    if (!res.ok) {
+      toast.error(json.error ?? "Failed to add member.");
+      throw new Error(json.error ?? "api error");
+    }
+
+    toast.success(`${data.full_name} has been added as a ${data.role}.`);
+    return json.membership;
+  } catch (error: any) {
+    if (error.message !== "validation" && error.message !== "api error") {
+      console.error("Error creating member:", error);
+      toast.error("An unexpected error occurred. Please try again.");
+    }
     throw error;
   }
 };

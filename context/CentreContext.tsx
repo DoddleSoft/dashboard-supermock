@@ -168,8 +168,33 @@ export function CentreProvider({ children }: { children: ReactNode }) {
       const center = centersData?.find((c) => c.slug === slugToCheck);
 
       if (!center) {
-        // Center not found
-        setError("Center not found");
+        // Not an owner — check if user is a member of any center with this slug
+        const { data: centerBySlug } = await supabase
+          .from("centers")
+          .select("*")
+          .eq("slug", slugToCheck)
+          .maybeSingle();
+
+        if (centerBySlug) {
+          const { data: membership } = await supabase
+            .from("center_members")
+            .select("membership_id")
+            .eq("center_id", centerBySlug.center_id)
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+          if (membership) {
+            setCurrentCenter(centerBySlug);
+            setIsOwner(false);
+            setIsValidCenter(true);
+            setError(null);
+            await fetchDashboardStats(centerBySlug.center_id);
+            setLoading(false);
+            return;
+          }
+        }
+
+        setError("Center not found or access denied");
         setCurrentCenter(null);
         setIsOwner(false);
         setIsValidCenter(false);
@@ -178,9 +203,8 @@ export function CentreProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Verify ownership - critical security check
+      // Verify ownership
       if (center.user_id !== user.id) {
-        // User is not the owner - security breach
         setError("Unauthorized: You do not own this center");
         setCurrentCenter(null);
         setIsOwner(false);
@@ -190,7 +214,7 @@ export function CentreProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // All checks passed - center is valid and owned by user
+      // Owner — all checks passed
       setCurrentCenter(center);
       setIsOwner(true);
       setIsValidCenter(true);

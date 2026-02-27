@@ -6,7 +6,7 @@ interface CreateMemberModalProps {
     full_name: string;
     email: string;
     role: "admin" | "examiner";
-    passcode: string;
+    password: string;
   };
   isSubmitting: boolean;
   onClose: () => void;
@@ -35,8 +35,9 @@ export function CreateMemberModal({
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <div>
-            <p className="text-lg text-slate-500 mt-1">
-              Add a new center member
+            <h2 className="text-lg font-semibold text-slate-800">Add Member</h2>
+            <p className="text-sm text-slate-500 mt-0.5">
+              A verified account will be created automatically.
             </p>
           </div>
           <button
@@ -94,16 +95,20 @@ export function CreateMemberModal({
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
-              Passcode *
+              Password *
             </label>
             <input
               type="password"
-              placeholder="Set a member passcode"
-              value={formData.passcode}
-              onChange={(e) => onChange("passcode", e.target.value)}
+              placeholder="Min 8 chars, upper, lower & number"
+              value={formData.password}
+              onChange={(e) => onChange("password", e.target.value)}
               required
+              autoComplete="new-password"
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 text-sm"
             />
+            <p className="mt-1 text-xs text-slate-400">
+              Must contain uppercase, lowercase and a digit (min 8 characters).
+            </p>
           </div>
 
           <div className="flex gap-3 pt-2">

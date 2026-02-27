@@ -21,27 +21,46 @@ export default function DashboardRedirect() {
       try {
         const supabase = createClient();
 
-        // Fetch user's centers
+        // Check owned centers first
         const { data: centers, error } = await supabase
           .from("centers")
-          .select("*")
+          .select("slug")
           .eq("user_id", user.id)
           .eq("is_active", true)
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
         if (error) {
           console.error("Error fetching centers:", error);
-          router.push("/auth/login");
+        }
+
+        if (centers?.slug) {
+          router.push(`/dashboard/${centers.slug}`);
           return;
         }
 
-        // If user has centers, redirect to the first one
-        if (centers && centers.length > 0) {
-          router.push(`/dashboard/${centers[0].slug}`);
-        } else {
-          // No centers found, redirect to login
-          router.push("/auth/login");
+        // Not an owner — check if they're a member of any active center
+        const { data: membership } = await supabase
+          .from("center_members")
+          .select("center_id, centers(slug, is_active)")
+          .eq("user_id", user.id)
+          .order("invited_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (membership?.centers) {
+          const center = Array.isArray(membership.centers)
+            ? membership.centers[0]
+            : membership.centers;
+          if ((center as any)?.is_active && (center as any)?.slug) {
+            router.push(`/dashboard/${(center as any).slug}`);
+            return;
+          }
         }
+
+        // No center found at all
+        router.push("/auth/login");
       } catch (error) {
         console.error("Error in redirect:", error);
         router.push("/auth/login");

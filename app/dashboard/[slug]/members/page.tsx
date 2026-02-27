@@ -46,7 +46,7 @@ export default function MembersPage() {
     full_name: "",
     email: "",
     role: "admin" as "admin" | "examiner",
-    passcode: "",
+    password: "",
   });
 
   const [editData, setEditData] = useState({
@@ -202,7 +202,7 @@ export default function MembersPage() {
       full_name: "",
       email: "",
       role: "admin",
-      passcode: "",
+      password: "",
     });
   };
 
