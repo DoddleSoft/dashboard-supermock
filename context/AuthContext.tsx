@@ -25,7 +25,6 @@ export interface AuthContextType {
   signIn: (
     email: string,
     password: string,
-    captchaToken?: string,
   ) => Promise<{
     success: boolean;
     error?: string;
@@ -154,11 +153,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Sign in function
-  const signIn = async (email: string, password: string, captchaToken?: string) => {
+  const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
 
-      const result = await authService.login({ email, password, captchaToken });
+      const result = await authService.login({ email, password });
 
       if (!result.success) {
         return {

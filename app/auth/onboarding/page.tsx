@@ -246,11 +246,6 @@ export default function Onboarding() {
             </div>
           </form>
         </div>
-
-        {/* Footer */}
-        <p className="text-center text-xs text-gray-500 mt-6">
-          You can update these settings anytime in your center settings
-        </p>
       </div>
     </div>
   );

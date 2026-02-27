@@ -18,7 +18,6 @@ export interface RegisterData {
 export interface LoginData {
   email: string;
   password: string;
-  captchaToken?: string;
 }
 
 export interface AuthResponse {
@@ -256,7 +255,6 @@ class AuthService {
         await this.supabase.auth.signInWithPassword({
           email: data.email,
           password: data.password,
-          options: { captchaToken: data.captchaToken },
         });
 
       if (error) {
@@ -267,6 +265,11 @@ class AuthService {
           case "Invalid login credentials":
             errorMessage =
               "Invalid email or password. Please check your credentials and try again.";
+            break;
+          case "captcha verification process failed":
+          case "Captcha verification process failed":
+            errorMessage =
+              "Login CAPTCHA is currently enforced in Supabase Auth settings. Disable Bot/ CAPTCHA protection for sign-in or re-enable CAPTCHA on the login form.";
             break;
           case "Email not confirmed":
             errorMessage =
@@ -281,7 +284,12 @@ class AuthService {
               "No account found with this email address. Please check your email or create a new account.";
             break;
           default:
-            errorMessage = error.message;
+            if (error.message.toLowerCase().includes("captcha")) {
+              errorMessage =
+                "Login CAPTCHA is currently enforced in Supabase Auth settings. Disable Bot/ CAPTCHA protection for sign-in or re-enable CAPTCHA on the login form.";
+            } else {
+              errorMessage = error.message;
+            }
             break;
         }
 

@@ -7,6 +7,7 @@ interface CreateStudentModalProps {
   formData: {
     name: string;
     email: string;
+    password: string;
     phone: string;
     guardian: string;
     guardian_phone: string;
@@ -46,7 +47,7 @@ export function CreateStudentModal({
               Add Student
             </h2>
             <p className="text-sm text-slate-500 mt-0.5">
-              The student must already have a registered account
+              A verified account will be created automatically for the student.
             </p>
           </div>
           <button
@@ -59,7 +60,7 @@ export function CreateStudentModal({
 
         <form onSubmit={onSubmit} className="px-6 py-5 space-y-5">
           <div className="grid grid-cols-2 gap-4">
-            {/* Email â€” required, used to look up the student uid */}
+            {/* Email + Password row */}
             <div className="col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Student Email *
@@ -70,10 +71,38 @@ export function CreateStudentModal({
                 value={formData.email}
                 onChange={(e) => onChange("email", e.target.value)}
                 required
+                autoComplete="off"
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 text-sm"
+              />
+            </div>
+
+            {/* Password — 8-digit numeric PIN */}
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Password *{" "}
+                <span className="text-slate-400 font-normal">
+                  (8 digits, numbers only)
+                </span>
+              </label>
+              <input
+                type="password"
+                inputMode="numeric"
+                pattern="\d{8}"
+                maxLength={8}
+                placeholder="••••••••"
+                value={formData.password}
+                onChange={(e) =>
+                  onChange(
+                    "password",
+                    e.target.value.replace(/\D/g, "").slice(0, 8),
+                  )
+                }
+                required
+                autoComplete="new-password"
                 className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 text-sm"
               />
               <p className="mt-1 text-xs text-slate-400">
-                Must match an existing registered account
+                The student will use this to log in on the exam portal.
               </p>
             </div>
 

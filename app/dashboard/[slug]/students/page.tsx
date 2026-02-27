@@ -43,6 +43,7 @@ export default function StudentsPage() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    password: "",
     phone: "",
     guardian: "",
     guardian_phone: "",
@@ -106,6 +107,10 @@ export default function StudentsPage() {
     }
     if (!formData.name?.trim()) {
       toast.error("Student name is required");
+      return;
+    }
+    if (!/^\d{8}$/.test(formData.password)) {
+      toast.error("Password must be exactly 8 digits (numbers only).");
       return;
     }
     if (!currentCenter?.center_id) {
@@ -227,6 +232,7 @@ export default function StudentsPage() {
     setFormData({
       name: "",
       email: "",
+      password: "",
       phone: "",
       guardian: "",
       guardian_phone: "",

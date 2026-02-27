@@ -45,14 +45,16 @@ export const fetchStudents = async (centerId: string): Promise<Student[]> => {
 };
 
 /**
- * Create a new student
- * Looks up the student uid from auth_user_table by email, then inserts into student_profiles
+ * Create a new student by calling the secure backend API route.
+ * The API will create the Supabase auth user (email pre-verified) and then
+ * insert the student_profiles row in a single atomic operation.
  */
 export const createStudent = async (
   centerId: string,
   studentData: {
     name: string;
     email: string;
+    password: string;
     phone?: string;
     guardian?: string;
     guardian_phone?: string;
@@ -62,73 +64,63 @@ export const createStudent = async (
   },
 ) => {
   try {
+    // Client-side pre-validation (mirrors server validation)
+    if (!studentData.name?.trim()) {
+      toast.error("Student name is required.");
+      throw new Error("name is required");
+    }
     if (!studentData.email?.trim()) {
       toast.error("Student email is required.");
       throw new Error("email is required");
     }
-
-    // Look up the uid from auth_user_table by email
-    const { data: authUser, error: lookupError } = await supabase
-      .from("auth_user_table")
-      .select("uid")
-      .ilike("email", studentData.email.trim())
-      .single();
-
-    if (lookupError || !authUser?.uid) {
-      toast.error(
-        "No registered account found for this email. The student must sign up first.",
-      );
-      throw new Error("student not found in auth_user_table");
+    const emailRe = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRe.test(studentData.email.trim())) {
+      toast.error("Please enter a valid email address.");
+      throw new Error("invalid email");
+    }
+    if (!/^\d{8}$/.test(studentData.password)) {
+      toast.error("Password must be exactly 8 digits (numbers only).");
+      throw new Error("invalid password");
     }
 
-    // Enforce guardian requirement for regular enrollment at DB constraint level
-    const enrollmentType =
-      studentData.enrollment_type === "regular" && !studentData.guardian?.trim()
-        ? "mock_only"
-        : studentData.enrollment_type || "regular";
-
-    const { data, error } = await supabase
-      .from("student_profiles")
-      .insert({
-        student_id: authUser.uid,
+    const res = await fetch("/api/create/student", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
         center_id: centerId,
         name: studentData.name.trim(),
-        email: studentData.email.trim(),
-        phone: studentData.phone?.trim() || null,
-        guardian: studentData.guardian?.trim() || null,
-        guardian_phone: studentData.guardian_phone?.trim() || null,
-        date_of_birth: studentData.date_of_birth?.trim() || null,
-        address: studentData.address?.trim() || null,
-        enrollment_type: enrollmentType,
-        status: "active",
-        tests_taken: 0,
-      })
-      .select()
-      .single();
+        email: studentData.email.trim().toLowerCase(),
+        password: studentData.password.trim(),
+        phone: studentData.phone?.trim() || "",
+        guardian: studentData.guardian?.trim() || "",
+        guardian_phone: studentData.guardian_phone?.trim() || "",
+        date_of_birth: studentData.date_of_birth?.trim() || "",
+        address: studentData.address?.trim() || "",
+        enrollment_type: studentData.enrollment_type || "regular",
+      }),
+    });
 
-    if (error) throw error;
+    const json = await res.json();
+
+    if (!res.ok) {
+      toast.error(json.error ?? "Failed to create student.");
+      throw new Error(json.error ?? "api error");
+    }
 
     toast.success("Student created successfully!");
-    return data;
+    return json.student;
   } catch (error: any) {
-    console.error("Error creating student:", error);
-
-    if (
-      error.message === "email is required" ||
-      error.message === "student not found in auth_user_table"
-    ) {
-      // Already toasted above
-    } else if (
-      error.code === "23505" ||
-      error.message?.includes("duplicate key")
-    ) {
-      toast.error("This student is already enrolled in this center.");
-    } else if (error.code === "23502") {
-      toast.error("Missing required field. Please fill all required fields.");
-    } else if (error.message?.includes("violates")) {
-      toast.error("Please check all required fields.");
-    } else {
-      toast.error("Failed to create student.");
+    // Avoid double-toasting for errors we already surfaced above
+    const knownErrors = [
+      "name is required",
+      "email is required",
+      "invalid email",
+      "invalid password",
+      "api error",
+    ];
+    if (!knownErrors.includes(error.message)) {
+      console.error("Error creating student:", error);
+      toast.error("An unexpected error occurred. Please try again.");
     }
     throw error;
   }

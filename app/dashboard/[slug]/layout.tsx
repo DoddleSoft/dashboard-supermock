@@ -22,6 +22,7 @@ import {
 } from "../../../components/dashboard/SidebarItem";
 import { Loader } from "../../../components/ui/Loader";
 import Image from "next/image";
+import { getCenterUsage, type CenterUsage } from "../../../helpers/usage";
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -30,6 +31,19 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, userProfile, signOut, loading } = useAuth();
   const { currentCenter } = useCentre();
   const [mounted, setMounted] = useState(false);
+  const [usage, setUsage] = useState<CenterUsage | null>(null);
+  const [usageLoaded, setUsageLoaded] = useState(false);
+
+  // Fetch usage whenever the center changes
+  useEffect(() => {
+    if (currentCenter?.center_id) {
+      setUsageLoaded(false);
+      getCenterUsage(currentCenter.center_id).then((result) => {
+        setUsage(result);
+        setUsageLoaded(true);
+      });
+    }
+  }, [currentCenter?.center_id]);
 
   // Generate navigation items with proper slug
   const slug = params.slug as string;
@@ -155,12 +169,12 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             height={30}
           />
 
-          {/* Logo */}
-          <h1 className="text-xl font-bold text-white-900 whitespace-nowrap">
+          <h1 className="text-xl font-bold whitespace-nowrap">
             {!isCollapsed && (
-              <>
-                Super<span className="text-red-600">Mock</span>
-              </>
+              <div>
+                <span className="text-white">Super</span>
+                <span className="text-red-600">Mock</span>
+              </div>
             )}
             {isCollapsed && <span className="text-red-600">S</span>}
           </h1>
@@ -193,25 +207,75 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="px-3 pb-2">
-          <SidebarItem
-            item={supportItem}
-            isCollapsed={isCollapsed}
-            isActive={isSupportActive}
-          />
+        <div className="p-3 space-y-2 bg-slate-900 m-2 rounded-md">
+          {!isCollapsed && (
+            <>
+              {/* Header row */}
+              <div className="flex justify-between items-center">
+                <p className="text-xs font-medium text-slate-200 uppercase tracking-wide">
+                  Storage
+                </p>
+                <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 uppercase tracking-wide">
+                  {usage?.tier_name ?? "—"}
+                </span>
+              </div>
+
+              {/* GB numbers */}
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">
+                  {!usageLoaded
+                    ? "Calculating…"
+                    : usage
+                      ? `${usage.used_gb} GB used`
+                      : "No data"}
+                </span>
+                <span className="text-slate-300 font-medium">
+                  {usage ? `${usage.limit_gb} GB` : ""}
+                </span>
+              </div>
+            </>
+          )}
+
+          {/* Progress bar — shown in both states */}
+          <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
+            {usage ? (
+              <div
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  usage.used_pct >= 90
+                    ? "bg-red-500"
+                    : usage.used_pct >= 70
+                      ? "bg-yellow-400"
+                      : "bg-green-500"
+                }`}
+                style={{ width: `${usage.used_pct}%` }}
+              />
+            ) : (
+              <div className="h-1.5 w-0 bg-slate-600 rounded-full" />
+            )}
+          </div>
         </div>
 
-        {/* Logout Button at Bottom */}
-        <div className="p-3 border-t border-slate-500">
-          <button
-            onClick={handleLogout}
-            className="text-slate-100 hover:text-slate-300 bg-red-600 hover:bg-red-700 w-full flex items-center rounded-md font-medium transition-all duration-200 ease-in-out px-4 py-2 gap-3"
-          >
-            <LogOut className="h-4 w-4 flex-shrink-0" />
-            {!isCollapsed && (
-              <span className="whitespace-nowrap text-md">Logout</span>
-            )}
-          </button>
+        <div className="relative space-y-2">
+          {/* Border only */}
+          <div className="absolute left-3 right-3 top-0 border-t-2 border-slate-500"></div>
+
+          {/* Content */}
+          <div className="p-3 space-y-2">
+            <SidebarItem
+              item={supportItem}
+              isCollapsed={isCollapsed}
+              isActive={isSupportActive}
+            />
+            <button
+              onClick={handleLogout}
+              className="text-slate-100 hover:text-slate-300 bg-red-600 hover:bg-red-700 w-full flex items-center rounded-md font-medium transition-all duration-200 ease-in-out px-4 py-2 gap-3"
+            >
+              <LogOut className="h-4 w-4 flex-shrink-0" />
+              {!isCollapsed && (
+                <span className="whitespace-nowrap text-md">Logout</span>
+              )}
+            </button>
+          </div>
         </div>
       </aside>
 

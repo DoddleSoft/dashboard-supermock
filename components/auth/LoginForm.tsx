@@ -1,19 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile";
 
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { signIn } = useAuth();
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const turnstileRef = useRef<TurnstileInstance>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -49,12 +46,6 @@ export function LoginForm() {
       toast.error(message);
     };
 
-    if (!captchaToken) {
-      toast.error("Please verify that you are human.");
-      setIsLoading(false);
-      return;
-    }
-
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
@@ -73,14 +64,12 @@ export function LoginForm() {
     const loadingToastId = "";
 
     try {
-      const result = await signIn(formData.email, formData.password, captchaToken ?? undefined);
+      const result = await signIn(formData.email, formData.password);
 
       if (!result.success) {
         const errorMsg =
           result.error || "Login failed. Please check your credentials.";
         toast.error(errorMsg, { id: loadingToastId });
-        turnstileRef.current?.reset();
-        setCaptchaToken(null);
         setIsLoading(false);
         return;
       }
@@ -213,16 +202,6 @@ export function LoginForm() {
                 Remember me
               </label>
             </div>
-
-            <Turnstile
-              ref={turnstileRef}
-              siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
-              onSuccess={(token) => {
-                setCaptchaToken(token);
-              }}
-              onExpire={() => setCaptchaToken(null)}
-              onError={() => setCaptchaToken(null)}
-            />
 
             {/* Submit Button */}
             <button
