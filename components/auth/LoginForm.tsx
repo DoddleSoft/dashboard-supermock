@@ -104,14 +104,14 @@ export function LoginForm() {
       <div className="w-full max-w-md">
         {/* Logo/Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
             Welcome Back
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 font-semibold ">
             New to SuperMock?{" "}
             <Link
               href="/auth/register"
-              className="font-semibold text-red-600 hover:text-red-700 transition-colors"
+              className="text-red-600 hover:text-red-700 font-semibold transition-colors"
             >
               Create Account
             </Link>
@@ -155,7 +155,7 @@ export function LoginForm() {
                 </label>
                 <Link
                   href="/auth/reset-password"
-                  className="text-sm text-red-600 hover:text-red-700 font-medium transition-colors"
+                  className="text-red-600 text-sm hover:text-red-700 font-semibold transition-colors"
                 >
                   Forgot Password?
                 </Link>
@@ -207,29 +207,11 @@ export function LoginForm() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-6 shadow-sm"
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-6 shadow-sm"
             >
-              {isLoading ? "Signing in..." : "Sign In"}
+              {isLoading ? "Logging in..." : "Log In"}
             </button>
           </form>
-
-          {/* Footer Text */}
-          <p className="text-center text-xs text-gray-500 mt-4">
-            By signing in, you agree to our{" "}
-            <Link
-              href="#"
-              className="underline hover:text-gray-700 transition-colors"
-            >
-              Terms of Service
-            </Link>{" "}
-            and{" "}
-            <Link
-              href="#"
-              className="underline hover:text-gray-700 transition-colors"
-            >
-              Privacy Policy
-            </Link>
-          </p>
         </div>
       </div>
     </div>

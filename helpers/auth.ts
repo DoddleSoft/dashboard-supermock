@@ -373,7 +373,7 @@ class AuthService {
 
       // ── Admin / Examiner flow ───────────────────────────────────
       if (role === "admin" || role === "examiner") {
-        // Check if they are already in a center
+        // Check center membership (admins/examiners are auto-registered to centers)
         const { data: membership } = await this.supabase
           .from("center_members")
           .select("center_id, centers(slug, name)")
@@ -393,8 +393,11 @@ class AuthService {
           };
         }
 
-        // Not yet in a centre → go to exchange code page
-        return { success: true, path: "/auth/exchange-code" };
+        // No center affiliation found - this shouldn't happen for admins/examiners
+        return {
+          success: false,
+          error: "No center access found. Please contact your administrator.",
+        };
       }
 
       // Fallback

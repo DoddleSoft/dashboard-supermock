@@ -85,7 +85,7 @@ export function ResetPasswordForm() {
       const signInResult = await authService.login({
         email: formData.email,
         password: formData.currentPassword,
-        captchaToken: captchaToken ?? undefined,
+        // captchaToken: captchaToken ?? undefined,
       });
 
       if (!signInResult.success) {
@@ -154,16 +154,17 @@ export function ResetPasswordForm() {
     <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12">
       <div className="w-full max-w-md">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
             Reset Password
           </h1>
-          <p className="text-md text-gray-500">
+          <p className="text-gray-600 font-semibold">
             Remember your password?{" "}
-            <span className="text-red-600">
-              <Link href="/auth/login" className="underline">
-                Log in
-              </Link>
-            </span>
+            <Link
+              href="/auth/login"
+              className="text-red-600 hover:text-red-700 font-semibold transition-colors"
+            >
+              Log in
+            </Link>
           </p>
         </div>
 
@@ -279,7 +280,7 @@ export function ResetPasswordForm() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? "Updating Password..." : "Update Password"}
           </button>

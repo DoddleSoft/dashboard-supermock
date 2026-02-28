@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
 
       // ── Admin / Examiner ───────────────────────────────────────
       if (role === "admin" || role === "examiner") {
-        // Check if already a member of a centre
+        // Check center membership (admins/examiners are auto-registered to centers)
         const { data: membership } = await supabase
           .from("center_members")
           .select("center_id, centers(slug)")
@@ -80,7 +80,10 @@ export async function GET(request: NextRequest) {
           return NextResponse.redirect(`${origin}/dashboard/${slug}`);
         }
 
-        return NextResponse.redirect(`${origin}/auth/exchange-code`);
+        // No center affiliation found - this shouldn't happen for admins/examiners
+        return NextResponse.redirect(
+          new URL("/auth/login?error=no_center_access", request.url),
+        );
       }
 
       // Fallback
