@@ -10,6 +10,7 @@ import {
   Headphones,
   Mic,
 } from "lucide-react";
+import { toast } from "sonner";
 import { ViewPaperModal } from "./ViewPaperModal";
 import { EditPaperModal } from "./EditPaperModal";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
@@ -150,6 +151,7 @@ export function PaperCard({
       await onPaperDelete(paper.id);
     } catch (error) {
       console.error("Failed to delete paper:", error);
+      toast.error("Failed to delete the paper. Please try again.");
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
@@ -184,8 +186,7 @@ export function PaperCard({
     } catch (error) {
       return {
         success: false,
-        error:
-          error instanceof Error ? error.message : "Failed to update paper",
+        error: "Failed to update paper. Please try again.",
       };
     }
   };

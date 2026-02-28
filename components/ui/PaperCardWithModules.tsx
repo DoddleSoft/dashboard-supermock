@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BookOpen, Headphones, PenTool, Mic, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { EditPaperModal } from "./EditPaperModal";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
 import type { Module, Paper } from "@/helpers/papers";
@@ -58,6 +59,7 @@ export function PaperCardWithModules({
       await onPaperDelete(paper.id);
     } catch (error) {
       console.error("Failed to delete paper:", error);
+      toast.error("Failed to delete the paper. Please try again.");
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
@@ -87,7 +89,7 @@ export function PaperCardWithModules({
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to update paper",
+        error: "Failed to update paper. Please try again.",
       };
     }
   };

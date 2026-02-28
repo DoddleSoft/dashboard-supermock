@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Search, Plus, FileText, Package, BookOpen } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
+import { toast } from "sonner";
 import { useModuleContext } from "../../../../context/ModuleContext";
 import { useCentre } from "../../../../context/CentreContext";
 import { SmallLoader } from "../../../../components/ui/SmallLoader";
@@ -119,6 +120,8 @@ export default function PapersPage() {
       );
       setDeleteConfirm({ open: false, moduleId: null, moduleName: null });
       setActiveMenu(null);
+    } else {
+      toast.error(result.error || "Failed to delete module. Please try again.");
     }
   };
 

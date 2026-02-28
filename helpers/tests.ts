@@ -275,6 +275,22 @@ export const createScheduledTest = async (
   try {
     const supabase = createClient();
 
+    // Validate required fields
+    if (!payload.title?.trim()) {
+      toast.error("Please enter a test title");
+      return { success: false, error: "Title is required" };
+    }
+
+    if (!payload.scheduledAt) {
+      toast.error("Please select a date and time for the test");
+      return { success: false, error: "Scheduled date is required" };
+    }
+
+    if (!payload.paperId) {
+      toast.error("Please select a paper for the test");
+      return { success: false, error: "Paper is required" };
+    }
+
     console.log("Creating scheduled test with payload:", {
       center_id: payload.centerId,
       paper_id: payload.paperId,
@@ -296,7 +312,7 @@ export const createScheduledTest = async (
       .insert({
         center_id: payload.centerId,
         paper_id: payload.paperId,
-        title: payload.title,
+        title: payload.title.trim(),
         scheduled_at: payload.scheduledAt,
         ended_at: endedDate.toISOString(),
         duration_minutes: durationMinutes,
@@ -336,7 +352,7 @@ export const createScheduledTest = async (
     } else if (error?.code === "23503") {
       errorMessage = "Invalid reference: Paper or center not found.";
     } else if (error?.message) {
-      errorMessage = error.message;
+      errorMessage = "Failed to schedule test. Please try again.";
     }
 
     toast.error(errorMessage);
@@ -395,9 +411,8 @@ export const updateScheduledTest = async (
     return { success: true };
   } catch (error: any) {
     console.error("Error updating scheduled test:", error);
-    const errorMessage = error?.message || "Failed to update test";
-    toast.error(errorMessage);
-    return { success: false, error: errorMessage };
+    toast.error("Failed to update test. Please try again.");
+    return { success: false, error: "Failed to update test" };
   }
 };
 
@@ -421,9 +436,8 @@ export const deleteScheduledTest = async (
     return { success: true };
   } catch (error: any) {
     console.error("Error deleting scheduled test:", error);
-    const errorMessage = error?.message || "Failed to delete test";
-    toast.error(errorMessage);
-    return { success: false, error: errorMessage };
+    toast.error("Failed to delete test. Please try again.");
+    return { success: false, error: "Failed to delete test" };
   }
 };
 
@@ -447,9 +461,8 @@ export const cancelScheduledTest = async (
     return { success: true };
   } catch (error: any) {
     console.error("Error cancelling scheduled test:", error);
-    const errorMessage = error?.message || "Failed to cancel test";
-    toast.error(errorMessage);
-    return { success: false, error: errorMessage };
+    toast.error("Failed to cancel test. Please try again.");
+    return { success: false, error: "Failed to cancel test" };
   }
 };
 
@@ -477,9 +490,8 @@ export const generateScheduledTestOtp = async (
     return { success: true, otp: data.otp };
   } catch (error: any) {
     console.error("Error generating OTP:", error);
-    const errorMessage = error?.message || "Failed to generate OTP";
-    toast.error(errorMessage);
-    return { success: false, error: errorMessage };
+    toast.error("Failed to generate OTP. Please try again.");
+    return { success: false, error: "Failed to generate OTP" };
   }
 };
 

@@ -163,11 +163,17 @@ export const createPaper = async (
       return { success: false, error: "No modules selected" };
     }
 
+    // Validate title
+    if (!payload.title?.trim()) {
+      toast.error("Please enter a paper title");
+      return { success: false, error: "Title is required" };
+    }
+
     const { data: paper, error: paperError } = await supabase
       .from("papers")
       .insert({
         center_id: payload.centerId,
-        title: payload.title,
+        title: payload.title.trim(),
         paper_type: payload.paperType,
         instruction: payload.instruction,
         reading_module_id: payload.readingModuleId,
@@ -185,9 +191,8 @@ export const createPaper = async (
     return { success: true, paperId: paper.id };
   } catch (error: any) {
     console.error("Error creating paper:", error);
-    const errorMessage = error?.message || "Failed to create paper";
-    toast.error(errorMessage);
-    return { success: false, error: errorMessage };
+    toast.error("Failed to create paper. Please try again.");
+    return { success: false, error: "Failed to create paper" };
   }
 };
 
@@ -226,9 +231,8 @@ export const updatePaper = async (
     return { success: true };
   } catch (error: any) {
     console.error("Error updating paper:", error);
-    const errorMessage = error?.message || "Failed to update paper";
-    toast.error(errorMessage);
-    return { success: false, error: errorMessage };
+    toast.error("Failed to update paper. Please try again.");
+    return { success: false, error: "Failed to update paper" };
   }
 };
 
@@ -249,9 +253,8 @@ export const deletePaper = async (
     return { success: true };
   } catch (error: any) {
     console.error("Error deleting paper:", error);
-    const errorMessage = error?.message || "Failed to delete paper";
-    toast.error(errorMessage);
-    return { success: false, error: errorMessage };
+    toast.error("Failed to delete paper. Please try again.");
+    return { success: false, error: "Failed to delete paper" };
   }
 };
 
@@ -276,8 +279,7 @@ export const togglePaperStatus = async (
     return { success: true };
   } catch (error: any) {
     console.error("Error toggling paper status:", error);
-    const errorMessage = error?.message || "Failed to update paper status";
-    toast.error(errorMessage);
-    return { success: false, error: errorMessage };
+    toast.error("Failed to update paper status. Please try again.");
+    return { success: false, error: "Failed to update paper status" };
   }
 };

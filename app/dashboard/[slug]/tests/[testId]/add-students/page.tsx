@@ -103,12 +103,25 @@ export default function AddStudentsPage() {
     const supabase = createClient();
 
     try {
+      // Sanitize query: escape PostgREST special chars to prevent filter injection
+      const sanitized = query
+        .replace(/[%_()\\,.*]/g, "")
+        .trim()
+        .slice(0, 100);
+
+      if (!sanitized) {
+        setSearchResults([]);
+        setShowSearchResults(false);
+        setIsSearching(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("student_profiles")
-        .select("*")
+        .select("student_id, name, email, phone, guardian, guardian_phone, enrollment_type")
         .eq("center_id", currentCenter.center_id)
         .eq("enrollment_type", "regular")
-        .or(`name.ilike.%${query}%,email.ilike.%${query}%`)
+        .or(`name.ilike.%${sanitized}%,email.ilike.%${sanitized}%`)
         .limit(5);
 
       if (error) throw error;
@@ -117,13 +130,13 @@ export default function AddStudentsPage() {
       setShowSearchResults(true);
     } catch (error) {
       console.error("Error searching students:", error);
-      toast.error("Failed to search students");
+      toast.error("Unable to search students. Please try again.");
     } finally {
       setIsSearching(false);
     }
   };
 
-  const selectExistingStudent = (student: any) => {
+  const selectExistingStudent = (student: { student_id: string; name: string; email: string; phone: string; guardian: string; guardian_phone: string }) => {
     setCurrentStudent({
       student_id: student.student_id,
       name: student.name || "",
@@ -241,7 +254,11 @@ export default function AddStudentsPage() {
 
         if (studentError) {
           console.error("Error creating students:", studentError);
-          toast.error(`Failed to create students: ${studentError.message}`);
+          toast.error(
+            studentError.code === "23505"
+              ? "One or more students are already enrolled in this center."
+              : "Failed to create student profiles. Please check the details and try again."
+          );
           setSubmitting(false);
           return;
         }
@@ -281,7 +298,9 @@ export default function AddStudentsPage() {
       if (mockAttemptError) {
         console.error("Error creating mock attempts:", mockAttemptError);
         toast.error(
-          `Failed to create mock attempts: ${mockAttemptError.message}`,
+          mockAttemptError.code === "23505"
+            ? "Some students already have attempts for this test."
+            : "Failed to assign students to the test. Please try again."
         );
         setSubmitting(false);
         return;

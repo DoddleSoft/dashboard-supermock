@@ -38,8 +38,9 @@ export default function PreviewPage() {
   }, [attemptId]);
 
   const loadAttemptDetails = async () => {
+    if (!attemptId) return;
     setLoading(true);
-    const data = await fetchAttemptDetails(attemptId!);
+    const data = await fetchAttemptDetails(attemptId);
     if (data) {
       setAttemptDetail(data);
     }

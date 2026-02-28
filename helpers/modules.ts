@@ -114,7 +114,7 @@ export async function createModule(
         "[createModule] Module creation error:",
         formatSupabaseError(moduleError),
       );
-      const errorMsg = `Module creation failed: ${moduleError.message || "Unknown error"}`;
+      const errorMsg = `Module creation failed. Please try again.`;
       toast.error(errorMsg);
       throw new Error(errorMsg);
     }
@@ -198,7 +198,7 @@ export async function createModule(
 
     // Only show toast if it's not already shown by child functions
     if (!errorMessage.includes("upload") && !errorMessage.includes("size")) {
-      toast.error(`Module creation failed: ${errorMessage}`);
+      toast.error("Module creation failed. Please try again.");
     }
 
     return {
@@ -813,7 +813,7 @@ export async function uploadMediaFile(
     console.error(`Error uploading ${fileType} file:`, err);
     const errorMessage =
       err instanceof Error ? err.message : `Failed to upload ${fileType}`;
-    toast.error(`Upload failed: ${errorMessage}`);
+    toast.error(`Upload failed. Please check the file and try again.`);
     return {
       success: false,
       error: errorMessage,
@@ -1026,7 +1026,6 @@ export const deleteModule = async (
     return { success: true };
   } catch (error: any) {
     console.error("Error deleting module:", error);
-    const errorMessage = error?.message || "Failed to delete module";
-    return { success: false, error: errorMessage };
+    return { success: false, error: "Failed to delete module. Please try again." };
   }
 };

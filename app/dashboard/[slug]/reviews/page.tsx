@@ -57,8 +57,9 @@ export default function ReviewPage() {
   };
 
   const loadReviews = async () => {
+    if (!currentCenter?.center_id) return;
     setLoading(true);
-    const data = await fetchReviews(currentCenter!.center_id);
+    const data = await fetchReviews(currentCenter.center_id);
     setReviews(data);
     setLoading(false);
   };

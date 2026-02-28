@@ -34,6 +34,21 @@ export async function createSupportRequest(
   const supabase = createClient();
 
   try {
+    // Validate required fields
+    if (!data.subject?.trim()) {
+      return {
+        success: false,
+        error: "Please enter a subject for your support request.",
+      };
+    }
+
+    if (!data.message?.trim()) {
+      return {
+        success: false,
+        error: "Please enter a message for your support request.",
+      };
+    }
+
     const { data: supportRequest, error } = await supabase
       .from("support_requests")
       .insert([
@@ -43,8 +58,8 @@ export async function createSupportRequest(
           center_id: data.center_id,
           center_name: data.center_name,
           email: data.email,
-          subject: data.subject,
-          message: data.message,
+          subject: data.subject.trim(),
+          message: data.message.trim(),
           status: "pending",
         },
       ])

@@ -102,10 +102,15 @@ export default function PapersPage() {
       return;
     }
 
+    if (!currentCenter?.center_id) {
+      toast.error("No center selected. Please select a center first.");
+      return;
+    }
+
     setCreatingPaper(true);
 
     const result = await createPaper({
-      centerId: currentCenter!.center_id,
+      centerId: currentCenter.center_id,
       title: paperTitle,
       paperType: paperType,
       readingModuleId: selectedModules.reading,

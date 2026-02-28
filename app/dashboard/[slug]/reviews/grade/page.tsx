@@ -43,7 +43,8 @@ export default function GradePage() {
   const loadModuleDetails = async () => {
     try {
       setLoading(true);
-      const detail = await fetchGradeModuleDetails(moduleId!);
+      if (!moduleId) return;
+      const detail = await fetchGradeModuleDetails(moduleId);
 
       if (detail) {
         setModuleDetail(detail);
@@ -66,7 +67,7 @@ export default function GradePage() {
     } catch (error: any) {
       console.error("Error loading module details:", error);
       toast.error(
-        "Failed to load module details: " + (error.message || "Unknown error"),
+        "Unable to load module details. Please refresh and try again.",
       );
     } finally {
       setLoading(false);
@@ -138,8 +139,12 @@ export default function GradePage() {
       }
 
       // Single RPC call handles everything: updates answers, calculates band, updates module
+      if (!moduleId) {
+        toast.error("Missing module information. Please go back and try again.");
+        return;
+      }
       const result = await saveGrades(
-        moduleId!,
+        moduleId,
         answersToUpdate,
         feedback || null,
       );
@@ -190,7 +195,7 @@ export default function GradePage() {
       setGradingDecisions(new Map());
     } catch (error: any) {
       console.error("Error saving grades:", error);
-      toast.error("Failed to save grades: " + error.message);
+      toast.error("Failed to save grades. Please try again.");
     } finally {
       setSaving(false);
     }

@@ -223,12 +223,17 @@ export default function CreateTestPage() {
       return;
     }
 
+    if (!currentCenter?.center_id) {
+      toast.error("No center selected. Please select a center first.");
+      return;
+    }
+
     setSubmitting(true);
 
     const scheduledAt = new Date(`${scheduledDate}T${scheduledTime}`);
 
     const payload = {
-      centerId: currentCenter!.center_id,
+      centerId: currentCenter.center_id,
       paperId: selectedPaper.id,
       title: testTitle,
       scheduledAt: scheduledAt.toISOString(),

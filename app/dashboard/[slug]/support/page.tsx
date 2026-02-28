@@ -73,7 +73,7 @@ export default function SupportPage() {
           message: "",
         });
       } else {
-        toast.error(result.error || "Failed to submit support message");
+        toast.error(result.error || "Failed to submit support message. Please try again.");
       }
     } catch (error) {
       console.error("Error submitting support message:", error);
