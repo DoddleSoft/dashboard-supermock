@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { parseError } from "@/lib/utils";
 
 export interface SupportRequest {
   id: string;
@@ -28,7 +29,7 @@ export interface CreateSupportRequestData {
  * Create a new support request
  */
 export async function createSupportRequest(
-  data: CreateSupportRequestData
+  data: CreateSupportRequestData,
 ): Promise<{ success: boolean; error?: string; data?: SupportRequest }> {
   const supabase = createClient();
 
@@ -54,7 +55,10 @@ export async function createSupportRequest(
       console.error("Error creating support request:", error);
       return {
         success: false,
-        error: error.message || "Failed to submit support request",
+        error: parseError(
+          error,
+          "Unable to submit your support request. Please try again.",
+        ),
       };
     }
 
@@ -63,7 +67,10 @@ export async function createSupportRequest(
     console.error("Unexpected error creating support request:", error);
     return {
       success: false,
-      error: "An unexpected error occurred. Please try again.",
+      error: parseError(
+        error,
+        "Unable to submit your support request. Please try again.",
+      ),
     };
   }
 }
@@ -72,7 +79,7 @@ export async function createSupportRequest(
  * Get support requests for the current user
  */
 export async function getUserSupportRequests(
-  userId: string
+  userId: string,
 ): Promise<{ success: boolean; error?: string; data?: SupportRequest[] }> {
   const supabase = createClient();
 
@@ -87,7 +94,10 @@ export async function getUserSupportRequests(
       console.error("Error fetching support requests:", error);
       return {
         success: false,
-        error: error.message || "Failed to fetch support requests",
+        error: parseError(
+          error,
+          "Unable to load your support tickets. Please refresh the page.",
+        ),
       };
     }
 
@@ -96,7 +106,10 @@ export async function getUserSupportRequests(
     console.error("Unexpected error fetching support requests:", error);
     return {
       success: false,
-      error: "An unexpected error occurred. Please try again.",
+      error: parseError(
+        error,
+        "Unable to load your support tickets. Please refresh the page.",
+      ),
     };
   }
 }
@@ -105,7 +118,7 @@ export async function getUserSupportRequests(
  * Get support requests for a specific center
  */
 export async function getCenterSupportRequests(
-  centerId: string
+  centerId: string,
 ): Promise<{ success: boolean; error?: string; data?: SupportRequest[] }> {
   const supabase = createClient();
 
@@ -120,7 +133,10 @@ export async function getCenterSupportRequests(
       console.error("Error fetching center support requests:", error);
       return {
         success: false,
-        error: error.message || "Failed to fetch support requests",
+        error: parseError(
+          error,
+          "Unable to load center support requests. Please refresh the page.",
+        ),
       };
     }
 
@@ -129,7 +145,10 @@ export async function getCenterSupportRequests(
     console.error("Unexpected error fetching center support requests:", error);
     return {
       success: false,
-      error: "An unexpected error occurred. Please try again.",
+      error: parseError(
+        error,
+        "Unable to load center support requests. Please refresh the page.",
+      ),
     };
   }
 }

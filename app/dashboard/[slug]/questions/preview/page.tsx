@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Loader } from "@/components/ui/Loader";
 import { RenderBlockView, ThemeColor } from "@/components/ui/RenderBlock";
+import { getRenderBlocks } from "@/lib/utils";
 
 // --- Types ---
 type ModuleType = "reading" | "writing" | "listening" | "speaking";
@@ -66,21 +67,6 @@ const getAudioUrl = (path: string | undefined) => {
   if (!path) return "";
   if (path.startsWith("http") || path.startsWith("blob:")) return path;
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${path}`;
-};
-
-const getRenderBlocks = (content: any): any[] => {
-  if (!content) return [];
-  if (Array.isArray(content)) return content;
-  if (typeof content === "string") {
-    try {
-      const parsed = JSON.parse(content);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      // If it's raw text, wrap it in a text block so RenderBlock can process it
-      return [{ type: "text", content }];
-    }
-  }
-  return content.blocks || [];
 };
 
 // --- Sub-Components ---

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { Student } from "@/types/student";
 import { toast } from "sonner";
+import { parseError } from "@/lib/utils";
 
 const supabase = createClient();
 
@@ -39,7 +40,9 @@ export const fetchStudents = async (centerId: string): Promise<Student[]> => {
     return mappedStudents;
   } catch (error) {
     console.error("Error fetching students:", error);
-    toast.error("Failed to load students");
+    toast.error(
+      parseError(error, "Unable to load students. Please refresh the page."),
+    );
     throw error;
   }
 };
@@ -120,7 +123,12 @@ export const createStudent = async (
     ];
     if (!knownErrors.includes(error.message)) {
       console.error("Error creating student:", error);
-      toast.error("An unexpected error occurred. Please try again.");
+      toast.error(
+        parseError(
+          error,
+          "Failed to create the student account. Please try again.",
+        ),
+      );
     }
     throw error;
   }
@@ -164,7 +172,9 @@ export const updateStudent = async (
     toast.success("Student updated successfully!");
   } catch (error: any) {
     console.error("Error updating student:", error);
-    toast.error("Failed to update student");
+    toast.error(
+      parseError(error, "Failed to save student changes. Please try again."),
+    );
     throw error;
   }
 };
@@ -184,7 +194,9 @@ export const deleteStudent = async (studentId: string) => {
     toast.success("Student deleted successfully!");
   } catch (error: any) {
     console.error("Error deleting student:", error);
-    toast.error("Failed to delete student");
+    toast.error(
+      parseError(error, "Failed to delete the student. Please try again."),
+    );
     throw error;
   }
 };

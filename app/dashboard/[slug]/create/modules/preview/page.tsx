@@ -21,11 +21,11 @@ import {
 } from "@/context/ModuleContext";
 import { Loader } from "@/components/ui/Loader";
 import { RenderBlockView } from "@/components/ui/RenderBlock";
+import { formatModuleType } from "@/lib/utils";
 
 type ModuleType = "reading" | "writing" | "listening" | "speaking";
 
-const getTypeLabel = (type: ModuleType) =>
-  type.charAt(0).toUpperCase() + type.slice(1);
+const getTypeLabel = (type: ModuleType) => formatModuleType(type);
 
 const getTypeIcon = (type: ModuleType) => {
   switch (type) {

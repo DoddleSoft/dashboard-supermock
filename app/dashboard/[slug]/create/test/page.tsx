@@ -27,6 +27,7 @@ import {
 import { SmallLoader } from "@/components/ui/SmallLoader";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import { formatModuleType, getModuleColor } from "@/lib/utils";
 
 interface Paper {
   id: string;
@@ -212,25 +213,6 @@ export default function CreateTestPage() {
       default:
         return <FileText className="w-4 h-4" />;
     }
-  };
-
-  const getModuleColor = (type: string) => {
-    switch (type.toLowerCase()) {
-      case "reading":
-        return "bg-blue-100 text-blue-600 border-blue-200";
-      case "listening":
-        return "bg-purple-100 text-purple-600 border-purple-200";
-      case "writing":
-        return "bg-green-100 text-green-600 border-green-200";
-      case "speaking":
-        return "bg-orange-100 text-orange-600 border-orange-200";
-      default:
-        return "bg-slate-100 text-slate-600 border-slate-200";
-    }
-  };
-
-  const formatModuleType = (type: string) => {
-    return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

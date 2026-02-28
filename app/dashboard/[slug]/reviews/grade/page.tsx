@@ -2,41 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { ArrowLeft, Save, Check, X } from "lucide-react";
 import Link from "next/link";
 import { SmallLoader } from "@/components/ui/SmallLoader";
-
-type AnswerDetail = {
-  id: string;
-  question_ref: string;
-  student_response: string | null;
-  marks_awarded: number | null;
-  is_correct: boolean | null;
-  reference_id: string;
-  correct_answer?: string;
-};
-
-type GradingDecision = {
-  answerId: string;
-  isCorrect: boolean;
-  marksAwarded: number;
-};
-
-type ModuleDetail = {
-  attemptModuleId: string;
-  moduleType: string;
-  heading: string | null;
-  status: string | null;
-  feedback: string | null;
-  band_score: number | null;
-  score_obtained: number | null;
-  answers: AnswerDetail[];
-  studentName: string;
-  studentEmail: string;
-  paperTitle: string;
-};
+import {
+  fetchGradeModuleDetails,
+  saveGrades,
+  GradeAnswerDetail as AnswerDetail,
+  GradingDecision,
+  GradeModuleDetail as ModuleDetail,
+} from "@/helpers/reviews";
 
 export default function GradePage() {
   const router = useRouter();
@@ -61,257 +37,32 @@ export default function GradePage() {
       toast.error("Missing attempt or module information");
       return;
     }
-    void fetchModuleDetails();
+    void loadModuleDetails();
   }, [attemptId, moduleId]);
 
-  const fetchModuleDetails = async () => {
+  const loadModuleDetails = async () => {
     try {
       setLoading(true);
-      const supabase = createClient();
+      const detail = await fetchGradeModuleDetails(moduleId!);
 
-      // Fetch module details
-      const { data: moduleData, error: moduleError } = await supabase
-        .from("attempt_modules")
-        .select(
-          `
-          id,
-          status,
-          feedback,
-          band_score,
-          score_obtained,
-          module_id,
-          attempt_id,
-          modules!inner (
-            id,
-            module_type,
-            heading,
-            paper_id
-          ),
-          mock_attempts!inner (
-            id,
-            student_id
-          )
-        `,
-        )
-        .eq("id", moduleId)
-        .single();
+      if (detail) {
+        setModuleDetail(detail);
+        setFeedback(detail.feedback || "");
+        setBandScore(detail.band_score);
 
-      if (moduleError) {
-        console.error("Module fetch error:", moduleError);
-        throw moduleError;
-      }
-
-      if (!moduleData) {
-        throw new Error("No module data found");
-      }
-
-      // Fetch student details
-      const mockAttempt = Array.isArray(moduleData.mock_attempts)
-        ? moduleData.mock_attempts[0]
-        : moduleData.mock_attempts;
-      const studentId = mockAttempt?.student_id;
-      let studentName = "Unknown Student";
-      let studentEmail = "";
-
-      if (studentId) {
-        const { data: studentData, error: studentError } = await supabase
-          .from("student_profiles")
-          .select("name, email")
-          .eq("student_id", studentId)
-          .single();
-
-        if (!studentError && studentData) {
-          studentName = studentData.name || "Unknown Student";
-          studentEmail = studentData.email || "";
-        }
-      }
-
-      // Fetch paper title
-      const moduleInfo = Array.isArray(moduleData.modules)
-        ? moduleData.modules[0]
-        : moduleData.modules;
-      const paperId = moduleInfo?.paper_id;
-      let paperTitle = "Untitled Paper";
-
-      if (paperId) {
-        const { data: paperData, error: paperError } = await supabase
-          .from("papers")
-          .select("title")
-          .eq("id", paperId)
-          .single();
-
-        if (!paperError && paperData) {
-          paperTitle = paperData.title || "Untitled Paper";
-        }
-      }
-
-      // Fetch answers first
-      const { data: answersData, error: answersError } = await supabase
-        .from("student_answers")
-        .select(
-          "id, question_ref, student_response, marks_awarded, is_correct, reference_id",
-        )
-        .eq("attempt_module_id", moduleId)
-        .order("question_ref");
-
-      if (answersError) {
-        console.error("Answers fetch error:", answersError);
-        throw answersError;
-      }
-
-      console.log("Fetched student answers:", answersData?.length || 0);
-      if (answersData && answersData.length > 0) {
-        console.log("Sample answer with reference_id:", {
-          question_ref: answersData[0].question_ref,
-          reference_id: answersData[0].reference_id,
-        });
-      }
-
-      // Get the actual module_id and attempt_id from the fetched data
-      const actualModuleId = moduleData.module_id;
-      const actualAttemptId = moduleData.attempt_id;
-
-      console.log("Fetching questions using RPC with:", {
-        attemptId: actualAttemptId,
-        moduleId: actualModuleId,
-      });
-
-      // Use RPC to fetch questions with proper permissions
-      const { data: questionsData, error: questionsError } = await supabase.rpc(
-        "get_module_questions_for_view",
-        {
-          p_attempt_id: actualAttemptId,
-          p_module_id: actualModuleId,
-        },
-      );
-
-      if (questionsError) {
-        console.error("RPC questions fetch error:", questionsError);
-        throw questionsError;
-      }
-
-      console.log("RPC returned questions:", questionsData?.length || 0);
-
-      // Build questions map from RPC results - map by question_ref
-      let questionsMap = new Map();
-      if (questionsData && questionsData.length > 0) {
-        console.log("✓ Fetched questions via RPC:", questionsData.length);
-        console.log("Sample question from RPC:", questionsData[0]);
-        console.log(
-          "Sample correct_answers field:",
-          questionsData[0]?.correct_answers,
-        );
-
-        questionsData.forEach((q: any) => {
-          // Map by question_ref to match with student_answers
-          questionsMap.set(q.question_ref, {
-            id: q.question_id,
-            correct_answers: q.correct_answers,
-            marks: q.marks,
-            question_ref: q.question_ref,
-          });
-        });
-
-        console.log(
-          "Questions map keys (question_refs):",
-          Array.from(questionsMap.keys()).slice(0, 5),
-        );
-      } else {
-        console.warn("No questions returned from RPC");
-      }
-
-      // Process answers to extract correct answer - match by question_ref
-      const processedAnswers = (answersData || []).map((ans: any) => {
-        let correctAnswer = "N/A";
-        try {
-          // Match by question_ref field, not reference_id
-          const question = questionsMap.get(ans.question_ref);
-
-          if (!question) {
-            console.warn(
-              `No question found for question_ref: ${ans.question_ref}`,
-            );
-          } else {
-            const correctAnswersData = question.correct_answers;
-            console.log(
-              `✓ Q${ans.question_ref}: Found match, correct_answers =`,
-              correctAnswersData,
-            );
-
-            // Handle different formats of correct_answers
-            if (typeof correctAnswersData === "string") {
-              correctAnswer = correctAnswersData;
-            } else if (correctAnswersData?.answer) {
-              correctAnswer = correctAnswersData.answer;
-            } else if (Array.isArray(correctAnswersData)) {
-              correctAnswer = correctAnswersData.join(", ");
-            } else if (
-              correctAnswersData &&
-              typeof correctAnswersData === "object"
-            ) {
-              // Extract value from object
-              const values = Object.values(correctAnswersData).filter(
-                (v) => v !== null && v !== undefined,
-              );
-              correctAnswer = values.join(", ") || "N/A";
-            }
-
-            // Clean up empty or whitespace-only answers
-            if (!correctAnswer || correctAnswer.trim() === "") {
-              correctAnswer = "N/A";
-            }
+        // Initialize grading decisions from existing marks
+        const initialDecisions = new Map<string, GradingDecision>();
+        detail.answers.forEach((ans) => {
+          if (ans.is_correct !== null) {
+            initialDecisions.set(ans.id, {
+              answerId: ans.id,
+              isCorrect: ans.is_correct,
+              marksAwarded: ans.marks_awarded || 0,
+            });
           }
-        } catch (e) {
-          console.error("Error processing correct answer:", e);
-          correctAnswer = "N/A";
-        }
-
-        return {
-          id: ans.id,
-          question_ref: ans.question_ref,
-          student_response: ans.student_response,
-          marks_awarded: ans.marks_awarded,
-          is_correct: ans.is_correct,
-          reference_id: ans.reference_id,
-          correct_answer: correctAnswer,
-        };
-      });
-
-      console.log("Processed answers - first 3 with correct answers:");
-      processedAnswers.slice(0, 3).forEach((ans) => {
-        console.log(`Q${ans.question_ref}: ${ans.correct_answer}`);
-      });
-
-      const detail: ModuleDetail = {
-        attemptModuleId: moduleData.id,
-        moduleType: moduleInfo?.module_type || "unknown",
-        heading: moduleInfo?.heading || null,
-        status: moduleData.status,
-        feedback: moduleData.feedback,
-        band_score: moduleData.band_score,
-        score_obtained: moduleData.score_obtained,
-        answers: processedAnswers,
-        studentName,
-        studentEmail,
-        paperTitle,
-      };
-
-      setModuleDetail(detail);
-      setFeedback(detail.feedback || "");
-      setBandScore(detail.band_score);
-
-      // Initialize grading decisions from existing marks
-      const initialDecisions = new Map<string, GradingDecision>();
-      processedAnswers.forEach((ans) => {
-        if (ans.is_correct !== null) {
-          initialDecisions.set(ans.id, {
-            answerId: ans.id,
-            isCorrect: ans.is_correct,
-            marksAwarded: ans.marks_awarded || 0,
-          });
-        }
-      });
-      setGradingDecisions(initialDecisions);
+        });
+        setGradingDecisions(initialDecisions);
+      }
     } catch (error: any) {
       console.error("Error loading module details:", error);
       toast.error(
@@ -371,9 +122,6 @@ export default function GradePage() {
 
     try {
       setSaving(true);
-      const supabase = createClient();
-
-      const isWriting = moduleDetail.moduleType === "writing";
 
       // Prepare batch update data - ONLY changed questions
       const answersToUpdate = Array.from(gradingDecisions.values()).map(
@@ -389,129 +137,54 @@ export default function GradePage() {
         return;
       }
 
-      console.log(
-        `Uploading ${answersToUpdate.length} changed answer(s) to database...`,
+      // Single RPC call handles everything: updates answers, calculates band, updates module
+      const result = await saveGrades(
+        moduleId!,
+        answersToUpdate,
+        feedback || null,
       );
-      console.log("Sample update:", answersToUpdate[0]);
 
-      if (isWriting) {
-        // Handle writing module with weighted band calculation
-        // Sort answers and take first two (Task 1 and Task 2)
-        const sortedAnswers = [...moduleDetail.answers].sort((a, b) => {
-          const numA = parseInt(a.question_ref.replace(/\D/g, ""), 10) || 0;
-          const numB = parseInt(b.question_ref.replace(/\D/g, ""), 10) || 0;
-          return numA - numB;
-        });
+      if (!result) {
+        throw new Error("Failed to save grades");
+      }
 
-        const task1Answer = sortedAnswers[0];
-        const task2Answer = sortedAnswers[1];
-
-        if (!task1Answer || !task2Answer) {
-          console.error(
-            "Available answers:",
-            moduleDetail.answers.map((a) => ({
-              id: a.id,
-              question_ref: a.question_ref,
-            })),
-          );
-          throw new Error(
-            `Could not find both tasks. Found ${moduleDetail.answers.length} answer(s)`,
-          );
-        }
-
-        console.log(
-          "Task 1:",
-          task1Answer.question_ref,
-          "Task 2:",
-          task2Answer.question_ref,
-        );
-
-        // Update individual task scores in student_answers first
-        for (const answer of answersToUpdate) {
-          const { error: updateError } = await supabase
-            .from("student_answers")
-            .update({
-              marks_awarded: answer.marks_awarded,
-              is_correct: answer.is_correct,
-            })
-            .eq("id", answer.id);
-
-          if (updateError) {
-            console.error("Error updating student answer:", updateError);
-            throw updateError;
-          }
-        }
-
-        // Get the latest scores (after update)
-        const { data: updatedAnswers, error: fetchError } = await supabase
-          .from("student_answers")
-          .select("id, question_ref, marks_awarded")
-          .in("id", [task1Answer.id, task2Answer.id]);
-
-        if (fetchError) throw fetchError;
-
-        const updatedTask1 = updatedAnswers?.find(
-          (a) => a.id === task1Answer.id,
-        );
-        const updatedTask2 = updatedAnswers?.find(
-          (a) => a.id === task2Answer.id,
-        );
-
-        const task1Score = updatedTask1?.marks_awarded ?? 0;
-        const task2Score = updatedTask2?.marks_awarded ?? 0;
-
-        // Calculate weighted band: (Task1 × 1 + Task2 × 2) / 3, rounded to nearest 0.5
-        const rawBand = (task1Score * 1 + task2Score * 2) / 3;
-        const calculatedBand = Math.round(rawBand * 2) / 2; // Round to nearest 0.5
-
-        console.log(
-          `Writing Band Calculation: (${task1Score} × 1 + ${task2Score} × 2) / 3 = ${rawBand.toFixed(2)} → ${calculatedBand}`,
-        );
-
-        // Update module with calculated band score
-        const { error: moduleError } = await supabase
-          .from("attempt_modules")
-          .update({
-            band_score: calculatedBand,
-            score_obtained: rawBand, // Store the exact weighted score
-            feedback: feedback || null,
-            status: "completed",
-          })
-          .eq("id", moduleId);
-
-        if (moduleError) {
-          console.error("Error updating attempt_modules:", moduleError);
-          throw moduleError;
-        }
-
-        console.log("✓ Writing module graded successfully");
-        console.log(
-          `Updated band_score: ${calculatedBand}, score_obtained: ${rawBand.toFixed(2)}`,
-        );
+      if (result.module_type === "writing") {
         toast.success(
-          `Saved! Task 1: ${task1Score}, Task 2: ${task2Score} | Band: ${calculatedBand}`,
+          `Saved! Task 1: ${result.task1_score}, Task 2: ${result.task2_score} | Band: ${result.band_score}`,
         );
       } else {
-        // Reading/Listening: Use RPC for batch update with auto band calculation
-        const { data, error } = await supabase.rpc("batch_update_grades", {
-          p_module_id: moduleId,
-          p_answers: answersToUpdate,
-          p_feedback: feedback || null,
-        });
-
-        if (error) {
-          console.error("RPC error:", error);
-          throw error;
-        }
-
-        console.log("✓ Batch update successful:", data);
         toast.success(
-          `Saved ${answersToUpdate.length} answer(s)! Total: ${data.total_score} | Band: ${data.band_score}`,
+          `Saved ${result.updated_count} answer(s)! Total: ${result.total_score} | Band: ${result.band_score}`,
         );
       }
 
-      // Refresh data
-      await fetchModuleDetails();
+      // Update local state instead of re-fetching everything
+      setModuleDetail((prev) => {
+        if (!prev) return prev;
+        const updatedAnswers = prev.answers.map((ans) => {
+          const decision = gradingDecisions.get(ans.id);
+          if (decision) {
+            return {
+              ...ans,
+              is_correct: decision.isCorrect,
+              marks_awarded: decision.marksAwarded,
+            };
+          }
+          return ans;
+        });
+        return {
+          ...prev,
+          answers: updatedAnswers,
+          band_score: result.band_score ?? prev.band_score,
+          score_obtained: result.total_score ?? prev.score_obtained,
+          feedback: feedback || prev.feedback,
+          status: "completed",
+        };
+      });
+
+      if (result.band_score !== undefined) {
+        setBandScore(result.band_score);
+      }
 
       // Clear decisions after successful save
       setGradingDecisions(new Map());

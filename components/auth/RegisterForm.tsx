@@ -7,6 +7,7 @@ import { Mail, Lock, User, Eye, EyeOff, ChevronDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile";
+import { parseError } from "@/lib/utils";
 
 const ROLES = [
   {
@@ -104,9 +105,15 @@ export function RegisterForm() {
         { id: loadingToastId },
       );
     } catch (error) {
-      toast.error("An unexpected error occurred. Please try again.", {
-        id: loadingToastId,
-      });
+      toast.error(
+        parseError(
+          error,
+          "Registration failed. Please check your connection and try again.",
+        ),
+        {
+          id: loadingToastId,
+        },
+      );
       console.error("Registration error:", error);
     } finally {
       setIsLoading(false);

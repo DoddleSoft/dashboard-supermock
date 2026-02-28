@@ -18,6 +18,7 @@ import { useCentre } from "@/context/CentreContext";
 import { fetchScheduledTest } from "@/helpers/tests";
 import { SmallLoader } from "@/components/ui/SmallLoader";
 import { createClient } from "@/lib/supabase/client";
+import { parseError } from "@/lib/utils";
 
 interface TestData {
   id: string;
@@ -296,7 +297,12 @@ export default function AddStudentsPage() {
       }, 500);
     } catch (error) {
       console.error("Error adding students:", error);
-      toast.error("An unexpected error occurred");
+      toast.error(
+        parseError(
+          error,
+          "Failed to add students to the test. Please try again.",
+        ),
+      );
     } finally {
       setSubmitting(false);
     }

@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { useCentre } from "@/context/CentreContext";
 import { createSupportRequest } from "@/helpers/support";
+import { parseError } from "@/lib/utils";
 
 export default function SupportPage() {
   const { user, userProfile } = useAuth();
@@ -76,7 +77,12 @@ export default function SupportPage() {
       }
     } catch (error) {
       console.error("Error submitting support message:", error);
-      toast.error("An unexpected error occurred. Please try again.");
+      toast.error(
+        parseError(
+          error,
+          "Failed to send your message. Please check your connection and try again.",
+        ),
+      );
     } finally {
       setIsLoading(false);
     }

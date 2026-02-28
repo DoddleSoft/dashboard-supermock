@@ -6,6 +6,7 @@ import { KeyRound, Mail, LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BrandedSection } from "@/components/auth/BrandedSection";
 import { toast } from "sonner";
+import { parseError } from "@/lib/utils";
 
 const hashPasscode = async (passcode: string): Promise<string> => {
   const encoder = new TextEncoder();
@@ -90,9 +91,15 @@ export default function ExchangeCodePage() {
         router.push(`/dashboard/${result.center_slug}`);
       }, 1000);
     } catch (err) {
-      toast.error("An unexpected error occurred. Please try again.", {
-        id: loadingId,
-      });
+      toast.error(
+        parseError(
+          err,
+          "Verification failed. Please check your connection and try again.",
+        ),
+        {
+          id: loadingId,
+        },
+      );
       console.error("Exchange code error:", err);
     } finally {
       setIsLoading(false);

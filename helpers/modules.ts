@@ -1006,3 +1006,27 @@ export const moduleHelpers = {
     }
   },
 };
+
+/**
+ * Delete a module by ID
+ */
+export const deleteModule = async (
+  moduleId: string,
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const supabase = createClient();
+
+    const { error } = await supabase
+      .from("modules")
+      .delete()
+      .eq("id", moduleId);
+
+    if (error) throw error;
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error deleting module:", error);
+    const errorMessage = error?.message || "Failed to delete module";
+    return { success: false, error: errorMessage };
+  }
+};

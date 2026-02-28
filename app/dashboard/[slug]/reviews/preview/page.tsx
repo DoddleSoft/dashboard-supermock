@@ -2,44 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { ArrowLeft, Edit3, CheckCircle, XCircle } from "lucide-react";
 import Link from "next/link";
 import { SmallLoader } from "@/components/ui/SmallLoader";
 import { useParams } from "next/navigation";
-
-type AnswerDetail = {
-  id: string;
-  question_ref: string;
-  student_response: string | null;
-  marks_awarded: number | null;
-  is_correct: boolean | null;
-  reference_id: string;
-};
-
-type ModuleDetail = {
-  attemptModuleId: string;
-  moduleType: string;
-  heading: string | null;
-  status: string | null;
-  score_obtained: number | null;
-  band_score: number | null;
-  time_spent_seconds: number | null;
-  completed_at: string | null;
-  answers: AnswerDetail[];
-};
-
-type AttemptDetail = {
-  attemptId: string;
-  studentId: string | null;
-  studentName: string;
-  studentEmail: string;
-  paperTitle: string;
-  status: string;
-  createdAt: string | null;
-  modules: ModuleDetail[];
-};
+import {
+  fetchAttemptDetails,
+  formatReviewDate,
+  formatDurationDetailed,
+  getReviewStatusColor,
+  PreviewAnswerDetail as AnswerDetail,
+  PreviewModuleDetail as ModuleDetail,
+  AttemptDetail,
+} from "@/helpers/reviews";
 
 export default function PreviewPage() {
   const params = useParams();
@@ -58,159 +34,21 @@ export default function PreviewPage() {
       toast.error("Missing attempt information");
       return;
     }
-    void fetchAttemptDetails();
+    void loadAttemptDetails();
   }, [attemptId]);
 
-  const fetchAttemptDetails = async () => {
-    try {
-      setLoading(true);
-      const supabase = createClient();
-
-      // Fetch attempt modules
-      const { data: attemptModulesData, error: amError } = await supabase
-        .from("attempt_modules")
-        .select(
-          `id,attempt_id,status,score_obtained,band_score,module_id,module_type,
-          modules!inner (id,module_type,heading,paper_id),
-          mock_attempts!inner (id,student_id,status,created_at)`,
-        )
-        .eq("attempt_id", attemptId);
-
-      if (amError) throw amError;
-
-      if (!attemptModulesData || attemptModulesData.length === 0) {
-        toast.error("No modules found for this attempt");
-        return;
-      }
-
-      // Get all attempt_module IDs
-      const attemptModuleIds = attemptModulesData.map((am: any) => am.id);
-
-      // Fetch all student answers for these modules
-      const { data: answersData, error: answersError } = await supabase
-        .from("student_answers")
-        .select(
-          "id,attempt_module_id,question_ref,student_response,marks_awarded,is_correct,reference_id",
-        )
-        .in("attempt_module_id", attemptModuleIds)
-        .order("question_ref");
-
-      if (answersError) throw answersError;
-
-      // Get student info
-      const firstModule = attemptModulesData[0];
-      const mockAttempt = Array.isArray(firstModule.mock_attempts)
-        ? firstModule.mock_attempts[0]
-        : firstModule.mock_attempts;
-      const studentId = mockAttempt?.student_id;
-
-      let studentName = "Unknown Student";
-      let studentEmail = "";
-
-      if (studentId) {
-        const { data: studentData, error: studentError } = await supabase
-          .from("student_profiles")
-          .select("name, email")
-          .eq("student_id", studentId)
-          .single();
-
-        if (!studentError && studentData) {
-          studentName = studentData.name || "Unknown Student";
-          studentEmail = studentData.email || "";
-        }
-      }
-
-      // Get paper title
-      const moduleInfo = Array.isArray(firstModule.modules)
-        ? firstModule.modules[0]
-        : firstModule.modules;
-      const paperId = moduleInfo?.paper_id;
-
-      let paperTitle = "Untitled Paper";
-
-      if (paperId) {
-        const { data: paperData, error: paperError } = await supabase
-          .from("papers")
-          .select("title")
-          .eq("id", paperId)
-          .single();
-
-        if (!paperError && paperData) {
-          paperTitle = paperData.title || "Untitled Paper";
-        }
-      }
-
-      // Build module structure
-      const modules: ModuleDetail[] = attemptModulesData.map((am: any) => {
-        const modInfo = Array.isArray(am.modules) ? am.modules[0] : am.modules;
-        const moduleAnswers = (answersData || []).filter(
-          (ans: any) => ans.attempt_module_id === am.id,
-        );
-
-        return {
-          attemptModuleId: am.id,
-          moduleType: am.module_type || modInfo.module_type || "unknown",
-          heading: modInfo.heading,
-          status: am.status,
-          score_obtained: am.score_obtained,
-          band_score: am.band_score,
-          time_spent_seconds: am.time_spent_seconds,
-          completed_at: am.completed_at,
-          answers: moduleAnswers,
-        };
-      });
-
-      const detail: AttemptDetail = {
-        attemptId: attemptId!,
-        studentId: studentId || null,
-        studentName,
-        studentEmail,
-        paperTitle,
-        status: mockAttempt?.status || "unknown",
-        createdAt: mockAttempt?.created_at || null,
-        modules,
-      };
-
-      setAttemptDetail(detail);
-    } catch (error: any) {
-      console.error("Error loading attempt details:", error);
-      toast.error("Failed to load attempt details");
-    } finally {
-      setLoading(false);
+  const loadAttemptDetails = async () => {
+    setLoading(true);
+    const data = await fetchAttemptDetails(attemptId!);
+    if (data) {
+      setAttemptDetail(data);
     }
+    setLoading(false);
   };
 
-  const formatDate = (value: string | null) => {
-    if (!value) return "-";
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(value));
-  };
-
-  const formatDuration = (seconds: number | null) => {
-    if (!seconds) return "-";
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}m ${secs}s`;
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "completed":
-        return "bg-green-100 text-green-700 border-green-200";
-      case "in_progress":
-      case "in-progress":
-        return "bg-blue-100 text-blue-700 border-blue-200";
-      case "pending":
-        return "bg-amber-100 text-amber-700 border-amber-200";
-      default:
-        return "bg-slate-100 text-slate-700 border-slate-200";
-    }
-  };
+  const formatDate = formatReviewDate;
+  const formatDuration = formatDurationDetailed;
+  const getStatusColor = getReviewStatusColor;
 
   if (loading) {
     return (
@@ -333,10 +171,17 @@ export default function PreviewPage() {
               <div className="text-right">
                 <p className="text-sm text-slate-600">Score</p>
                 <p className="text-2xl font-bold text-slate-900">
-                  {selectedModule.score_obtained || 0}
-                  {selectedModule.band_score && (
+                  {isWriting
+                    ? selectedModule.band_score || 0
+                    : selectedModule.score_obtained || 0}
+                  {selectedModule.band_score && !isWriting && (
                     <span className="text-base text-slate-600 ml-2">
                       (Band {selectedModule.band_score})
+                    </span>
+                  )}
+                  {isWriting && (
+                    <span className="text-base text-slate-600 ml-2">
+                      (Band {selectedModule.band_score || 0})
                     </span>
                   )}
                 </p>

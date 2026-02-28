@@ -54,7 +54,8 @@ export interface Module {
   heading: string;
   subheading?: string;
   center_id: string;
-  paper_id?: string;
+  paper_id?: string | null;
+  created_at: string;
 }
 
 /**
@@ -73,7 +74,7 @@ export const fetchPapers = async (centerId: string): Promise<Paper[]> => {
         listening_module:modules!papers_listening_fk(id, heading, module_type),
         writing_module:modules!papers_writing_fk(id, heading, module_type),
         speaking_module:modules!papers_speaking_fk(id, heading, module_type)
-      `
+      `,
       )
       .eq("center_id", centerId)
       .order("created_at", { ascending: false });
@@ -92,7 +93,7 @@ export const fetchPapers = async (centerId: string): Promise<Paper[]> => {
  * Fetch standalone modules (not assigned to any paper)
  */
 export const fetchStandaloneModules = async (
-  centerId: string
+  centerId: string,
 ): Promise<Module[]> => {
   try {
     const supabase = createClient();
@@ -116,10 +117,37 @@ export const fetchStandaloneModules = async (
 };
 
 /**
+ * Fetch all modules for a center (both standalone and paper-assigned)
+ */
+export const fetchCenterModules = async (
+  centerId: string,
+): Promise<Module[]> => {
+  try {
+    const supabase = createClient();
+
+    const { data, error } = await supabase
+      .from("modules")
+      .select(
+        "id, module_type, heading, subheading, created_at, paper_id, center_id",
+      )
+      .eq("center_id", centerId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    return data || [];
+  } catch (error) {
+    console.error("Error fetching center modules:", error);
+    toast.error("Failed to load modules");
+    return [];
+  }
+};
+
+/**
  * Create a new paper
  */
 export const createPaper = async (
-  payload: CreatePaperPayload
+  payload: CreatePaperPayload,
 ): Promise<{ success: boolean; paperId?: string; error?: string }> => {
   try {
     const supabase = createClient();
@@ -168,7 +196,7 @@ export const createPaper = async (
  */
 export const updatePaper = async (
   paperId: string,
-  updates: Partial<CreatePaperPayload>
+  updates: Partial<CreatePaperPayload>,
 ): Promise<{ success: boolean; error?: string }> => {
   try {
     const supabase = createClient();
@@ -208,7 +236,7 @@ export const updatePaper = async (
  * Delete a paper
  */
 export const deletePaper = async (
-  paperId: string
+  paperId: string,
 ): Promise<{ success: boolean; error?: string }> => {
   try {
     const supabase = createClient();
@@ -232,7 +260,7 @@ export const deletePaper = async (
  */
 export const togglePaperStatus = async (
   paperId: string,
-  isActive: boolean
+  isActive: boolean,
 ): Promise<{ success: boolean; error?: string }> => {
   try {
     const supabase = createClient();

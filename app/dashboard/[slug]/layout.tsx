@@ -209,53 +209,55 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="p-3 space-y-2 bg-slate-900 m-2 rounded-md">
-          {!isCollapsed && (
-            <>
-              {/* Header row */}
-              <div className="flex justify-between items-center">
-                <p className="text-xs font-medium text-slate-200 uppercase tracking-wide">
-                  Storage
-                </p>
-                <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 uppercase tracking-wide">
-                  {usage?.tier_name ?? "—"}
-                </span>
-              </div>
+        {(role === "owner" || role === "admin") && (
+          <div className="p-3 space-y-2 bg-slate-900 m-2 rounded-md">
+            {!isCollapsed && (
+              <>
+                {/* Header row */}
+                <div className="flex justify-between items-center">
+                  <p className="text-xs font-medium text-slate-200 uppercase tracking-wide">
+                    Storage
+                  </p>
+                  <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 uppercase tracking-wide">
+                    {usage?.tier_name ?? "—"}
+                  </span>
+                </div>
 
-              {/* GB numbers */}
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-400">
-                  {!usageLoaded
-                    ? "Calculating…"
-                    : usage
-                      ? `${usage.used_gb} GB used`
-                      : "No data"}
-                </span>
-                <span className="text-slate-300 font-medium">
-                  {usage ? `${usage.limit_gb} GB` : ""}
-                </span>
-              </div>
-            </>
-          )}
-
-          {/* Progress bar — shown in both states */}
-          <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
-            {usage ? (
-              <div
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  usage.used_pct >= 90
-                    ? "bg-red-500"
-                    : usage.used_pct >= 70
-                      ? "bg-yellow-400"
-                      : "bg-green-500"
-                }`}
-                style={{ width: `${usage.used_pct}%` }}
-              />
-            ) : (
-              <div className="h-1.5 w-0 bg-slate-600 rounded-full" />
+                {/* GB numbers */}
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-400">
+                    {!usageLoaded
+                      ? "Calculating…"
+                      : usage
+                        ? `${usage.used_gb} GB used`
+                        : "No data"}
+                  </span>
+                  <span className="text-slate-300 font-medium">
+                    {usage ? `${usage.limit_gb} GB` : ""}
+                  </span>
+                </div>
+              </>
             )}
+
+            {/* Progress bar — shown in both states */}
+            <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
+              {usage ? (
+                <div
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    usage.used_pct >= 90
+                      ? "bg-red-500"
+                      : usage.used_pct >= 70
+                        ? "bg-yellow-400"
+                        : "bg-green-500"
+                  }`}
+                  style={{ width: `${usage.used_pct}%` }}
+                />
+              ) : (
+                <div className="h-1.5 w-0 bg-slate-600 rounded-full" />
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="relative space-y-2">
           {/* Border only */}

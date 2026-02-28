@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { CenterMember } from "@/types/member";
 import { toast } from "sonner";
+import { parseError } from "@/lib/utils";
 
 const supabase = createClient();
 
@@ -71,7 +72,12 @@ export const fetchCenterMembers = async (
     return ownerMember ? [ownerMember, ...filteredMembers] : filteredMembers;
   } catch (error) {
     console.error("Error fetching members:", error);
-    toast.error("Failed to load members");
+    toast.error(
+      parseError(
+        error,
+        "Unable to load center members. Please refresh the page.",
+      ),
+    );
     throw error;
   }
 };
@@ -127,7 +133,9 @@ export const createCenterMember = async (
   } catch (error: any) {
     if (error.message !== "validation" && error.message !== "api error") {
       console.error("Error creating member:", error);
-      toast.error("An unexpected error occurred. Please try again.");
+      toast.error(
+        parseError(error, "Failed to add the team member. Please try again."),
+      );
     }
     throw error;
   }
@@ -158,7 +166,9 @@ export const updateCenterMember = async (
     toast.success("Member updated successfully!");
   } catch (error: any) {
     console.error("Error updating member:", error);
-    toast.error("Failed to update member");
+    toast.error(
+      parseError(error, "Failed to save member changes. Please try again."),
+    );
     throw error;
   }
 };
@@ -176,7 +186,9 @@ export const deleteCenterMember = async (centerId: string, userId: string) => {
     toast.success("Member removed successfully!");
   } catch (error: any) {
     console.error("Error removing member:", error);
-    toast.error("Failed to remove member");
+    toast.error(
+      parseError(error, "Failed to remove the member. Please try again."),
+    );
     throw error;
   }
 };

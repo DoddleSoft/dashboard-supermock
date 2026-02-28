@@ -7,6 +7,7 @@ import { Lock, Eye, EyeOff, Mail } from "lucide-react";
 import { authService } from "@/helpers/auth";
 import { toast } from "sonner";
 import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile";
+import { parseError } from "@/lib/utils";
 
 export function ResetPasswordForm() {
   const router = useRouter();
@@ -138,7 +139,10 @@ export function ResetPasswordForm() {
         router.push("/auth/login");
       }, 2000);
     } catch (error) {
-      const errorMsg = "An unexpected error occurred. Please try again.";
+      const errorMsg = parseError(
+        error,
+        "Password update failed. Please refresh the page and try again.",
+      );
       toast.error(errorMsg, { id: loadingToastId });
       console.error("Password reset error:", error);
     } finally {

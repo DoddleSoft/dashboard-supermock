@@ -482,3 +482,47 @@ export const generateScheduledTestOtp = async (
     return { success: false, error: errorMessage };
   }
 };
+
+// ----- Formatting helpers -----
+
+/**
+ * Get CSS classes for test status badges
+ */
+export const getTestStatusColor = (status: string): string => {
+  switch (status) {
+    case "scheduled":
+      return "bg-blue-100 text-blue-700 border-blue-200";
+    case "in_progress":
+      return "bg-yellow-100 text-yellow-700 border-yellow-200";
+    case "completed":
+      return "bg-green-100 text-green-700 border-green-200";
+    case "cancelled":
+      return "bg-red-100 text-red-700 border-red-200";
+    default:
+      return "bg-slate-100 text-slate-700 border-slate-200";
+  }
+};
+
+/**
+ * Format a date string for test display (e.g., "Jan 16, 2025, 2:30 PM")
+ */
+export const formatTestDate = (dateString: string): string => {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(dateString));
+};
+
+/**
+ * Format a test status string for display (e.g., "in_progress" → "In Progress")
+ */
+export const formatTestStatus = (status: string): string => {
+  return status
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};

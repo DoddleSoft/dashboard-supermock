@@ -4,32 +4,22 @@ import { useState, useEffect } from "react";
 import { Search, Plus, FileText, Package, BookOpen } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useModuleContext } from "../../../../context/ModuleContext";
-import { createClient } from "../../../../lib/supabase/client";
 import { useCentre } from "../../../../context/CentreContext";
 import { SmallLoader } from "../../../../components/ui/SmallLoader";
 import { CreateModuleModal } from "../../../../components/questions/CreatePaperModal";
 import { DeleteModuleDialog } from "../../../../components/questions/DeleteModuleDialog";
 import { PaperCard } from "../../../../components/ui/PaperCard";
 import { ModuleCard } from "../../../../components/ui/ModuleCard";
-import { deletePaper, updatePaper } from "../../../../helpers/papers";
+import {
+  deletePaper,
+  updatePaper,
+  fetchCenterModules,
+  Module,
+} from "../../../../helpers/papers";
+import { deleteModule } from "../../../../helpers/modules";
+import { formatDateShort } from "../../../../lib/utils";
 
-interface StandaloneModule {
-  id: string;
-  module_type: string;
-  heading: string;
-  created_at: string;
-  subheading?: string;
-  paper_id?: string | null;
-}
-
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-};
+const formatDate = formatDateShort;
 
 export default function PapersPage() {
   const params = useParams();
@@ -39,10 +29,8 @@ export default function PapersPage() {
   const [filterType, setFilterType] = useState("all");
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [standaloneModules, setStandaloneModules] = useState<
-    StandaloneModule[]
-  >([]);
-  const [allModules, setAllModules] = useState<StandaloneModule[]>([]);
+  const [standaloneModules, setStandaloneModules] = useState<Module[]>([]);
+  const [allModules, setAllModules] = useState<Module[]>([]);
   const [modulesLoading, setModulesLoading] = useState(true);
   const [activeView, setActiveView] = useState<"all" | "papers" | "modules">(
     "all",
@@ -76,18 +64,9 @@ export default function PapersPage() {
     if (!currentCenter?.center_id) return;
 
     setModulesLoading(true);
-    const supabase = createClient();
-
-    const { data, error } = await supabase
-      .from("modules")
-      .select("id, module_type, heading, subheading, created_at, paper_id")
-      .eq("center_id", currentCenter.center_id)
-      .order("created_at", { ascending: false });
-
-    if (!error && data) {
-      setAllModules(data);
-      setStandaloneModules(data.filter((module) => !module.paper_id));
-    }
+    const data = await fetchCenterModules(currentCenter.center_id);
+    setAllModules(data);
+    setStandaloneModules(data.filter((module) => !module.paper_id));
     setModulesLoading(false);
   };
 
@@ -131,16 +110,10 @@ export default function PapersPage() {
     if (!deleteConfirm.moduleId) return;
 
     setIsDeleting(true);
-    const supabase = createClient();
-
-    const { error } = await supabase
-      .from("modules")
-      .delete()
-      .eq("id", deleteConfirm.moduleId);
-
+    const result = await deleteModule(deleteConfirm.moduleId);
     setIsDeleting(false);
 
-    if (!error) {
+    if (result.success) {
       setStandaloneModules(
         standaloneModules.filter((m) => m.id !== deleteConfirm.moduleId),
       );
