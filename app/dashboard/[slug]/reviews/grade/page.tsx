@@ -140,7 +140,9 @@ export default function GradePage() {
 
       // Single RPC call handles everything: updates answers, calculates band, updates module
       if (!moduleId) {
-        toast.error("Missing module information. Please go back and try again.");
+        toast.error(
+          "Missing module information. Please go back and try again.",
+        );
         return;
       }
       const result = await saveGrades(

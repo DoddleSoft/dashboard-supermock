@@ -321,7 +321,9 @@ function CreateModuleContent() {
       // Clear the module title after successful creation
       setModuleTitle(typeKey, "");
     } else {
-      setToastMessage("Failed to create module. Please check your content and try again.");
+      setToastMessage(
+        "Failed to create module. Please check your content and try again.",
+      );
       setToastType("error");
       setShowToast(true);
       setTimeout(() => setShowToast(false), 5000);

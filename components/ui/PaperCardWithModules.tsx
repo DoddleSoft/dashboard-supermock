@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
-import { BookOpen, Headphones, PenTool, Mic, MoreVertical, Edit, Trash2 } from "lucide-react";
+import {
+  BookOpen,
+  Headphones,
+  PenTool,
+  Mic,
+  MoreVertical,
+  Edit,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { EditPaperModal } from "./EditPaperModal";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
@@ -193,10 +201,12 @@ export function PaperCardWithModules({
           title: paper.title,
           paperType: paper.paper_type,
           isActive: paper.is_active,
-          readingModuleId: paper.reading_module?.id ?? paper.reading_module_id ?? null,
+          readingModuleId:
+            paper.reading_module?.id ?? paper.reading_module_id ?? null,
           listeningModuleId:
             paper.listening_module?.id ?? paper.listening_module_id ?? null,
-          writingModuleId: paper.writing_module?.id ?? paper.writing_module_id ?? null,
+          writingModuleId:
+            paper.writing_module?.id ?? paper.writing_module_id ?? null,
           speakingModuleId:
             paper.speaking_module?.id ?? paper.speaking_module_id ?? null,
         }}

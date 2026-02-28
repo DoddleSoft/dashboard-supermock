@@ -1026,6 +1026,9 @@ export const deleteModule = async (
     return { success: true };
   } catch (error: any) {
     console.error("Error deleting module:", error);
-    return { success: false, error: "Failed to delete module. Please try again." };
+    return {
+      success: false,
+      error: "Failed to delete module. Please try again.",
+    };
   }
 };

@@ -118,7 +118,9 @@ export default function AddStudentsPage() {
 
       const { data, error } = await supabase
         .from("student_profiles")
-        .select("student_id, name, email, phone, guardian, guardian_phone, enrollment_type")
+        .select(
+          "student_id, name, email, phone, guardian, guardian_phone, enrollment_type",
+        )
         .eq("center_id", currentCenter.center_id)
         .eq("enrollment_type", "regular")
         .or(`name.ilike.%${sanitized}%,email.ilike.%${sanitized}%`)
@@ -136,7 +138,14 @@ export default function AddStudentsPage() {
     }
   };
 
-  const selectExistingStudent = (student: { student_id: string; name: string; email: string; phone: string; guardian: string; guardian_phone: string }) => {
+  const selectExistingStudent = (student: {
+    student_id: string;
+    name: string;
+    email: string;
+    phone: string;
+    guardian: string;
+    guardian_phone: string;
+  }) => {
     setCurrentStudent({
       student_id: student.student_id,
       name: student.name || "",
@@ -257,7 +266,7 @@ export default function AddStudentsPage() {
           toast.error(
             studentError.code === "23505"
               ? "One or more students are already enrolled in this center."
-              : "Failed to create student profiles. Please check the details and try again."
+              : "Failed to create student profiles. Please check the details and try again.",
           );
           setSubmitting(false);
           return;
@@ -300,7 +309,7 @@ export default function AddStudentsPage() {
         toast.error(
           mockAttemptError.code === "23505"
             ? "Some students already have attempts for this test."
-            : "Failed to assign students to the test. Please try again."
+            : "Failed to assign students to the test. Please try again.",
         );
         setSubmitting(false);
         return;
