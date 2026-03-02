@@ -1568,6 +1568,99 @@ BEGIN
 END;
 $function$;
 
+-- Function: Delete student with full cascade cleanup
+CREATE OR REPLACE FUNCTION public.delete_student_cascade(p_student_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_center_id uuid;
+  v_center_owner_id uuid;
+  v_caller_id uuid;
+  v_attempt_ids uuid[];
+  v_attempt_module_ids uuid[];
+  v_deleted_answers int := 0;
+  v_deleted_modules int := 0;
+  v_deleted_attempts int := 0;
+BEGIN
+  -- Get caller ID
+  v_caller_id := auth.uid();
+  IF v_caller_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  -- Get student's center and verify ownership
+  SELECT sp.center_id, c.user_id
+  INTO v_center_id, v_center_owner_id
+  FROM student_profiles sp
+  JOIN centers c ON c.center_id = sp.center_id
+  WHERE sp.student_id = p_student_id;
+
+  IF v_center_id IS NULL THEN
+    RAISE EXCEPTION 'Student not found';
+  END IF;
+
+  IF v_center_owner_id IS DISTINCT FROM v_caller_id THEN
+    RAISE EXCEPTION 'Access denied: You do not own this center';
+  END IF;
+
+  -- Step 1: Collect all attempt IDs for this student
+  SELECT array_agg(id) INTO v_attempt_ids
+  FROM mock_attempts
+  WHERE student_id = p_student_id;
+
+  IF v_attempt_ids IS NOT NULL AND array_length(v_attempt_ids, 1) > 0 THEN
+    -- Step 2: Collect all attempt_module IDs
+    SELECT array_agg(id) INTO v_attempt_module_ids
+    FROM attempt_modules
+    WHERE attempt_id = ANY(v_attempt_ids);
+
+    IF v_attempt_module_ids IS NOT NULL AND array_length(v_attempt_module_ids, 1) > 0 THEN
+      -- Step 3: Delete student answers first (deepest child)
+      DELETE FROM student_answers
+      WHERE attempt_module_id = ANY(v_attempt_module_ids);
+      GET DIAGNOSTICS v_deleted_answers = ROW_COUNT;
+
+      -- Step 4: Delete attempt modules
+      DELETE FROM attempt_modules
+      WHERE id = ANY(v_attempt_module_ids);
+      GET DIAGNOSTICS v_deleted_modules = ROW_COUNT;
+    END IF;
+
+    -- Step 5: Delete mock attempts
+    DELETE FROM mock_attempts
+    WHERE student_id = p_student_id;
+    GET DIAGNOSTICS v_deleted_attempts = ROW_COUNT;
+  END IF;
+
+  -- Step 6: Delete the student profile
+  DELETE FROM student_profiles
+  WHERE student_id = p_student_id;
+
+  -- Step 7: Manually update center_usage since we bypassed some triggers
+  UPDATE center_usage
+  SET 
+    student_count = GREATEST(student_count - 1, 0),
+    mock_attempt_count = GREATEST(mock_attempt_count - v_deleted_attempts, 0),
+    updated_at = now(),
+    last_calculated_at = now()
+  WHERE center_id = v_center_id;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'deleted_answers', v_deleted_answers,
+    'deleted_modules', v_deleted_modules,
+    'deleted_attempts', v_deleted_attempts
+  );
+
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE EXCEPTION 'DELETE_FAILED: %', SQLERRM;
+END;
+$function$;
+
 -- ============================================================================
 -- TRIGGERS
 -- ============================================================================

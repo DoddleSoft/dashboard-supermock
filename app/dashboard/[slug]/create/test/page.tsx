@@ -447,9 +447,6 @@ export default function CreateTestPage() {
             step={15}
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900"
           />
-          <p className="text-xs text-slate-500 mt-2">
-            Standard IELTS test is 180 minutes (3 hours)
-          </p>
         </div>
 
         {/* Status (only show when editing) */}

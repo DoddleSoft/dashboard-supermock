@@ -180,18 +180,19 @@ export const updateStudent = async (
 };
 
 /**
- * Delete a student
+ * Delete a student and all related records (mock attempts, attempt modules, student answers)
+ * Uses a SECURITY DEFINER RPC to handle the full cascade cleanup safely
  */
 export const deleteStudent = async (studentId: string) => {
   try {
-    const { error } = await supabase
-      .from("student_profiles")
-      .delete()
-      .eq("student_id", studentId);
+    const { data, error } = await supabase.rpc("delete_student_cascade", {
+      p_student_id: studentId,
+    });
 
     if (error) throw error;
 
     toast.success("Student deleted successfully!");
+    return data;
   } catch (error: any) {
     console.error("Error deleting student:", error);
     toast.error(
