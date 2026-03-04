@@ -51,6 +51,68 @@ export interface CreateTestPayload {
   status?: "scheduled" | "in_progress" | "completed" | "cancelled";
 }
 
+export interface PaperWithModules {
+  id: string;
+  title: string;
+  paper_type: string;
+  reading_module?: { id: string; heading: string; module_type: string };
+  listening_module?: { id: string; heading: string; module_type: string };
+  writing_module?: { id: string; heading: string; module_type: string };
+  speaking_module?: { id: string; heading: string; module_type: string };
+}
+
+/**
+ * Fetch all active papers for a center (with module details)
+ */
+export const fetchActivePapers = async (
+  centerId: string,
+): Promise<PaperWithModules[]> => {
+  try {
+    const supabase = createClient();
+
+    const { data, error } = await supabase
+      .from("papers")
+      .select(
+        `
+        id,
+        title,
+        paper_type,
+        reading_module:modules!papers_reading_fk(id, heading, module_type),
+        listening_module:modules!papers_listening_fk(id, heading, module_type),
+        writing_module:modules!papers_writing_fk(id, heading, module_type),
+        speaking_module:modules!papers_speaking_fk(id, heading, module_type)
+      `,
+      )
+      .eq("center_id", centerId)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    return (data || []).map((p: any) => ({
+      id: p.id,
+      title: p.title,
+      paper_type: p.paper_type,
+      reading_module: Array.isArray(p.reading_module)
+        ? p.reading_module[0]
+        : p.reading_module,
+      listening_module: Array.isArray(p.listening_module)
+        ? p.listening_module[0]
+        : p.listening_module,
+      writing_module: Array.isArray(p.writing_module)
+        ? p.writing_module[0]
+        : p.writing_module,
+      speaking_module: Array.isArray(p.speaking_module)
+        ? p.speaking_module[0]
+        : p.speaking_module,
+    }));
+  } catch (error) {
+    console.error("Error fetching active papers:", error);
+    toast.error("Failed to load papers. Please refresh the page.");
+    return [];
+  }
+};
+
 /**
  * Fetch a single scheduled test by ID
  */
@@ -82,20 +144,6 @@ export const fetchScheduledTest = async (
     if (error) throw error;
     if (!data) return null;
 
-    // Fetch students
-    const { data: studentsData } = await supabase
-      .from("test_students")
-      .select(
-        `
-        student:student_profiles!test_students_student_id_fkey (
-          student_id,
-          name,
-          email
-        )
-      `,
-      )
-      .eq("test_id", data.id);
-
     // Build modules array
     const modules: Array<{
       id: string;
@@ -119,7 +167,6 @@ export const fetchScheduledTest = async (
     return {
       ...data,
       modules,
-      students: studentsData?.map((s: any) => s.student) || [],
     };
   } catch (error) {
     console.error("Error fetching scheduled test:", error);
@@ -160,20 +207,6 @@ export const fetchScheduledTests = async (
     // Fetch students for each test and build modules array from paper
     const testsWithDetails = await Promise.all(
       (data || []).map(async (test) => {
-        // Fetch students
-        const { data: studentsData } = await supabase
-          .from("test_students")
-          .select(
-            `
-            student:student_profiles!test_students_student_id_fkey (
-              student_id,
-              name,
-              email
-            )
-          `,
-          )
-          .eq("test_id", test.id);
-
         // Build modules array from paper module references
         const modules: Array<{
           id: string;
@@ -197,7 +230,6 @@ export const fetchScheduledTests = async (
         return {
           ...test,
           modules,
-          students: studentsData?.map((s: any) => s.student) || [],
         };
       }),
     );
@@ -207,62 +239,6 @@ export const fetchScheduledTests = async (
     console.error("Error fetching scheduled tests:", error);
     toast.error("Failed to load tests");
     return [];
-  }
-};
-
-/**
- * Get test statistics for a center
- */
-export const fetchTestStats = async (
-  centerId: string,
-): Promise<TestStats | null> => {
-  try {
-    const supabase = createClient();
-
-    // Get test counts by status
-    const { data: tests, error: testsError } = await supabase
-      .from("scheduled_tests")
-      .select("status")
-      .eq("center_id", centerId);
-
-    if (testsError) throw testsError;
-
-    // Get total modules count
-    const { count: modulesCount, error: modulesError } = await supabase
-      .from("modules")
-      .select("*", { count: "exact", head: true })
-      .eq("center_id", centerId);
-
-    if (modulesError) throw modulesError;
-
-    // Get total papers count
-    const { count: papersCount, error: papersError } = await supabase
-      .from("papers")
-      .select("*", { count: "exact", head: true })
-      .eq("center_id", centerId);
-
-    if (papersError) throw papersError;
-
-    const totalTests = tests?.length || 0;
-    const scheduledTests =
-      tests?.filter((t) => t.status === "scheduled").length || 0;
-    const completedTests =
-      tests?.filter((t) => t.status === "completed").length || 0;
-    const inProgressTests =
-      tests?.filter((t) => t.status === "in_progress").length || 0;
-
-    return {
-      totalTests,
-      scheduledTests,
-      completedTests,
-      inProgressTests,
-      totalModules: modulesCount || 0,
-      totalPapers: papersCount || 0,
-    };
-  } catch (error) {
-    console.error("Error fetching test stats:", error);
-    toast.error("Failed to load test statistics");
-    return null;
   }
 };
 
@@ -432,7 +408,6 @@ export const deleteScheduledTest = async (
 
     if (error) throw error;
 
-    toast.success("Test deleted successfully!");
     return { success: true };
   } catch (error: any) {
     console.error("Error deleting scheduled test:", error);
@@ -492,6 +467,72 @@ export const generateScheduledTestOtp = async (
     console.error("Error generating OTP:", error);
     toast.error("Failed to generate OTP. Please try again.");
     return { success: false, error: "Failed to generate OTP" };
+  }
+};
+
+// ----- Student helpers -----
+
+export interface TestStudent {
+  attempt_id: string;
+  attempt_status: string;
+  overall_band_score: number | null;
+  started_at: string;
+  completed_at: string | null;
+  student: {
+    student_id: string;
+    name: string | null;
+    email: string | null;
+    phone: string | null;
+    enrollment_type: string;
+    guardian: string | null;
+  };
+}
+
+/**
+ * Fetch all students registered under a scheduled test via mock_attempts
+ */
+export const fetchTestStudents = async (
+  testId: string,
+): Promise<TestStudent[]> => {
+  try {
+    const supabase = createClient();
+
+    const { data, error } = await supabase
+      .from("mock_attempts")
+      .select(
+        `
+        id,
+        status,
+        overall_band_score,
+        started_at,
+        completed_at,
+        student:student_profiles!mock_attempts_student_id_fkey (
+          student_id,
+          name,
+          email,
+          phone,
+          enrollment_type,
+          guardian
+        )
+      `,
+      )
+      .eq("scheduled_test_id", testId)
+      .order("started_at", { ascending: true });
+
+    if (error) throw error;
+
+    return (data || []).map((row: any) => ({
+      attempt_id: row.id,
+      attempt_status: row.status,
+      overall_band_score: row.overall_band_score,
+      started_at: row.started_at,
+      completed_at: row.completed_at,
+      student: Array.isArray(row.student) ? row.student[0] : row.student,
+    }));
+  } catch (error) {
+    console.error("Error fetching test students:", error);
+    toast.error("Failed to load students for this test");
+    return [];
   }
 };
 

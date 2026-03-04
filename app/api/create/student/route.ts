@@ -18,9 +18,6 @@ function sanitizeString(raw: unknown, maxLen = 255): string {
 /** Safe email: lowercase, ASCII only, proper format. */
 const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
 
-/** Password must be exactly 8 digits (numeric PIN). */
-const PASSWORD_RE = /^\d{8}$/;
-
 // ─── Rate-limit (in-memory, resets on cold start) ────────────────────────────
 // Keyed by authenticated user_id so each staff account gets its own bucket.
 const rateBucket = new Map<string, { count: number; resetAt: number }>();
@@ -90,8 +87,7 @@ export async function POST(req: NextRequest) {
     const errors: string[] = [];
     if (!name) errors.push("Full name is required.");
     if (!EMAIL_RE.test(emailRaw)) errors.push("Invalid email format.");
-    if (!PASSWORD_RE.test(password))
-      errors.push("Password must be exactly 8 digits (numbers only).");
+
     if (!centerId) errors.push("Center ID is required.");
 
     if (errors.length) {

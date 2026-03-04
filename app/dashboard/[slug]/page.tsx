@@ -2,33 +2,31 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect } from "react";
-import { Users, FileText, TrendingUp, ArrowRight } from "lucide-react";
+import {
+  Users,
+  FileText,
+  TrendingDown,
+  TrendingUp,
+  ArrowRight,
+} from "lucide-react";
 import { useCentre } from "@/context/CentreContext";
 import { notFound } from "next/navigation";
 import { Loader } from "@/components/ui/Loader";
+import { cn } from "@/lib/utils";
 
 export default function DashboardPage() {
   const params = useParams();
   const slug = params.slug as string;
   const { dashboardStats, loading, isValidCenter } = useCentre();
 
-  // Only 404 if the center genuinely doesn't exist or user has no access at all.
-  // isOwner=false is fine — admin/examiner members are also valid.
-  useEffect(() => {
-    if (!loading && !isValidCenter) {
-      notFound();
-    }
-  }, [loading, isValidCenter]);
-
   // Show loading state
   if (loading) {
     return <Loader />;
   }
 
-  // Safety check
+  // Call notFound during render phase for invalid center access.
   if (!isValidCenter) {
-    return null;
+    notFound();
   }
 
   const stats = [
@@ -41,7 +39,7 @@ export default function DashboardPage() {
     {
       label: "Test Papers",
       value: dashboardStats?.totalPapers ?? 0,
-      trend: "neutral" as const,
+      trend: "down" as const,
       color: "bg-purple-100 text-purple-600",
     },
     {
@@ -55,19 +53,26 @@ export default function DashboardPage() {
   return (
     <div className="max-w-7xl flex flex-col gap-8 mx-auto">
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-6">
         {stats.map((stat) => {
+          const TrendIcon = stat.trend === "up" ? TrendingUp : TrendingDown;
+
           return (
             <div
               key={stat.label}
-              className="bg-white rounded-lg border border-slate-200 px-6 py-4 transition-all duration-200"
+              className={cn(
+                "bg-white rounded-lg border border-slate-200 px-6 py-4 transition-all duration-200",
+                stat.color,
+              )}
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center justify-between w-full">
                   <p className="text-slate-500 text-md mb-1">{stat.label}</p>
-                  <p className="text-3xl font-bold text-slate-900">
-                    {stat.value}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-3xl font-bold text-slate-900">
+                      {stat.value}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

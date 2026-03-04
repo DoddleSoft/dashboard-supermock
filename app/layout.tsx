@@ -10,9 +10,9 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
-const radeil = localFont({
-  src: "./fonts/Radeil3DDemoRuderight-4n7xD.otf",
-  variable: "--font-radeil", // This defines the CSS variable name
+const maian = localFont({
+  src: "./fonts/maian.ttf",
+  variable: "--font-maian", // This defines the CSS variable name
   display: "swap", // Prevents invisible text while loading
 });
 
@@ -35,7 +35,7 @@ export default function RootLayout({
     <html lang="en">
       <AuthProvider>
         <body
-          className={`${geistSans.variable} ${geistMono.variable} ${radeil.variable} antialiased`}
+          className={`${geistSans.variable} ${geistMono.variable} ${maian.variable} antialiased`}
           suppressHydrationWarning
         >
           <Toaster position="top-right" richColors />

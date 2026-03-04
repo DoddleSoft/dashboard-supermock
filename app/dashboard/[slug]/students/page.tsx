@@ -109,10 +109,7 @@ export default function StudentsPage() {
       toast.error("Student name is required");
       return;
     }
-    if (!/^\d{8}$/.test(formData.password)) {
-      toast.error("Password must be exactly 8 digits (numbers only).");
-      return;
-    }
+
     if (!currentCenter?.center_id) {
       toast.error("Center information is missing. Please refresh the page.");
       return;
@@ -293,16 +290,6 @@ export default function StudentsPage() {
                 <option value="passed">Passed</option>
                 <option value="archived">Archived</option>
                 <option value="cancelled">Cancelled</option>
-              </select>
-
-              <select
-                value={selectedEnrollmentType}
-                onChange={(e) => setSelectedEnrollmentType(e.target.value)}
-                className="px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 bg-white text-sm font-medium"
-              >
-                <option value="all">All Types</option>
-                <option value="regular">Regular</option>
-                <option value="mock_only">Mock Only</option>
               </select>
             </div>
             <button

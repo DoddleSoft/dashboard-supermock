@@ -26,14 +26,11 @@ export function DeleteConfirmationDialog({
       <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
         {/* Header */}
         <div className="flex items-start justify-between p-6 border-b border-slate-200">
-          <div className="flex items-start gap-4 flex-1">
+          <div className="flex items-center gap-4 flex-1">
             <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
               <AlertTriangle className="w-6 h-6 text-red-600" />
             </div>
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-              <p className="text-sm text-slate-500 mt-1">{description}</p>
-            </div>
+            <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
           </div>
           <button
             onClick={onCancel}

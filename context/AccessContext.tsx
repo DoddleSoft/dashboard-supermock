@@ -11,49 +11,14 @@ import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "./AuthContext";
 import { useCentre } from "./CentreContext";
+import {
+  isAllowedPath,
+  ROLE_ALLOWED_SEGMENTS,
+  ROLE_DEFAULT_SEGMENT,
+  type CenterRole,
+} from "@/lib/access-control";
 
 // ─── Role types ───────────────────────────────────────────────────────────────
-
-export type CenterRole = "owner" | "admin" | "examiner";
-
-/**
- * The first path in each array is the default landing page for that role.
- * Segments are relative to /dashboard/[slug].
- *   ""              → /dashboard/[slug]          (overview)
- *   "/reviews"      → /dashboard/[slug]/reviews
- *   etc.
- */
-const ROLE_ALLOWED_SEGMENTS: Record<CenterRole, string[]> = {
-  owner: [
-    "",
-    "/tests",
-    "/questions",
-    "/papers",
-    "/reviews",
-    "/students",
-    "/members",
-    "/support",
-    "/create",
-  ],
-  admin: [
-    "",
-    "/tests",
-    "/questions",
-    "/papers",
-    "/reviews",
-    "/students",
-    "/support",
-    "/create",
-  ],
-  examiner: ["/reviews", "/questions", "/create/modules", "/support"],
-};
-
-/** Where each role lands by default when visiting the dashboard root. */
-export const ROLE_DEFAULT_SEGMENT: Record<CenterRole, string> = {
-  owner: "",
-  admin: "",
-  examiner: "/reviews",
-};
 
 // ─── Context shape ────────────────────────────────────────────────────────────
 
@@ -130,11 +95,7 @@ export function AccessProvider({ children }: { children: ReactNode }) {
     if (!pathname.startsWith(base)) return false;
 
     const relative = pathname.slice(base.length) || "";
-
-    return allowedSegments.some((seg) => {
-      if (seg === "") return relative === "";
-      return relative === seg || relative.startsWith(seg + "/");
-    });
+    return isAllowedPath(relative, role);
   };
 
   const defaultPath = slug

@@ -1,80 +1,49 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  isAllowedPath,
+  ROLE_DEFAULT_SEGMENT,
+  type CenterRole,
+} from "@/lib/access-control";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
-// ─── Role-based access control ────────────────────────────────────────────────
-
-type CenterRole = "owner" | "admin" | "examiner";
-
-/** Path segments (relative to /dashboard/[slug]) each role may access. */
-const ROLE_ALLOWED_SEGMENTS: Record<CenterRole, string[]> = {
-  owner: [
-    "",
-    "/tests",
-    "/questions",
-    "/papers",
-    "/reviews",
-    "/students",
-    "/members",
-    "/support",
-    "/create",
-  ],
-  admin: [
-    "",
-    "/tests",
-    "/questions",
-    "/papers",
-    "/reviews",
-    "/students",
-    "/support",
-    "/create",
-  ],
-  examiner: ["/reviews", "/questions", "/create/modules", "/support"],
+type CenterAccess = {
+  role: CenterRole | null;
+  centerId: string | null;
+  isActive: boolean;
+  status: "pending" | "verified" | "rejected" | null;
 };
 
-/** Default segment each role should land on inside the dashboard. */
-const ROLE_DEFAULT_SEGMENT: Record<CenterRole, string> = {
-  owner: "",
-  admin: "",
-  examiner: "/reviews",
-};
-
-function isAllowed(relative: string, role: CenterRole): boolean {
-  return ROLE_ALLOWED_SEGMENTS[role].some((seg) => {
-    if (seg === "") return relative === "";
-    return relative === seg || relative.startsWith(seg + "/");
-  });
-}
-
-/**
- * Resolves the current user's role for the given center slug.
- * Returns null if the user has no access at all.
- */
 async function resolveRole(
   supabase: ReturnType<typeof createServerClient>,
   userId: string,
   slug: string,
-): Promise<CenterRole | null> {
-  // 1. Check ownership
-  const { data: owned } = await supabase
-    .from("centers")
-    .select("center_id")
-    .eq("slug", slug)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (owned?.center_id) return "owner";
-
-  // 2. Check membership — look up the center by slug, then verify membership
+): Promise<CenterAccess> {
   const { data: centerBySlug } = await supabase
     .from("centers")
-    .select("center_id")
+    .select("center_id, user_id, is_active, status")
     .eq("slug", slug)
     .maybeSingle();
 
-  if (!centerBySlug?.center_id) return null;
+  if (!centerBySlug?.center_id) {
+    return {
+      role: null,
+      centerId: null,
+      isActive: false,
+      status: null,
+    };
+  }
+
+  if (centerBySlug.user_id === userId) {
+    return {
+      role: "owner",
+      centerId: centerBySlug.center_id,
+      isActive: Boolean(centerBySlug.is_active),
+      status: centerBySlug.status,
+    };
+  }
 
   const { data: membership } = await supabase
     .from("center_members")
@@ -83,9 +52,15 @@ async function resolveRole(
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (!membership) return null;
+  if (!membership) {
+    return {
+      role: null,
+      centerId: centerBySlug.center_id,
+      isActive: Boolean(centerBySlug.is_active),
+      status: centerBySlug.status,
+    };
+  }
 
-  // 3. Get the user's role from public.users
   const { data: profile } = await supabase
     .from("users")
     .select("role")
@@ -93,13 +68,78 @@ async function resolveRole(
     .maybeSingle();
 
   const r = profile?.role as string | null;
-  if (r === "admin" || r === "examiner") return r;
+  if (r === "admin" || r === "examiner") {
+    return {
+      role: r,
+      centerId: centerBySlug.center_id,
+      isActive: Boolean(centerBySlug.is_active),
+      status: centerBySlug.status,
+    };
+  }
+
+  return {
+    role: null,
+    centerId: centerBySlug.center_id,
+    isActive: Boolean(centerBySlug.is_active),
+    status: centerBySlug.status,
+  };
+}
+
+async function getLatestAccessibleCenter(
+  supabase: ReturnType<typeof createServerClient>,
+  userId: string,
+): Promise<{ slug: string; role: CenterRole } | null> {
+  const { data: ownedCenter } = await supabase
+    .from("centers")
+    .select("slug")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .neq("status", "rejected")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (ownedCenter?.slug) {
+    return { slug: ownedCenter.slug, role: "owner" };
+  }
+
+  const { data: membership } = await supabase
+    .from("center_members")
+    .select("centers(slug, is_active, status)")
+    .eq("user_id", userId)
+    .order("invited_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const center = Array.isArray(membership?.centers)
+    ? membership?.centers[0]
+    : membership?.centers;
+
+  if (!center?.slug || !center.is_active || center.status === "rejected") {
+    return null;
+  }
+
+  const access = await resolveRole(supabase, userId, center.slug);
+  if (access.role) {
+    return { slug: center.slug, role: access.role };
+  }
+
   return null;
 }
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // API routes perform their own session + permission checks.
+  // Skipping middleware DB calls here removes a large latency chunk.
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.next({
+      request: { headers: request.headers },
+    });
+  }
+
   const response = NextResponse.next({
     request: { headers: request.headers },
   });
@@ -122,17 +162,14 @@ export async function proxy(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const { pathname } = request.nextUrl;
 
   // ── 1. Public routes — no auth required ───────────────────────────────────
-  const publicRoutes = [
-    "/auth/login",
-    "/auth/register",
-    "/auth/callback",
-    "/auth/reset-password",
-    "/",
-  ];
-  const isPublic = publicRoutes.some((r) => pathname.startsWith(r));
+  const isPublic =
+    pathname === "/" ||
+    pathname.startsWith("/auth/login") ||
+    pathname.startsWith("/auth/register") ||
+    pathname.startsWith("/auth/callback") ||
+    pathname.startsWith("/auth/reset-password");
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
@@ -142,43 +179,11 @@ export async function proxy(request: NextRequest) {
 
   // ── 2. Authenticated user hitting login or register → redirect to dashboard ─
   if (user && (pathname === "/auth/login" || pathname === "/auth/register")) {
-    // Check owner first
-    const { data: ownedCenter } = await supabase
-      .from("centers")
-      .select("slug")
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (ownedCenter?.slug) {
+    const latest = await getLatestAccessibleCenter(supabase, user.id);
+    if (latest) {
       const url = request.nextUrl.clone();
-      url.pathname = `/dashboard/${ownedCenter.slug}`;
+      url.pathname = `/dashboard/${latest.slug}${ROLE_DEFAULT_SEGMENT[latest.role]}`;
       return NextResponse.redirect(url);
-    }
-
-    // Check membership
-    const { data: membership } = await supabase
-      .from("center_members")
-      .select("center_id, centers(slug, is_active)")
-      .eq("user_id", user.id)
-      .order("invited_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (membership?.centers) {
-      const center = Array.isArray(membership.centers)
-        ? membership.centers[0]
-        : membership.centers;
-
-      if (center?.is_active && center?.slug) {
-        // Find their role to redirect to the correct default page
-        const role = await resolveRole(supabase, user.id, center.slug);
-        const url = request.nextUrl.clone();
-        url.pathname = `/dashboard/${center.slug}${role ? ROLE_DEFAULT_SEGMENT[role] : ""}`;
-        return NextResponse.redirect(url);
-      }
     }
   }
 
@@ -194,22 +199,31 @@ export async function proxy(request: NextRequest) {
 
     if (slug) {
       const relative = "/" + parts.slice(3).join("/");
-      const relativeNormalized =
-        relative === "/" ? "" : relative.replace(/\/$/, "");
+      const access = await resolveRole(supabase, user.id, slug);
 
-      const role = await resolveRole(supabase, user.id, slug);
+      if (!access.centerId) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/auth/login";
+        return NextResponse.redirect(url);
+      }
 
-      if (!role) {
+      if (!access.isActive || access.status === "rejected") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/auth/login";
+        return NextResponse.redirect(url);
+      }
+
+      if (!access.role) {
         // No access to this center at all
         const url = request.nextUrl.clone();
         url.pathname = "/auth/login";
         return NextResponse.redirect(url);
       }
 
-      if (!isAllowed(relativeNormalized, role)) {
+      if (!isAllowedPath(relative, access.role)) {
         // Has a role but is trying a forbidden path — send to their default
         const url = request.nextUrl.clone();
-        url.pathname = `/dashboard/${slug}${ROLE_DEFAULT_SEGMENT[role]}`;
+        url.pathname = `/dashboard/${slug}${ROLE_DEFAULT_SEGMENT[access.role]}`;
         return NextResponse.redirect(url);
       }
     }
@@ -221,5 +235,5 @@ export async function proxy(request: NextRequest) {
 export default proxy;
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)"],
 };

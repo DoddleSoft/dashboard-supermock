@@ -62,73 +62,26 @@ export function CentreProvider({ children }: { children: ReactNode }) {
   const [isValidCenter, setIsValidCenter] = useState(false);
   const [slugReady, setSlugReady] = useState(false);
 
-  // Fetch dashboard statistics for a center
-  const fetchDashboardStats = async (centerId: string) => {
+  // Fetch dashboard statistics only after center validity is known.
+  const fetchDashboardStats = async (centerSlug: string) => {
     try {
-      // Fetch total students for this center
-      const { count: studentsCount, error: studentsError } = await supabase
-        .from("student_profiles")
-        .select("student_id", { count: "exact", head: true })
-        .eq("center_id", centerId);
+      const response = await fetch(
+        `/api/dashboard-stats?slug=${encodeURIComponent(centerSlug)}`,
+        {
+          method: "GET",
+          credentials: "include",
+        },
+      );
 
-      if (studentsError) throw studentsError;
+      if (!response.ok) {
+        throw new Error("Failed to fetch dashboard stats");
+      }
 
-      // Fetch total papers for this center
-      const { count: papersCount, error: papersError } = await supabase
-        .from("papers")
-        .select("id", { count: "exact", head: true })
-        .eq("center_id", centerId);
-
-      if (papersError) throw papersError;
-
-      // Fetch completed tests for students in this center
-      const { count: completedTests, error: testsError } = await supabase
-        .from("mock_attempts")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "completed")
-        .in(
-          "student_id",
-          (
-            await supabase
-              .from("student_profiles")
-              .select("student_id")
-              .eq("center_id", centerId)
-          ).data?.map((s: any) => s.student_id) || [],
-        );
-
-      if (testsError) throw testsError;
-
-      // Fetch total mock attempts for students in this center
-      const { count: mockAttemptsCount, error: mockAttemptsError } =
-        await supabase
-          .from("mock_attempts")
-          .select("id", { count: "exact", head: true })
-          .in(
-            "student_id",
-            (
-              await supabase
-                .from("student_profiles")
-                .select("student_id")
-                .eq("center_id", centerId)
-            ).data?.map((s: any) => s.student_id) || [],
-          );
-
-      if (mockAttemptsError) throw mockAttemptsError;
-
-      setDashboardStats({
-        totalStudents: studentsCount || 0,
-        completedTests: completedTests || 0,
-        totalPapers: papersCount || 0,
-        totalMockTestRegistered: mockAttemptsCount || 0,
-      });
+      const payload = (await response.json()) as { stats?: DashboardStats };
+      setDashboardStats(payload.stats ?? null);
     } catch (err) {
       console.error("Error fetching dashboard stats:", err);
-      setDashboardStats({
-        totalStudents: 0,
-        completedTests: 0,
-        totalPapers: 0,
-        totalMockTestRegistered: 0,
-      });
+      setDashboardStats(null);
     }
   };
 
@@ -188,7 +141,6 @@ export function CentreProvider({ children }: { children: ReactNode }) {
             setIsOwner(false);
             setIsValidCenter(true);
             setError(null);
-            await fetchDashboardStats(centerBySlug.center_id);
             setLoading(false);
             return;
           }
@@ -219,9 +171,6 @@ export function CentreProvider({ children }: { children: ReactNode }) {
       setIsOwner(true);
       setIsValidCenter(true);
       setError(null);
-
-      // Fetch dashboard stats for this center
-      await fetchDashboardStats(center.center_id);
     } catch (err) {
       console.error("Error fetching centers:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch centers");
@@ -268,6 +217,14 @@ export function CentreProvider({ children }: { children: ReactNode }) {
       setDashboardStats(null);
     }
   }, [user?.id, slug, slugReady]);
+
+  // Fetch stats only after center validity is definitively true.
+  useEffect(() => {
+    if (!slug || !isValidCenter || !currentCenter?.center_id) {
+      return;
+    }
+    fetchDashboardStats(slug);
+  }, [slug, isValidCenter, currentCenter?.center_id]);
 
   const value: CentreContextType = {
     currentCenter,

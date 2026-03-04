@@ -76,27 +76,17 @@ export function CreateStudentModal({
               />
             </div>
 
-            {/* Password — 8-digit numeric PIN */}
+            {/* Password */}
             <div className="col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Password *{" "}
-                <span className="text-slate-400 font-normal">
-                  (8 digits, numbers only)
-                </span>
               </label>
               <input
                 type="password"
-                inputMode="numeric"
-                pattern="\d{8}"
-                maxLength={8}
-                placeholder="••••••••"
+                maxLength={20}
+                placeholder="Enter password"
                 value={formData.password}
-                onChange={(e) =>
-                  onChange(
-                    "password",
-                    e.target.value.replace(/\D/g, "").slice(0, 8),
-                  )
-                }
+                onChange={(e) => onChange("password", e.target.value)}
                 required
                 autoComplete="new-password"
                 className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 text-sm"
@@ -121,22 +111,6 @@ export function CreateStudentModal({
               />
             </div>
 
-            {/* Enrollment Type */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Enrollment Type *
-              </label>
-              <select
-                value={formData.enrollment_type}
-                onChange={(e) => onChange("enrollment_type", e.target.value)}
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 bg-white text-sm"
-              >
-                <option value="regular">Regular</option>
-                <option value="mock_only">Mock Only</option>
-                <option value="visitor">Visitor</option>
-              </select>
-            </div>
-
             {/* Phone */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -148,19 +122,6 @@ export function CreateStudentModal({
                 value={formData.phone}
                 onChange={(e) => onChange("phone", e.target.value)}
                 className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 text-sm"
-              />
-            </div>
-
-            {/* Date of Birth */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Date of Birth
-              </label>
-              <input
-                type="date"
-                value={formData.date_of_birth}
-                onChange={(e) => onChange("date_of_birth", e.target.value)}
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 text-sm"
               />
             </div>
 

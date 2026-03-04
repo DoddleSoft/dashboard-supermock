@@ -76,11 +76,7 @@ export function LoginForm() {
 
       // Redirect based on path
       if (result.path) {
-        if (result.centerName) {
-          toast.success(`Welcome back to ${result.centerName}!`, {
-            id: loadingToastId,
-          });
-        } else {
+        if (!result.centerName) {
           toast.info("Let's set up your first center!", {
             id: loadingToastId,
           });

@@ -349,6 +349,10 @@ CREATE INDEX IF NOT EXISTS idx_scheduled_tests_scheduled_at ON public.scheduled_
 CREATE INDEX IF NOT EXISTS idx_scheduled_tests_active_expiration ON public.scheduled_tests(ended_at) WHERE status = 'in_progress'::text;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_otp ON public.scheduled_tests(otp) WHERE status = ANY (ARRAY['scheduled'::text, 'in_progress'::text]);
 CREATE INDEX IF NOT EXISTS idx_attempts_student_type ON public.mock_attempts(student_id, attempt_type);
+CREATE INDEX IF NOT EXISTS idx_student_profiles_center_id ON public.student_profiles(center_id);
+CREATE INDEX IF NOT EXISTS idx_mock_attempts_student_id ON public.mock_attempts(student_id);
+CREATE INDEX IF NOT EXISTS idx_mock_attempts_student_status ON public.mock_attempts(student_id, status);
+CREATE INDEX IF NOT EXISTS idx_center_members_user_id ON public.center_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_answers_module ON public.student_answers(attempt_module_id);
 
 -- ============================================================================

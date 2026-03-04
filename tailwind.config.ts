@@ -6,7 +6,7 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        radeil: ["var(--font-radeil)", "sans-serif"],
+        maian: ["var(--font-maian)", "sans-serif"],
       },
     },
   },

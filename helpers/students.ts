@@ -81,10 +81,6 @@ export const createStudent = async (
       toast.error("Please enter a valid email address.");
       throw new Error("invalid email");
     }
-    if (!/^\d{8}$/.test(studentData.password)) {
-      toast.error("Password must be exactly 8 digits (numbers only).");
-      throw new Error("invalid password");
-    }
 
     const res = await fetch("/api/create/student", {
       method: "POST",
