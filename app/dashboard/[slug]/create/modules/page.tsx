@@ -1,15 +1,11 @@
 "use client";
 
-import { useMemo, useState, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import QuestionModal from "../../../../../components/dashboard/QuestionModal";
 import ReadingModule from "../../../../../components/create/ReadingModule";
 import WritingModule from "../../../../../components/create/WritingModule";
 import ListeningModule from "../../../../../components/create/ListeningModule";
-import {
-  useModuleContext,
-  QuestionDefinition,
-} from "../../../../../context/ModuleContext";
+import { useModuleContext } from "../../../../../context/ModuleContext";
 import { Loader2 } from "lucide-react";
 import { SmallLoader } from "../../../../../components/ui/SmallLoader";
 
@@ -80,86 +76,9 @@ function CreateModuleContent() {
     toggleReadingSection,
   } = useModuleContext();
 
-  const [showQuestionModal, setShowQuestionModal] = useState(false);
-  const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
-  const [currentBlockIndex, setCurrentBlockIndex] = useState<number | null>(
-    null,
-  );
-  const [currentModuleType, setCurrentModuleType] = useState<
-    "reading" | "listening"
-  >("reading");
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState<"success" | "error">("success");
-
-  const sectionById = useMemo(
-    () => ({
-      reading: (id: string) => readingSections.find((s) => s.id === id),
-      listening: (id: string) => listeningSections.find((s) => s.id === id),
-    }),
-    [readingSections, listeningSections],
-  );
-
-  const addQuestion = (sectionId: string, blockIndex: number) => {
-    setCurrentSectionId(sectionId);
-    setCurrentBlockIndex(blockIndex);
-    setCurrentModuleType(type === "listening" ? "listening" : "reading");
-    setShowQuestionModal(true);
-  };
-
-  const handleSaveQuestion = (questionData: {
-    questionRef: string;
-    type: "fill-blank" | "mcq" | "true-false-not-given" | "yes-no-not-given";
-    blankPosition?: "first" | "middle" | "end";
-    options?: string[];
-    correctAnswers?: string[];
-    answer: string;
-    explanation: string;
-  }) => {
-    if (!currentSectionId) return;
-
-    const targetSection = sectionById[currentModuleType](currentSectionId);
-    if (!targetSection) return;
-
-    const questionRef = questionData.questionRef.trim();
-    if (!questionRef) return;
-
-    const optionsFromType =
-      questionData.type === "true-false-not-given"
-        ? ["TRUE", "FALSE", "NOT GIVEN"]
-        : questionData.type === "yes-no-not-given"
-          ? ["YES", "NO", "NOT GIVEN"]
-          : questionData.options;
-
-    const normalizedOptions = optionsFromType?.filter(
-      (opt) => opt && opt.trim(),
-    );
-    const normalizedCorrectAnswers =
-      questionData.type === "mcq"
-        ? (questionData.correctAnswers || []).filter((ans) => ans && ans.trim())
-        : [questionData.answer].filter((ans) => ans && ans.trim());
-
-    const questionDefinition: QuestionDefinition = {
-      answer: questionData.answer,
-      correctAnswers: normalizedCorrectAnswers,
-      options: normalizedOptions,
-      explanation: questionData.explanation,
-      createdInBlockIndex: currentBlockIndex ?? 0,
-    };
-
-    if (currentModuleType === "reading") {
-      updateReadingQuestion(currentSectionId, questionRef, questionDefinition);
-    } else {
-      updateListeningQuestion(
-        currentSectionId,
-        questionRef,
-        questionDefinition,
-      );
-    }
-
-    setShowQuestionModal(false);
-    setCurrentSectionId(null);
-  };
 
   const handleTabChange = (moduleType: string) => {
     router.push(`/dashboard/${slug}/create/modules?type=${moduleType}`);
@@ -220,7 +139,6 @@ function CreateModuleContent() {
             onToggleSection={toggleReadingSection}
             onAddSection={addReadingSection}
             onDeleteSection={deleteReadingSection}
-            onAddQuestion={addQuestion}
             onDeleteQuestion={deleteReadingQuestion}
             onUpdateQuestion={updateReadingQuestion}
             onUpdateSectionTitle={updateReadingSectionTitle}
@@ -262,7 +180,6 @@ function CreateModuleContent() {
             onToggleSection={toggleListeningSection}
             onAddSection={addListeningSection}
             onDeleteSection={deleteListeningSection}
-            onAddQuestion={addQuestion}
             onDeleteQuestion={deleteListeningQuestion}
             onUpdateQuestion={updateListeningQuestion}
             onUpdateSectionTitle={updateListeningSectionTitle}
@@ -417,17 +334,6 @@ function CreateModuleContent() {
           </button>
         </div>
       </div>
-
-      {/* Question Creation Modal Component */}
-      <QuestionModal
-        isOpen={showQuestionModal}
-        onClose={() => {
-          setShowQuestionModal(false);
-          setCurrentSectionId(null);
-          setCurrentBlockIndex(null);
-        }}
-        onSave={handleSaveQuestion}
-      />
     </>
   );
 }

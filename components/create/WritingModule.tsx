@@ -370,7 +370,7 @@ export default function WritingModule({
 
                   <button
                     onClick={() => onAddRenderBlock(section.id)}
-                    className="w-full px-4 py-3 border-2 border-dashed border-slate-300 text-blue-600 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
+                    className="w-full px-4 py-3 border-2 border-dashed border-slate-300 text-red-600 rounded-xl hover:border-red-400 hover:bg-red-50 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
                   >
                     <Plus className="w-4 h-4" />
                     Add Block

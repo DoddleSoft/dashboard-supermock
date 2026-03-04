@@ -39,7 +39,7 @@ export interface RenderBlock {
 }
 
 export interface QuestionDefinition {
-  type?: "blanks" | "mcq-3" | "mcq-5";
+  type?: "mcq" | "blanks" | "true-false" | "mcq-3" | "mcq-5";
   answer: string;
   correctAnswers?: string[];
   options?: string[];
