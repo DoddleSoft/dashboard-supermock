@@ -115,28 +115,32 @@ export default function Onboarding() {
     } catch (error: any) {
       console.error("Onboarding error:", error);
 
-      // Provide more specific error messages
       let errorMessage = "Failed to create center. Please try again.";
 
       if (
-        error?.message?.includes(
-          "duplicate key value violates unique constraint",
-        )
+        error?.code === "23505" ||
+        error?.message?.includes("unique constraint")
       ) {
-        if (error.message.includes("slug")) {
+        if (error.message.includes("centers_slug_key")) {
           errorMessage =
-            "A center with this slug already exists. Please choose a different name.";
+            "This URL slug is already taken. Please try a different name.";
+        } else if (error.message.includes("centers_user_id_unique")) {
+          errorMessage =
+            "You have already created a center. You can only manage one center per account.";
+          // Optional: Auto-redirect them since they already have one
+          // router.push("/dashboard");
         } else {
           errorMessage = "A center with this information already exists.";
         }
-      } else if (error?.message?.includes("permission denied")) {
+      } else if (
+        error?.code === "42501" ||
+        error?.message?.includes("permission denied")
+      ) {
         errorMessage =
-          "You don't have permission to create a center. Please contact support.";
-      } else if (error?.message) {
-        errorMessage = error.message;
+          "You don't have permission to create a center. Check your RLS policies.";
       }
-      toast.error(errorMessage);
 
+      toast.error(errorMessage);
       setError(errorMessage);
     } finally {
       setIsLoading(false);

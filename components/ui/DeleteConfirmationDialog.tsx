@@ -22,8 +22,16 @@ export function DeleteConfirmationDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+    <div
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      onClick={() => {
+        if (!isDeleting) onCancel();
+      }}
+    >
+      <div
+        className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-start justify-between p-6 border-b border-slate-200">
           <div className="flex items-center gap-4 flex-1">

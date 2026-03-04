@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Plus, Search } from "lucide-react";
 import { useCentre } from "@/context/CentreContext";
+import { useAccess } from "@/context/AccessContext";
 import { CenterMember } from "@/types/member";
 import { MemberTable } from "@/components/members/MemberTable";
 import { EditMemberDrawer } from "@/components/members/EditMemberDrawer";
@@ -19,6 +20,8 @@ import {
 
 export default function MembersPage() {
   const { currentCenter, loading: centerLoading } = useCentre();
+  const { role } = useAccess();
+  const isOwner = role === "owner";
 
   const [members, setMembers] = useState<CenterMember[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -57,20 +60,17 @@ export default function MembersPage() {
   });
 
   useEffect(() => {
-    if (currentCenter?.center_id && currentCenter?.user_id) {
+    if (currentCenter?.center_id) {
       loadMembers();
     }
-  }, [currentCenter?.center_id, currentCenter?.user_id]);
+  }, [currentCenter?.center_id]);
 
   const loadMembers = async () => {
-    if (!currentCenter?.center_id || !currentCenter?.user_id) return;
+    if (!currentCenter?.center_id) return;
 
     try {
       setLoading(true);
-      const data = await fetchCenterMembers(
-        currentCenter.center_id,
-        currentCenter.user_id,
-      );
+      const data = await fetchCenterMembers(currentCenter.center_id);
       setMembers(data);
     } catch (error) {
       // handled by helper
@@ -79,25 +79,25 @@ export default function MembersPage() {
     }
   };
 
-  const filteredMembers = members.filter((member) => {
-    const matchesSearch =
-      (member.full_name?.toLowerCase() || "").includes(
-        searchQuery.toLowerCase(),
-      ) ||
-      (member.email?.toLowerCase() || "").includes(searchQuery.toLowerCase());
-    const matchesRole = selectedRole === "all" || member.role === selectedRole;
-    const matchesStatus =
-      selectedStatus === "all" ||
-      (selectedStatus === "active" && member.is_active) ||
-      (selectedStatus === "inactive" && !member.is_active);
-
-    return matchesSearch && matchesRole && matchesStatus;
-  });
+  const filteredMembers = useMemo(() => {
+    const query = searchQuery.toLowerCase();
+    return members.filter((member) => {
+      const matchesSearch =
+        (member.full_name?.toLowerCase() || "").includes(query) ||
+        (member.email?.toLowerCase() || "").includes(query);
+      const matchesRole =
+        selectedRole === "all" || member.role === selectedRole;
+      const matchesStatus =
+        selectedStatus === "all" ||
+        (selectedStatus === "active" && member.is_active) ||
+        (selectedStatus === "inactive" && !member.is_active);
+      return matchesSearch && matchesRole && matchesStatus;
+    });
+  }, [members, searchQuery, selectedRole, selectedStatus]);
 
   const handleCreateMember = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!currentCenter?.center_id) return;
+    if (!isOwner || !currentCenter?.center_id) return;
 
     try {
       setSubmitting(true);
@@ -112,7 +112,7 @@ export default function MembersPage() {
   };
 
   const openEditDrawer = (member: CenterMember) => {
-    if (member.isOwner) return;
+    if (member.isOwner || !isOwner) return;
 
     setSelectedMember(member);
     setEditData({
@@ -136,7 +136,12 @@ export default function MembersPage() {
   };
 
   const handleSaveChanges = async () => {
-    if (!selectedMember || selectedMember.isOwner || !currentCenter?.center_id)
+    if (
+      !selectedMember ||
+      selectedMember.isOwner ||
+      !isOwner ||
+      !currentCenter?.center_id
+    )
       return;
 
     try {
@@ -152,14 +157,14 @@ export default function MembersPage() {
   };
 
   const handleDeleteMember = () => {
-    if (!selectedMember || selectedMember.isOwner) return;
+    if (!selectedMember || selectedMember.isOwner || !isOwner) return;
     setMemberToDelete(selectedMember);
     setShowDeleteConfirm(true);
   };
 
   const toggleActionMenu = (member: CenterMember, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (member.isOwner) return;
+    if (member.isOwner || !isOwner) return;
 
     const button = e.currentTarget as HTMLElement;
     const rect = button.getBoundingClientRect();
@@ -189,11 +194,11 @@ export default function MembersPage() {
   };
 
   const handleEditChange = (field: string, value: string | boolean) => {
-    setEditData({ ...editData, [field]: value });
+    setEditData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleCreateChange = (field: string, value: string) => {
-    setFormData({ ...formData, [field]: value });
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleCloseCreateModal = () => {
@@ -268,7 +273,7 @@ export default function MembersPage() {
             </div>
             <button
               onClick={() => setShowCreateModal(true)}
-              disabled={!currentCenter || centerLoading}
+              disabled={!isOwner || !currentCenter || centerLoading}
               className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium shadow-sm shadow-red-100 transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4" />

@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Search, Plus, FileText, Package, BookOpen } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
 import { useModuleContext } from "../../../../context/ModuleContext";
 import { useCentre } from "../../../../context/CentreContext";
 import { SmallLoader } from "../../../../components/ui/SmallLoader";
-import { CreateModuleModal } from "../../../../components/questions/CreatePaperModal";
+import { CreateModuleModal } from "../../../../components/questions/CreateModuleModal";
 import { DeleteModuleDialog } from "../../../../components/questions/DeleteModuleDialog";
+import { ViewPaperModal } from "../../../../components/ui/ViewPaperModal";
+import { EditPaperModal } from "../../../../components/ui/EditPaperModal";
+import { DeleteConfirmationDialog } from "../../../../components/ui/DeleteConfirmationDialog";
 import { PaperCard } from "../../../../components/ui/PaperCard";
 import { ModuleCard } from "../../../../components/ui/ModuleCard";
 import {
@@ -29,7 +32,7 @@ export default function PapersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateModuleModal, setShowCreateModuleModal] = useState(false);
   const [standaloneModules, setStandaloneModules] = useState<Module[]>([]);
   const [allModules, setAllModules] = useState<Module[]>([]);
   const [modulesLoading, setModulesLoading] = useState(true);
@@ -47,21 +50,18 @@ export default function PapersPage() {
   });
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const {
-    centerPapers,
-    centerModuleStats,
-    centerModulesLoading,
-    refreshCenterModules,
-  } = useModuleContext();
+  // Paper modal state
+  const [selectedPaperId, setSelectedPaperId] = useState<string | null>(null);
+  const [showPaperViewModal, setShowPaperViewModal] = useState(false);
+  const [showPaperEditModal, setShowPaperEditModal] = useState(false);
+  const [showPaperDeleteDialog, setShowPaperDeleteDialog] = useState(false);
+  const [isPaperDeleting, setIsPaperDeleting] = useState(false);
+
+  const { centerPapers, centerModulesLoading, refreshCenterModules } =
+    useModuleContext();
   const { currentCenter } = useCentre();
 
-  useEffect(() => {
-    if (currentCenter?.center_id) {
-      fetchStandaloneModules();
-    }
-  }, [currentCenter?.center_id]);
-
-  const fetchStandaloneModules = async () => {
+  const refreshLocalModules = useCallback(async () => {
     if (!currentCenter?.center_id) return;
 
     setModulesLoading(true);
@@ -69,7 +69,13 @@ export default function PapersPage() {
     setAllModules(data);
     setStandaloneModules(data.filter((module) => !module.paper_id));
     setModulesLoading(false);
-  };
+  }, [currentCenter?.center_id]);
+
+  useEffect(() => {
+    if (currentCenter?.center_id) {
+      refreshLocalModules();
+    }
+  }, [currentCenter?.center_id, refreshLocalModules]);
 
   const handleUpdatePaper = async (
     paperId: string,
@@ -94,7 +100,7 @@ export default function PapersPage() {
     });
 
     if (result.success) {
-      await refreshCenterModules();
+      await Promise.all([refreshCenterModules(), refreshLocalModules()]);
     }
 
     return result;
@@ -103,7 +109,46 @@ export default function PapersPage() {
   const handleDeletePaper = async (paperId: string) => {
     const result = await deletePaper(paperId);
     if (result.success) {
-      await refreshCenterModules();
+      await Promise.all([refreshCenterModules(), refreshLocalModules()]);
+    }
+  };
+
+  const handleConfirmDeletePaper = async () => {
+    if (!selectedPaperId) return;
+    setIsPaperDeleting(true);
+    try {
+      await handleDeletePaper(selectedPaperId);
+    } catch (error) {
+      console.error("Failed to delete paper:", error);
+      toast.error("Failed to delete the paper. Please try again.");
+    } finally {
+      setIsPaperDeleting(false);
+      setShowPaperDeleteDialog(false);
+      setSelectedPaperId(null);
+      setActiveMenu(null);
+    }
+  };
+
+  const handleSavePaper = async (data: {
+    title: string;
+    paperType: string;
+    isActive: boolean;
+    readingModuleId?: string | null;
+    listeningModuleId?: string | null;
+    writingModuleId?: string | null;
+    speakingModuleId?: string | null;
+  }) => {
+    if (!selectedPaperId) {
+      return { success: false, error: "No paper selected" };
+    }
+    try {
+      const result = await handleUpdatePaper(selectedPaperId, data);
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        error: "Failed to update paper. Please try again.",
+      };
     }
   };
 
@@ -132,26 +177,51 @@ export default function PapersPage() {
     setActiveMenu(null);
   };
 
-  const filteredPapers = centerPapers.filter((paper) => {
-    const matchesSearch = paper.title
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesFilter =
-      filterType === "all" ||
-      paper.moduleTypes.map((t) => t.toLowerCase()).includes(filterType);
-    return matchesSearch && matchesFilter;
-  });
+  const filteredPapers = useMemo(
+    () =>
+      centerPapers.filter((paper) => {
+        const matchesSearch = paper.title
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase());
+        const matchesFilter =
+          filterType === "all" ||
+          paper.moduleTypes.map((t) => t.toLowerCase()).includes(filterType);
+        return matchesSearch && matchesFilter;
+      }),
+    [centerPapers, searchQuery, filterType],
+  );
 
-  const filteredModules = standaloneModules.filter((module) => {
-    const matchesSearch = module.heading
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesFilter =
-      filterType === "all" || module.module_type.toLowerCase() === filterType;
-    return matchesSearch && matchesFilter;
-  });
+  const filteredModules = useMemo(
+    () =>
+      standaloneModules.filter((module) => {
+        const matchesSearch = module.heading
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase());
+        const matchesFilter =
+          filterType === "all" ||
+          module.module_type.toLowerCase() === filterType;
+        return matchesSearch && matchesFilter;
+      }),
+    [standaloneModules, searchQuery, filterType],
+  );
 
   const totalItems = filteredPapers.length + filteredModules.length;
+
+  const visibleItems = useMemo(() => {
+    if (activeView === "papers") return filteredPapers.length;
+    if (activeView === "modules") return filteredModules.length;
+    return totalItems;
+  }, [activeView, filteredPapers.length, filteredModules.length, totalItems]);
+
+  const selectedPaper = useMemo(
+    () => centerPapers.find((p) => p.id === selectedPaperId) ?? null,
+    [centerPapers, selectedPaperId],
+  );
+
+  const getModuleNameById = (moduleId?: string | null) => {
+    if (!moduleId) return null;
+    return allModules.find((m) => m.id === moduleId)?.heading ?? null;
+  };
 
   // Show single loading state while data is loading
   if (centerModulesLoading || modulesLoading) {
@@ -228,42 +298,12 @@ export default function PapersPage() {
         </div>
 
         <button
-          onClick={() => setShowCreateModal(true)}
+          onClick={() => setShowCreateModuleModal(true)}
           className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium shadow-sm shadow-red-100 transition-all duration-200 flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
           Create Module
         </button>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-white rounded-md border border-slate-200 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-slate-500 text-sm">Total Papers</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">
-                {centerModuleStats?.totalPapers ?? 0}
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-md bg-red-100 text-red-600 flex items-center justify-center">
-              <FileText className="w-6 h-6" />
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-md border border-slate-200 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-slate-500 text-sm">Total Modules</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">
-                {centerModuleStats?.totalModules ?? 0}
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center">
-              <Package className="w-6 h-6" />
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Papers Grid */}
@@ -278,7 +318,7 @@ export default function PapersPage() {
                 ({filteredPapers.length})
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               {filteredPapers.map((paper) => (
                 <PaperCard
                   key={paper.id}
@@ -289,9 +329,18 @@ export default function PapersPage() {
                   }
                   onMenuClose={() => setActiveMenu(null)}
                   formatDate={formatDate}
-                  availableModules={allModules}
-                  onPaperUpdate={handleUpdatePaper}
-                  onPaperDelete={handleDeletePaper}
+                  onCardClick={(paperId) => {
+                    setSelectedPaperId(paperId);
+                    setShowPaperViewModal(true);
+                  }}
+                  onEditClick={(paperId) => {
+                    setSelectedPaperId(paperId);
+                    setShowPaperEditModal(true);
+                  }}
+                  onDeleteClick={(paperId) => {
+                    setSelectedPaperId(paperId);
+                    setShowPaperDeleteDialog(true);
+                  }}
                 />
               ))}
             </div>
@@ -319,7 +368,7 @@ export default function PapersPage() {
                   onMenuToggle={(moduleId) =>
                     setActiveMenu(activeMenu === moduleId ? null : moduleId)
                   }
-                  onViewModule={handleViewModule}
+                  onCardClick={handleViewModule}
                   onDeleteModule={(moduleId, moduleName) =>
                     setDeleteConfirm({
                       open: true,
@@ -335,7 +384,7 @@ export default function PapersPage() {
         )}
 
       {/* Empty State */}
-      {totalItems === 0 && (
+      {visibleItems === 0 && (
         <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
           <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-4" />
           <p className="text-slate-500 mb-2">No content found</p>
@@ -347,12 +396,12 @@ export default function PapersPage() {
 
       {/* Create Test Paper Modal */}
       <CreateModuleModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        isOpen={showCreateModuleModal}
+        onClose={() => setShowCreateModuleModal(false)}
         slug={slug}
       />
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Module Confirmation Dialog */}
       <DeleteModuleDialog
         isOpen={deleteConfirm.open}
         moduleName={deleteConfirm.moduleName}
@@ -366,6 +415,62 @@ export default function PapersPage() {
           })
         }
       />
+
+      {/* Paper View Details Modal */}
+      {selectedPaper && (
+        <ViewPaperModal
+          paper={{
+            ...selectedPaper,
+            readingModuleName:
+              selectedPaper.readingModuleName ??
+              getModuleNameById(selectedPaper.readingModuleId),
+            listeningModuleName:
+              selectedPaper.listeningModuleName ??
+              getModuleNameById(selectedPaper.listeningModuleId),
+            writingModuleName:
+              selectedPaper.writingModuleName ??
+              getModuleNameById(selectedPaper.writingModuleId),
+            speakingModuleName:
+              selectedPaper.speakingModuleName ??
+              getModuleNameById(selectedPaper.speakingModuleId),
+          }}
+          isOpen={showPaperViewModal}
+          onClose={() => {
+            setShowPaperViewModal(false);
+            setSelectedPaperId(null);
+          }}
+        />
+      )}
+
+      {/* Paper Edit Modal */}
+      {selectedPaper && (
+        <EditPaperModal
+          paper={selectedPaper}
+          isOpen={showPaperEditModal}
+          onClose={() => {
+            setShowPaperEditModal(false);
+            setSelectedPaperId(null);
+          }}
+          availableModules={allModules}
+          onSave={handleSavePaper}
+        />
+      )}
+
+      {/* Paper Delete Confirmation Dialog */}
+      {selectedPaper && (
+        <DeleteConfirmationDialog
+          isOpen={showPaperDeleteDialog}
+          title="Delete Paper"
+          description="This action will permanently remove the paper."
+          itemName={selectedPaper.title}
+          isDeleting={isPaperDeleting}
+          onConfirm={handleConfirmDeletePaper}
+          onCancel={() => {
+            setShowPaperDeleteDialog(false);
+            setSelectedPaperId(null);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -7,9 +7,18 @@ const supabase = createClient();
 
 export const fetchCenterMembers = async (
   centerId: string,
-  ownerId: string,
 ): Promise<CenterMember[]> => {
   try {
+    // Resolve the center owner from the database — never trust the client.
+    const { data: centerRow, error: centerError } = await supabase
+      .from("centers")
+      .select("user_id")
+      .eq("center_id", centerId)
+      .single();
+
+    if (centerError) throw centerError;
+    const ownerId: string = centerRow.user_id;
+
     const { data: memberRows, error: memberError } = await supabase
       .from("center_members")
       .select(

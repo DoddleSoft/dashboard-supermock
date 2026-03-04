@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Plus, Search } from "lucide-react";
 import { useCentre } from "@/context/CentreContext";
 import { Student } from "@/types/student";
@@ -12,23 +12,29 @@ import { formatLocalTime, getRelativeTime } from "@/lib/utils";
 import { SmallLoader } from "@/components/ui/SmallLoader";
 import { toast } from "sonner";
 import {
-  fetchStudents,
   createStudent,
   updateStudent,
   deleteStudent,
 } from "@/helpers/students";
 
+const PAGE_SIZES = [25, 50, 75, 100] as const;
+type PageSize = (typeof PAGE_SIZES)[number];
+
 export default function StudentsPage() {
   const { currentCenter, loading: centerLoading } = useCentre();
 
   const [students, setStudents] = useState<Student[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState<PageSize>(25);
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
-  const [selectedEnrollmentType, setSelectedEnrollmentType] =
-    useState<string>("regular");
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -36,7 +42,6 @@ export default function StudentsPage() {
   const [actionMenuStudent, setActionMenuStudent] = useState<Student | null>(
     null,
   );
-  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
 
@@ -65,38 +70,63 @@ export default function StudentsPage() {
     enrollment_type: "regular",
   });
 
-  // Fetch students for the current center
+  // Debounce search — 350 ms
   useEffect(() => {
-    if (currentCenter?.center_id) {
-      loadStudents();
-    }
-  }, [currentCenter?.center_id]);
+    const id = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(id);
+  }, [searchQuery]);
 
-  const loadStudents = async () => {
+  // Reset to page 1 whenever status filter changes
+  const prevStatus = useRef(selectedStatus);
+  useEffect(() => {
+    if (selectedStatus !== prevStatus.current) {
+      prevStatus.current = selectedStatus;
+      setPage(1);
+    }
+  }, [selectedStatus]);
+
+  const loadStudents = useCallback(async () => {
     if (!currentCenter?.center_id) return;
 
     try {
       setLoading(true);
-      const data = await fetchStudents(currentCenter.center_id);
-      setStudents(data);
-    } catch (error) {
-      // Error already handled in service
+      const params = new URLSearchParams({
+        centerId: currentCenter.center_id,
+        page: String(page),
+        limit: String(limit),
+        search: debouncedSearch,
+        status: selectedStatus,
+      });
+
+      const res = await fetch(`/api/fetch?${params.toString()}`, {
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? "Failed to load students");
+      }
+
+      const { students: rows, total: count } = await res.json();
+      setStudents(rows);
+      setTotal(count);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to load students";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentCenter?.center_id, page, limit, debouncedSearch, selectedStatus]);
 
-  const filteredStudents = students.filter((student) => {
-    const matchesSearch =
-      (student.name?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
-      (student.email?.toLowerCase() || "").includes(searchQuery.toLowerCase());
-    const matchesStatus =
-      selectedStatus === "all" || student.status === selectedStatus;
-    const matchesEnrollmentType =
-      selectedEnrollmentType === "all" ||
-      student.enrollment_type === selectedEnrollmentType;
-    return matchesSearch && matchesStatus && matchesEnrollmentType;
-  });
+  useEffect(() => {
+    if (currentCenter?.center_id) {
+      loadStudents();
+    }
+  }, [loadStudents]);
 
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,14 +148,10 @@ export default function StudentsPage() {
     try {
       setSubmitting(true);
       await createStudent(currentCenter.center_id, formData);
-
-      // Refresh the students list
       await loadStudents();
-
-      // Close modal and reset form
       handleCloseCreateModal();
-    } catch (error) {
-      // Error already handled in service
+    } catch {
+      // Handled in helper
     } finally {
       setSubmitting(false);
     }
@@ -173,8 +199,8 @@ export default function StudentsPage() {
       await updateStudent(selectedStudent.student_id, editData);
       await loadStudents();
       closeEditDrawer();
-    } catch (error) {
-      // Error already handled in service
+    } catch {
+      // Handled in helper
     } finally {
       setSubmitting(false);
     }
@@ -188,19 +214,11 @@ export default function StudentsPage() {
 
   const toggleActionMenu = (student: Student, e: React.MouseEvent) => {
     e.stopPropagation();
-    const button = e.currentTarget as HTMLElement;
-    const rect = button.getBoundingClientRect();
-
     if (actionMenuStudent?.student_id === student.student_id) {
-      setShowActionMenu(!showActionMenu);
+      setShowActionMenu((prev) => !prev);
     } else {
       setActionMenuStudent(student);
       setShowActionMenu(true);
-      // Position menu relative to the button
-      setMenuPosition({
-        top: rect.bottom + 8,
-        right: window.innerWidth - rect.right,
-      });
     }
   };
 
@@ -209,7 +227,7 @@ export default function StudentsPage() {
     openEditDrawer(student);
   };
 
-  const handleActionDelete = async (student: Student) => {
+  const handleActionDelete = (student: Student) => {
     setActionMenuStudent(null);
     setShowActionMenu(false);
     setStudentToDelete(student);
@@ -217,7 +235,7 @@ export default function StudentsPage() {
   };
 
   const handleEditChange = (field: string, value: string) => {
-    setEditData({ ...editData, [field]: value });
+    setEditData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleCreateChange = (field: string, value: string) => {
@@ -245,12 +263,14 @@ export default function StudentsPage() {
     try {
       setDeleting(true);
       await deleteStudent(studentToDelete.student_id);
-      await loadStudents();
+      // If the deleted student was the last on this page, go back one page
+      if (students.length === 1 && page > 1) setPage((p) => p - 1);
+      else await loadStudents();
       setShowDeleteConfirm(false);
       setStudentToDelete(null);
       closeEditDrawer();
-    } catch (error) {
-      // Error already handled in service
+    } catch {
+      // Handled in helper
     } finally {
       setDeleting(false);
     }
@@ -259,6 +279,17 @@ export default function StudentsPage() {
   const cancelDelete = () => {
     setShowDeleteConfirm(false);
     setStudentToDelete(null);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setShowActionMenu(false);
+    setPage(newPage);
+  };
+
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit as PageSize);
+    setPage(1);
+    setShowActionMenu(false);
   };
 
   return (
@@ -309,18 +340,23 @@ export default function StudentsPage() {
         {/* Table */}
         {!loading && (
           <StudentTable
-            students={filteredStudents}
+            students={students}
             loading={loading}
             onActionClick={toggleActionMenu}
             showActionMenu={showActionMenu}
             actionMenuStudent={actionMenuStudent}
-            menuPosition={menuPosition}
             isDeleting={deleting}
             onEdit={handleActionEdit}
             onDelete={handleActionDelete}
             onCloseMenu={() => setShowActionMenu(false)}
             formatLocalTime={formatLocalTime}
             getRelativeTime={getRelativeTime}
+            total={total}
+            currentPage={page}
+            pageSize={limit}
+            pageSizeOptions={[...PAGE_SIZES]}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handleLimitChange}
           />
         )}
       </div>

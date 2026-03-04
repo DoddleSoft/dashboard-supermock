@@ -1016,10 +1016,64 @@ export const deleteModule = async (
   try {
     const supabase = createClient();
 
+    // 1. Verify the current user is authenticated
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    // 2. Fetch the module to determine its center_id
+    const { data: mod, error: fetchError } = await supabase
+      .from("modules")
+      .select("center_id")
+      .eq("id", moduleId)
+      .single();
+
+    if (fetchError || !mod) {
+      return { success: false, error: "Module not found" };
+    }
+
+    // 3. Verify the user is the center owner or an authorized member
+    const { data: center } = await supabase
+      .from("centers")
+      .select("user_id")
+      .eq("center_id", mod.center_id)
+      .single();
+
+    const isOwner = center?.user_id === user.id;
+
+    if (!isOwner) {
+      const { data: membership } = await supabase
+        .from("center_members")
+        .select("membership_id")
+        .eq("center_id", mod.center_id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!membership) {
+        return { success: false, error: "Unauthorized" };
+      }
+
+      // Verify the member has admin role
+      const { data: profile } = await supabase
+        .from("users")
+        .select("role")
+        .eq("user_id", user.id)
+        .single();
+
+      if (profile?.role !== "admin") {
+        return { success: false, error: "Unauthorized" };
+      }
+    }
+
+    // 4. Delete scoped to center_id for defense-in-depth
     const { error } = await supabase
       .from("modules")
       .delete()
-      .eq("id", moduleId);
+      .eq("id", moduleId)
+      .eq("center_id", mod.center_id);
 
     if (error) throw error;
 

@@ -1,6 +1,5 @@
 import {
   MoreVertical,
-  Eye,
   Trash2,
   BookOpen,
   PenTool,
@@ -19,7 +18,7 @@ interface ModuleCardProps {
   };
   activeMenu: string | null;
   onMenuToggle: (moduleId: string) => void;
-  onViewModule: (moduleId: string, moduleType: string) => void;
+  onCardClick: (moduleId: string, moduleType: string) => void;
   onDeleteModule: (moduleId: string, moduleName: string) => void;
   formatDate: (dateString: string) => string;
 }
@@ -65,14 +64,17 @@ export function ModuleCard({
   module,
   activeMenu,
   onMenuToggle,
-  onViewModule,
+  onCardClick,
   onDeleteModule,
   formatDate,
 }: ModuleCardProps) {
   const normalizedType = normalizeType(module.module_type);
 
   return (
-    <div className="group relative bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-visible">
+    <div
+      className="group relative bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-visible cursor-pointer"
+      onClick={() => onCardClick(module.id, module.module_type)}
+    >
       {/* Top Decorative Line */}
       <div
         className={`h-1.5 w-full rounded-t-2xl bg-gradient-to-r from-slate-200 to-transparent ${getModuleColor(normalizedType).replace("text-", "bg-").split(" ")[0]}`}
@@ -111,16 +113,11 @@ export function ModuleCard({
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="py-1">
                   <button
-                    onClick={() => onViewModule(module.id, module.module_type)}
-                    className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-3 transition-colors"
-                  >
-                    <Eye className="w-4 h-4" />
-                    View Details
-                  </button>
-                  <div className="h-px bg-slate-100 my-1" />
-                  <button
-                    onClick={() => onDeleteModule(module.id, module.heading)}
-                    className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors rounded-b-xl"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteModule(module.id, module.heading);
+                    }}
+                    className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors rounded-xl"
                   >
                     <Trash2 className="w-4 h-4" />
                     Delete Module

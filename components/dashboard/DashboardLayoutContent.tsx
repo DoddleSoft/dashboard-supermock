@@ -68,12 +68,12 @@ export default function DashboardLayoutContent({
     () => [
       { label: "Overview", href: `/dashboard/${slug}`, icon: LayoutDashboard },
       { label: "Tests", href: `/dashboard/${slug}/tests`, icon: FileText },
+      { label: "Papers", href: `/dashboard/${slug}/papers`, icon: NotepadText },
       {
         label: "Questions",
         href: `/dashboard/${slug}/questions`,
         icon: Layers,
       },
-      { label: "Papers", href: `/dashboard/${slug}/papers`, icon: NotepadText },
       { label: "Reviews", href: `/dashboard/${slug}/reviews`, icon: BarChart3 },
       { label: "Students", href: `/dashboard/${slug}/students`, icon: Users },
       { label: "Members", href: `/dashboard/${slug}/members`, icon: UserStar },

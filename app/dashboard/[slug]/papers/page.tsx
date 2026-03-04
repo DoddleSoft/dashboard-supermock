@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Plus, FileText } from "lucide-react";
 import { useCentre } from "@/context/CentreContext";
@@ -8,8 +8,6 @@ import {
   fetchStandaloneModules,
   createPaper,
   Module,
-  fetchPapers,
-  Paper,
   updatePaper,
   deletePaper,
   togglePaperStatus,
@@ -20,25 +18,24 @@ import { CreatePaperModal } from "@/components/papers/CreatePaperModal";
 import { PaperCardWithModules } from "@/components/ui/PaperCardWithModules";
 import { toast } from "sonner";
 
-export default function PapersPage() {
+function PapersPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const slug = params.slug as string;
   const { currentCenter } = useCentre();
 
-  const [searchQuery] = useState("");
-  const [filterType] = useState("all");
-  const [loading, setLoading] = useState(true);
-  const [papers, setPapers] = useState<Paper[]>([]);
   const [showCreatePaperModal, setShowCreatePaperModal] = useState(false);
   const [paperTitle, setPaperTitle] = useState("");
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
-  const { centerPapers } = useModuleContext();
+  const { centerPapers, centerModulesLoading, refreshCenterModules } =
+    useModuleContext();
+
   const [paperType, setPaperType] = useState<"IELTS" | "OIETC" | "GRE">(
     "IELTS",
   );
   const [availableModules, setAvailableModules] = useState<Module[]>([]);
+  const [modulesLoading, setModulesLoading] = useState(true);
   const [selectedModules, setSelectedModules] = useState<{
     reading?: string;
     listening?: string;
@@ -50,41 +47,25 @@ export default function PapersPage() {
   );
   const [creatingPaper, setCreatingPaper] = useState(false);
 
-  useEffect(() => {
-    if (currentCenter?.center_id) {
-      loadData();
-    }
+  const loadModules = useCallback(async () => {
+    if (!currentCenter?.center_id) return;
+    setModulesLoading(true);
+    const modulesData = await fetchStandaloneModules(currentCenter.center_id);
+    setAvailableModules(modulesData);
+    setModulesLoading(false);
   }, [currentCenter?.center_id]);
 
   useEffect(() => {
-    // Check if URL has create=true parameter
+    if (currentCenter?.center_id) {
+      loadModules();
+    }
+  }, [currentCenter?.center_id, loadModules]);
+
+  useEffect(() => {
     if (searchParams.get("create") === "true") {
       setShowCreatePaperModal(true);
     }
   }, [searchParams]);
-
-  const filteredPapers = centerPapers.filter((paper) => {
-    const matchesSearch = paper.title
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesFilter =
-      filterType === "all" ||
-      paper.moduleTypes.map((t) => t.toLowerCase()).includes(filterType);
-    return matchesSearch && matchesFilter;
-  });
-
-  const loadData = async () => {
-    if (!currentCenter?.center_id) return;
-
-    setLoading(true);
-    const [papersData, modulesData] = await Promise.all([
-      fetchPapers(currentCenter.center_id),
-      fetchStandaloneModules(currentCenter.center_id),
-    ]);
-    setPapers(papersData);
-    setAvailableModules(modulesData);
-    setLoading(false);
-  };
 
   const handleCreatePaper = async () => {
     if (!paperTitle.trim()) {
@@ -125,7 +106,7 @@ export default function PapersPage() {
       setShowCreatePaperModal(false);
       setPaperTitle("");
       setSelectedModules({});
-      loadData(); // Reload papers
+      await Promise.all([refreshCenterModules(), loadModules()]);
     }
   };
 
@@ -151,12 +132,15 @@ export default function PapersPage() {
       instruction: undefined,
     });
 
-    const currentPaper = papers.find((p) => p.id === paperId);
-    if (result.success && currentPaper) {
-      if (data.isActive !== currentPaper.is_active) {
-        await togglePaperStatus(paperId, data.isActive);
+    if (result.success) {
+      const currentPaper = centerPapers.find((p) => p.id === paperId);
+      if (currentPaper && data.isActive !== currentPaper.isActive) {
+        const toggleResult = await togglePaperStatus(paperId, data.isActive);
+        if (!toggleResult.success) {
+          toast.error(toggleResult.error || "Failed to update paper status.");
+        }
       }
-      await loadData();
+      await refreshCenterModules();
     }
 
     return result;
@@ -165,11 +149,11 @@ export default function PapersPage() {
   const handleDeletePaper = async (paperId: string) => {
     const result = await deletePaper(paperId);
     if (result.success) {
-      await loadData();
+      await refreshCenterModules();
     }
   };
 
-  if (loading) {
+  if (centerModulesLoading || modulesLoading) {
     return (
       <div className="max-w-7xl mx-auto">
         <SmallLoader subtitle="Loading papers..." />
@@ -187,7 +171,7 @@ export default function PapersPage() {
               Test Papers
             </h2>
             <span className="text-sm text-slate-500">
-              ({filteredPapers.length})
+              ({centerPapers.length})
             </span>
           </div>
 
@@ -201,9 +185,9 @@ export default function PapersPage() {
         </div>
 
         {/* Papers Grid */}
-        {papers.length > 0 ? (
+        {centerPapers.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {papers.map((paper) => (
+            {centerPapers.map((paper) => (
               <PaperCardWithModules
                 key={paper.id}
                 paper={paper}
@@ -253,5 +237,19 @@ export default function PapersPage() {
         slug={slug}
       />
     </>
+  );
+}
+
+export default function PapersPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-7xl mx-auto">
+          <SmallLoader subtitle="Loading papers..." />
+        </div>
+      }
+    >
+      <PapersPageContent />
+    </Suspense>
   );
 }

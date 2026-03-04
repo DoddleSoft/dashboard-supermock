@@ -237,7 +237,7 @@ export const updatePaper = async (
 };
 
 /**
- * Delete a paper
+ * Delete a paper (with auth + center ownership enforcement)
  */
 export const deletePaper = async (
   paperId: string,
@@ -245,7 +245,68 @@ export const deletePaper = async (
   try {
     const supabase = createClient();
 
-    const { error } = await supabase.from("papers").delete().eq("id", paperId);
+    // 1. Verify the current user is authenticated
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("You must be logged in to delete a paper.");
+      return { success: false, error: "Not authenticated" };
+    }
+
+    // 2. Fetch the paper to determine its center_id
+    const { data: paper, error: fetchError } = await supabase
+      .from("papers")
+      .select("center_id")
+      .eq("id", paperId)
+      .single();
+
+    if (fetchError || !paper) {
+      toast.error("Paper not found.");
+      return { success: false, error: "Paper not found" };
+    }
+
+    // 3. Verify the user is the center owner or an authorized member
+    const { data: center } = await supabase
+      .from("centers")
+      .select("user_id")
+      .eq("center_id", paper.center_id)
+      .single();
+
+    const isOwner = center?.user_id === user.id;
+
+    if (!isOwner) {
+      const { data: membership } = await supabase
+        .from("center_members")
+        .select("membership_id")
+        .eq("center_id", paper.center_id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!membership) {
+        toast.error("You do not have permission to delete this paper.");
+        return { success: false, error: "Unauthorized" };
+      }
+
+      // Verify the member has admin role
+      const { data: profile } = await supabase
+        .from("users")
+        .select("role")
+        .eq("user_id", user.id)
+        .single();
+
+      if (profile?.role !== "admin") {
+        toast.error("You do not have permission to delete this paper.");
+        return { success: false, error: "Unauthorized" };
+      }
+    }
+
+    // 4. Delete scoped to center_id for defense-in-depth
+    const { error } = await supabase
+      .from("papers")
+      .delete()
+      .eq("id", paperId)
+      .eq("center_id", paper.center_id);
 
     if (error) throw error;
 

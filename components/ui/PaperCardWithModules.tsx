@@ -11,10 +11,12 @@ import {
 import { toast } from "sonner";
 import { EditPaperModal } from "./EditPaperModal";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
-import type { Module, Paper } from "@/helpers/papers";
+import { ViewPaperModal } from "./ViewPaperModal";
+import type { Module } from "@/helpers/papers";
+import type { PaperSummary } from "@/context/ModuleContext";
 
 interface PaperCardWithModulesProps {
-  paper: Paper;
+  paper: PaperSummary;
   activeMenu: string | null;
   onMenuToggle: (paperId: string) => void;
   onMenuClose: () => void;
@@ -43,6 +45,7 @@ export function PaperCardWithModules({
   onPaperUpdate,
   onPaperDelete,
 }: PaperCardWithModulesProps) {
+  const [showViewModal, setShowViewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -103,25 +106,28 @@ export function PaperCardWithModules({
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-lg transition-all duration-200">
+    <div
+      className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-lg transition-all duration-200 cursor-pointer"
+      onClick={() => setShowViewModal(true)}
+    >
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
           <h3 className="text-lg font-semibold text-slate-900 mb-1">
             {paper.title}
           </h3>
-          <p className="text-sm text-slate-500">{paper.paper_type}</p>
+          <p className="text-sm text-slate-500">{paper.paperType}</p>
         </div>
         <div className="flex items-center gap-2">
           <span
             className={`px-3 py-1 text-xs font-medium rounded-full ${
-              paper.is_active
+              paper.isActive
                 ? "bg-green-100 text-green-700"
                 : "bg-slate-100 text-slate-500"
             }`}
           >
-            {paper.is_active ? "Active" : "Inactive"}
+            {paper.isActive ? "Active" : "Inactive"}
           </span>
-          <div className="relative">
+          <div className="relative" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => onMenuToggle(paper.id)}
               className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -153,62 +159,67 @@ export function PaperCardWithModules({
 
       {/* Modules */}
       <div className="space-y-2 mb-4">
-        {paper.reading_module && (
+        {paper.readingModuleName && (
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <div className="w-6 h-6 rounded bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
               <BookOpen className="w-3 h-3" />
             </div>
-            <span className="truncate">{paper.reading_module.heading}</span>
+            <span className="truncate">{paper.readingModuleName}</span>
           </div>
         )}
-        {paper.listening_module && (
+        {paper.listeningModuleName && (
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <div className="w-6 h-6 rounded bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
               <Headphones className="w-3 h-3" />
             </div>
-            <span className="truncate">{paper.listening_module.heading}</span>
+            <span className="truncate">{paper.listeningModuleName}</span>
           </div>
         )}
-        {paper.writing_module && (
+        {paper.writingModuleName && (
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <div className="w-6 h-6 rounded bg-green-100 text-green-600 flex items-center justify-center flex-shrink-0">
               <PenTool className="w-3 h-3" />
             </div>
-            <span className="truncate">{paper.writing_module.heading}</span>
+            <span className="truncate">{paper.writingModuleName}</span>
           </div>
         )}
-        {paper.speaking_module && (
+        {paper.speakingModuleName && (
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <div className="w-6 h-6 rounded bg-orange-100 text-orange-600 flex items-center justify-center flex-shrink-0">
               <Mic className="w-3 h-3" />
             </div>
-            <span className="truncate">{paper.speaking_module.heading}</span>
+            <span className="truncate">{paper.speakingModuleName}</span>
           </div>
         )}
       </div>
 
-      {/* Tests Conducted */}
-      <div className="pt-3 border-t border-slate-100">
-        <p className="text-xs text-slate-500">
-          {paper.tests_conducted} test
-          {paper.tests_conducted !== 1 ? "s" : ""} conducted
-        </p>
-      </div>
-
+      <ViewPaperModal
+        paper={{
+          id: paper.id,
+          title: paper.title,
+          modulesCount: paper.modulesCount,
+          paperType: paper.paperType,
+          createdAt: paper.createdAt,
+          isActive: paper.isActive,
+          moduleTypes: paper.moduleTypes,
+          readingModuleName: paper.readingModuleName,
+          listeningModuleName: paper.listeningModuleName,
+          writingModuleName: paper.writingModuleName,
+          speakingModuleName: paper.speakingModuleName,
+        }}
+        isOpen={showViewModal}
+        onClose={() => setShowViewModal(false)}
+      />
       <EditPaperModal
         paper={{
           id: paper.id,
           title: paper.title,
-          paperType: paper.paper_type,
-          isActive: paper.is_active,
-          readingModuleId:
-            paper.reading_module?.id ?? paper.reading_module_id ?? null,
-          listeningModuleId:
-            paper.listening_module?.id ?? paper.listening_module_id ?? null,
-          writingModuleId:
-            paper.writing_module?.id ?? paper.writing_module_id ?? null,
-          speakingModuleId:
-            paper.speaking_module?.id ?? paper.speaking_module_id ?? null,
+          paperType: paper.paperType ?? "",
+          isActive: paper.isActive,
+          readingModuleId: paper.readingModuleId ?? null,
+          listeningModuleId: paper.listeningModuleId ?? null,
+          writingModuleId: paper.writingModuleId ?? null,
+          speakingModuleId: paper.speakingModuleId ?? null,
         }}
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}

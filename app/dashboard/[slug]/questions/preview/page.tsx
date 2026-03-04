@@ -5,22 +5,18 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   ArrowLeft,
-  BookOpen,
   Headphones,
-  PenTool,
-  Mic,
-  FileText,
   AlertCircle,
   CheckCircle2,
   Info,
 } from "lucide-react";
+import { toast } from "sonner";
+import DOMPurify from "isomorphic-dompurify";
 import { Loader } from "@/components/ui/Loader";
 import { RenderBlockView, ThemeColor } from "@/components/ui/RenderBlock";
 import { getRenderBlocks } from "@/lib/utils";
 
 // --- Types ---
-type ModuleType = "reading" | "writing" | "listening" | "speaking";
-
 interface Question {
   id: string;
   question_number: number;
@@ -69,23 +65,6 @@ const getAudioUrl = (path: string | undefined) => {
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${path}`;
 };
 
-// --- Sub-Components ---
-
-const ModuleIcon = ({ type }: { type: string }) => {
-  switch (type as ModuleType) {
-    case "reading":
-      return <BookOpen className="h-4 w-4" />;
-    case "writing":
-      return <PenTool className="h-4 w-4" />;
-    case "listening":
-      return <Headphones className="h-4 w-4" />;
-    case "speaking":
-      return <Mic className="h-4 w-4" />;
-    default:
-      return <FileText className="h-4 w-4" />;
-  }
-};
-
 const ConsolidatedAnswerKey = ({ questions }: { questions: Question[] }) => {
   if (!questions || questions.length === 0) return null;
 
@@ -98,7 +77,7 @@ const ConsolidatedAnswerKey = ({ questions }: { questions: Question[] }) => {
         </h3>
       </div>
       <div className="divide-y divide-slate-100">
-        {questions
+        {[...questions]
           .sort((a, b) => parseInt(a.question_ref) - parseInt(b.question_ref))
           .map((q) => {
             let answerDisplay = "";
@@ -153,6 +132,7 @@ export default function PreviewPage() {
 
   const [data, setData] = useState<ModuleHierarchy | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(
     null,
   );
@@ -161,7 +141,12 @@ export default function PreviewPage() {
     if (!moduleId) return;
     const fetchModule = async () => {
       setLoading(true);
+      setFetchError(null);
       const supabase = createClient();
+
+      // NOTE: Ensure the `get_module_hierarchy` RPC function uses SECURITY INVOKER
+      // so it respects RLS policies, or explicitly verifies center ownership
+      // within the PL/pgSQL function body before returning data.
       const { data: rpcData, error } = await supabase.rpc(
         "get_module_hierarchy",
         {
@@ -169,7 +154,19 @@ export default function PreviewPage() {
         },
       );
 
-      if (!error && rpcData) {
+      if (error) {
+        console.error("Error fetching module hierarchy:", error);
+        const message =
+          error.code === "PGRST116"
+            ? "Module not found or you do not have access."
+            : error.message || "Failed to load module data.";
+        setFetchError(message);
+        toast.error(message);
+        setLoading(false);
+        return;
+      }
+
+      if (rpcData) {
         const hierarchy = rpcData as ModuleHierarchy;
         setData(hierarchy);
         if (hierarchy.sections.length > 0) {
@@ -189,20 +186,25 @@ export default function PreviewPage() {
     );
   if (!data)
     return (
-      <div className="h-screen flex items-center justify-center">
-        Module not found
+      <div className="h-screen flex flex-col items-center justify-center gap-4">
+        <AlertCircle className="w-10 h-10 text-slate-300" />
+        <p className="text-slate-500">{fetchError || "Module not found"}</p>
+        <button
+          onClick={() => router.push(`/dashboard/${slug}/questions`)}
+          className="text-sm text-blue-600 hover:underline"
+        >
+          Back to Questions
+        </button>
       </div>
     );
 
   const currentSection = data.sections.find((s) => s.id === selectedSectionId);
 
-  // Helper to map questions for RenderBlock
-  // RenderBlock expects questions indexed by their ref string (e.g. "1", "2")
   const getQuestionMap = (questions: Question[]) => {
     const map: Record<string, { answer: string; options?: any[] }> = {};
     questions.forEach((q) => {
       map[q.question_ref] = {
-        answer: "", // In preview we don't pre-fill answers usually, or fill with correct one if desired
+        answer: "",
         options: q.options || [],
       };
     });
@@ -211,7 +213,6 @@ export default function PreviewPage() {
 
   // Helper to construct dummy answers object if you want to show inputs working
   const getAnswersMap = (questions: Question[]) => {
-    // Returns empty answers so inputs are empty initially
     return {};
   };
 
@@ -271,14 +272,17 @@ export default function PreviewPage() {
             </div>
           )}
 
-          {/* Render Text Passage using RenderBlock if it's structured, or raw HTML if text */}
+          {/* Render Text Passage — sanitize HTML content to prevent XSS */}
           {(currentSection.content_text ||
             currentSection.content_type === "text") && (
             <div className="text-lg max-w-none text-slate-800">
               {currentSection.content_text ? (
-                <h2 className="text-md text-slate-900 mb-2">
-                  {currentSection.content_text}
-                </h2>
+                <div
+                  className="text-md text-slate-900 mb-2 prose prose-slate"
+                  dangerouslySetInnerHTML={{
+                    __html: DOMPurify.sanitize(currentSection.content_text),
+                  }}
+                />
               ) : null}
             </div>
           )}
