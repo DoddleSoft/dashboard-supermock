@@ -82,7 +82,6 @@ export async function createPaper(
 
     return { success: true, paperId: data.id };
   } catch (err) {
-    console.error("Error creating paper:", err);
     return {
       success: false,
       error: err instanceof Error ? err.message : "Failed to create paper",
@@ -110,17 +109,12 @@ export async function createModule(
       .single();
 
     if (moduleError) {
-      console.error(
-        "[createModule] Module creation error:",
-        formatSupabaseError(moduleError),
-      );
       const errorMsg = `Module creation failed. Please try again.`;
       toast.error(errorMsg);
       throw new Error(errorMsg);
     }
 
     const moduleId = moduleData.id;
-    console.log(`[createModule] Module created with ID: ${moduleId}`);
 
     try {
       // 2. Process sections based on module type
@@ -129,9 +123,6 @@ export async function createModule(
         payload.sections &&
         payload.sections.length > 0
       ) {
-        console.log(
-          `[createModule] Creating ${payload.sections.length} reading sections`,
-        );
         await createReadingSections(
           supabase,
           moduleId,
@@ -142,9 +133,6 @@ export async function createModule(
         payload.sections &&
         payload.sections.length > 0
       ) {
-        console.log(
-          `[createModule] Creating ${payload.sections.length} listening sections`,
-        );
         await createListeningSections(
           supabase,
           moduleId,
@@ -155,9 +143,6 @@ export async function createModule(
         payload.sections &&
         payload.sections.length > 0
       ) {
-        console.log(
-          `[createModule] Creating ${payload.sections.length} writing sections`,
-        );
         await createWritingSections(
           supabase,
           moduleId,
@@ -168,12 +153,6 @@ export async function createModule(
       toast.success("Module created successfully!");
       return { success: true, moduleId, paperId: payload.paperId };
     } catch (subsectionError) {
-      // If subsection creation fails, delete the module to maintain consistency
-      console.error(
-        "[createModule] Subsection creation failed, rolling back module creation:",
-        formatSupabaseError(subsectionError),
-      );
-
       toast.error("Module creation failed. Rolling back changes...");
 
       const { error: deleteError } = await supabase
@@ -182,18 +161,12 @@ export async function createModule(
         .eq("id", moduleId);
 
       if (deleteError) {
-        console.error("[createModule] Failed to rollback module:", deleteError);
         toast.error("Failed to rollback changes. Please contact support.");
-      } else {
-        console.log(
-          `[createModule] Successfully rolled back module ${moduleId}`,
-        );
       }
 
       throw subsectionError;
     }
   } catch (err) {
-    console.error("[createModule] Error:", formatSupabaseError(err));
     const errorMessage = formatSupabaseError(err);
 
     // Only show toast if it's not already shown by child functions
@@ -214,13 +187,8 @@ async function createReadingSections(
   sections: ReadingSection[],
 ): Promise<void> {
   if (!sections || sections.length === 0) {
-    console.log("[createReadingSections] No sections to create");
     return;
   }
-
-  console.log(
-    `[createReadingSections] Creating ${sections.length} sections for module ${moduleId}`,
-  );
 
   const sectionIds = sections.map(() => crypto.randomUUID());
   const sectionsToInsert = sections.map((section, sectionIndex) => ({
@@ -233,10 +201,6 @@ async function createReadingSections(
     instruction: section.instruction || null,
     subtext: section.heading || null,
   }));
-
-  console.log(
-    `[createReadingSections] Inserting ${sectionsToInsert.length} section records`,
-  );
 
   const sectionChunks = chunkArray(sectionsToInsert, INSERT_CHUNK_SIZE);
   const sectionResults = await Promise.all(
@@ -265,13 +229,8 @@ async function createListeningSections(
   sections: ListeningSection[],
 ): Promise<void> {
   if (!sections || sections.length === 0) {
-    console.log("[createListeningSections] No sections to create");
     return;
   }
-
-  console.log(
-    `[createListeningSections] Creating ${sections.length} sections for module ${moduleId}`,
-  );
 
   const sectionIds = sections.map(() => crypto.randomUUID());
   const sectionsToInsert = sections.map((section, sectionIndex) => ({
@@ -283,10 +242,6 @@ async function createListeningSections(
     resource_url: section.audioPath || null,
     instruction: section.instruction || null,
   }));
-
-  console.log(
-    `[createListeningSections] Inserting ${sectionsToInsert.length} section records`,
-  );
 
   const sectionChunks = chunkArray(sectionsToInsert, INSERT_CHUNK_SIZE);
   const sectionResults = await Promise.all(
@@ -315,13 +270,8 @@ async function createWritingSections(
   sections: WritingSection[],
 ): Promise<void> {
   if (!sections || sections.length === 0) {
-    console.log("[createWritingSections] No sections to create");
     return;
   }
-
-  console.log(
-    `[createWritingSections] Creating sections for ${sections.length} writing sections for module ${moduleId}`,
-  );
 
   // For writing module, each render block becomes a separate section row
   // All blocks from the same WritingSection share the same metadata (title, subheading, instruction, params)
@@ -375,10 +325,6 @@ async function createWritingSections(
   });
 
   if (sectionsToInsert.length > 0) {
-    console.log(
-      `[createWritingSections] Inserting ${sectionsToInsert.length} section records`,
-    );
-
     const sectionChunks = chunkArray(sectionsToInsert, INSERT_CHUNK_SIZE);
     const sectionResults = await Promise.all(
       sectionChunks.map((chunk) => supabase.from("sections").insert(chunk)),
@@ -417,9 +363,6 @@ async function createSubSectionsFromBlocks(
 
   if (meaningfulBlocks.length === 0) {
     if (Object.keys(questions).length > 0) {
-      console.warn(
-        "[createSubSectionsFromBlocks] No render blocks with content; skipping sub-section insert to avoid dummy data.",
-      );
     }
     return;
   }
@@ -444,17 +387,9 @@ async function createSubSectionsFromBlocks(
       instruction: instruction,
       sub_section_index: blockIndex + 1,
     });
-
-    console.log(
-      `[createSubSectionsFromBlocks] Created sub_section ${blockIndex + 1} for render block`,
-    );
   });
 
   if (subSectionsToInsert.length > 0) {
-    console.log(
-      `[createSubSectionsFromBlocks] Inserting ${subSectionsToInsert.length} sub-section records for section ${sectionId}`,
-    );
-
     const subSectionChunks = chunkArray(subSectionsToInsert, INSERT_CHUNK_SIZE);
     const subSectionResults = await Promise.all(
       subSectionChunks.map((chunk) =>
@@ -464,10 +399,6 @@ async function createSubSectionsFromBlocks(
 
     for (const result of subSectionResults) {
       if (result.error) {
-        console.error(
-          "[createSubSectionsFromBlocks] Sub-sections batch insert error:",
-          result.error,
-        );
         throw result.error;
       }
     }
@@ -491,15 +422,20 @@ async function createSubSectionsFromBlocks(
     const subSectionId = subSectionsToInsert[blockIndex]?.id;
 
     if (!subSectionId) {
-      console.error(
-        `[createSubSectionsFromBlocks] CRITICAL: No sub_section found at block index ${blockIndex} for question ${ref}!`,
-      );
       return;
     }
 
-    console.log(
-      `[createSubSectionsFromBlocks] Assigning question ${ref} to block ${blockIndex + 1} (sub_section: ${subSectionId})`,
-    );
+    const isTrueFalse =
+      questionDef.type === "true-false" ||
+      (questionDef.answer &&
+        ["TRUE", "FALSE", "NOT GIVEN"].includes(
+          questionDef.answer.toUpperCase(),
+        ));
+
+    const finalOptions =
+      isTrueFalse && (!questionDef.options || questionDef.options.length === 0)
+        ? ["TRUE", "FALSE", "NOT GIVEN"]
+        : (questionDef.options ?? null);
 
     questionsToInsert.push({
       sub_section_id: subSectionId,
@@ -510,7 +446,7 @@ async function createSubSectionsFromBlocks(
           : questionDef.answer
             ? [questionDef.answer]
             : null,
-      options: questionDef.options ?? null,
+      options: finalOptions,
       explanation: questionDef.explanation || null,
       marks: 1.0,
     });
@@ -526,31 +462,10 @@ async function createSubSectionsFromBlocks(
 
     for (const result of questionResults) {
       if (result.error) {
-        console.error(
-          "[createSubSectionsFromBlocks] Question answers batch insert error:",
-          result.error,
-        );
         throw result.error;
       }
     }
   }
-}
-
-function extractQuestionRefs(content: string): string[] {
-  const refs = new Set<string>();
-  const patterns = [
-    /\{\{(\d+)\}(?:mcq|blanks|dropdown|boolean)\}\}/g,
-    /⟦Q(\d+):(mcq|blanks|dropdown|boolean)⟧/g,
-  ];
-
-  patterns.forEach((regex) => {
-    let match: RegExpExecArray | null;
-    while ((match = regex.exec(content)) !== null) {
-      refs.add(match[1]);
-    }
-  });
-
-  return Array.from(refs);
 }
 
 export async function createCompletePaper(
@@ -649,7 +564,6 @@ export async function createCompletePaper(
 
     return { success: true, paperId, moduleIds };
   } catch (err) {
-    console.error("Error creating complete paper:", err);
     return {
       success: false,
       error: err instanceof Error ? err.message : "Failed to create paper",
@@ -709,14 +623,7 @@ export async function uploadMediaFile(
             error: `Audio must be under ${MAX_AUDIO_SIZE_MB}MB after compression`,
           };
         }
-
-        if (compressedSizeMB < initialSizeMB) {
-          console.log(
-            `Audio compressed: ${initialSizeMB.toFixed(2)}MB → ${compressedSizeMB.toFixed(2)}MB`,
-          );
-        }
       } catch (compressionError) {
-        console.error("Audio compression failed:", compressionError);
         toast.warning("Audio compression failed, using original file");
         // Continue with original file if compression fails
       }
@@ -752,12 +659,7 @@ export async function uploadMediaFile(
             error: `Image must be under ${MAX_IMAGE_SIZE_MB}MB after compression`,
           };
         }
-
-        console.log(
-          `Image compressed: ${initialSizeMB.toFixed(2)}MB → ${compressedSizeMB.toFixed(2)}MB`,
-        );
       } catch (compressionError) {
-        console.error("Image compression failed:", compressionError);
         toast.warning("Image compression failed, using original file");
         // Continue with original file if compression fails
       }
@@ -791,12 +693,10 @@ export async function uploadMediaFile(
           data: { publicUrl },
         } = supabase.storage.from("media_files").getPublicUrl(data.path);
 
-        console.log(`✓ ${fileType} uploaded successfully:`, publicUrl);
         return { success: true, url: publicUrl };
       } catch (err) {
         uploadAttempts++;
         uploadError = err;
-        console.error(`Upload attempt ${uploadAttempts} failed:`, err);
 
         if (uploadAttempts < MAX_UPLOAD_ATTEMPTS) {
           // Wait before retrying (exponential backoff)
@@ -810,7 +710,6 @@ export async function uploadMediaFile(
     // All upload attempts failed
     throw uploadError;
   } catch (err) {
-    console.error(`Error uploading ${fileType} file:`, err);
     const errorMessage =
       err instanceof Error ? err.message : `Failed to upload ${fileType}`;
     toast.error(`Upload failed. Please check the file and try again.`);
@@ -845,20 +744,6 @@ export const moduleHelpers = {
     error?: string;
   }> => {
     try {
-      console.log("[saveModule] Starting save process:", {
-        centerId,
-        moduleType,
-        moduleTitle,
-        hasReadingSections: !!(readingSections && readingSections.length > 0),
-        readingSectionCount: readingSections?.length || 0,
-        hasListeningSections: !!(
-          listeningSections && listeningSections.length > 0
-        ),
-        listeningSectionCount: listeningSections?.length || 0,
-        hasWritingSections: !!(writingSections && writingSections.length > 0),
-        writingSectionCount: writingSections?.length || 0,
-      });
-
       let sections:
         | ReadingSection[]
         | ListeningSection[]
@@ -866,8 +751,6 @@ export const moduleHelpers = {
         | undefined;
       const title =
         moduleTitle || moduleTitles[moduleType] || `${moduleType} Module`;
-
-      console.log("[saveModule] Using title:", title);
 
       if (moduleType === "reading" && readingSections) {
         const { readingHelpers } = await import("@/helpers/reading");
@@ -899,10 +782,6 @@ export const moduleHelpers = {
 
       return result;
     } catch (err) {
-      console.error(
-        "[saveModule] Error:",
-        err instanceof Error ? err.message : String(err),
-      );
       const errorMsg =
         err instanceof Error ? err.message : "Failed to save module";
       return { success: false, error: errorMsg };
@@ -1079,7 +958,6 @@ export const deleteModule = async (
 
     return { success: true };
   } catch (error: any) {
-    console.error("Error deleting module:", error);
     return {
       success: false,
       error: "Failed to delete module. Please try again.",

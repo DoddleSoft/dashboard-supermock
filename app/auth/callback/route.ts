@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
+  const type = searchParams.get("type");
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
@@ -31,8 +32,14 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error && data.session) {
-      const user = data.session.user;
       const origin = new URL(request.url).origin;
+
+      // If this is a password recovery flow, redirect to the change-password page
+      if (type === "recovery") {
+        return NextResponse.redirect(new URL("/auth/change-password", origin));
+      }
+
+      const user = data.session.user;
 
       if (!user.email_confirmed_at) {
         return NextResponse.redirect(

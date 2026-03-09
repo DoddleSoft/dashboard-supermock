@@ -113,8 +113,6 @@ export default function Onboarding() {
       toast.success(`Redirecting to ${centerData.name}...`);
       router.push(`/dashboard/${centerData.slug}`);
     } catch (error: any) {
-      console.error("Onboarding error:", error);
-
       let errorMessage = "Failed to create center. Please try again.";
 
       if (

@@ -55,10 +55,6 @@ export const fetchCenterMembers = async (
       .eq("user_id", ownerId)
       .single();
 
-    if (ownerError) {
-      console.error("Error fetching owner profile:", ownerError);
-    }
-
     const ownerMember: CenterMember | null = ownerProfile
       ? {
           membership_id: undefined,
@@ -80,7 +76,6 @@ export const fetchCenterMembers = async (
 
     return ownerMember ? [ownerMember, ...filteredMembers] : filteredMembers;
   } catch (error) {
-    console.error("Error fetching members:", error);
     toast.error(
       parseError(
         error,
@@ -141,7 +136,6 @@ export const createCenterMember = async (
     return json.membership;
   } catch (error: any) {
     if (error.message !== "validation" && error.message !== "api error") {
-      console.error("Error creating member:", error);
       toast.error(
         parseError(error, "Failed to add the team member. Please try again."),
       );
@@ -174,7 +168,6 @@ export const updateCenterMember = async (
 
     toast.success("Member updated successfully!");
   } catch (error: any) {
-    console.error("Error updating member:", error);
     toast.error(
       parseError(error, "Failed to save member changes. Please try again."),
     );
@@ -194,7 +187,6 @@ export const deleteCenterMember = async (centerId: string, userId: string) => {
 
     toast.success("Member removed successfully!");
   } catch (error: any) {
-    console.error("Error removing member:", error);
     toast.error(
       parseError(error, "Failed to remove the member. Please try again."),
     );

@@ -93,7 +93,6 @@ export function RegisterForm() {
           id: loadingToastId,
         },
       );
-      console.error("Registration error:", error);
     } finally {
       setIsLoading(false);
     }

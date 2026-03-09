@@ -39,7 +39,6 @@ export const fetchStudents = async (centerId: string): Promise<Student[]> => {
 
     return mappedStudents;
   } catch (error) {
-    console.error("Error fetching students:", error);
     toast.error(
       parseError(error, "Unable to load students. Please refresh the page."),
     );
@@ -118,7 +117,6 @@ export const createStudent = async (
       "api error",
     ];
     if (!knownErrors.includes(error.message)) {
-      console.error("Error creating student:", error);
       toast.error(
         parseError(
           error,
@@ -167,7 +165,6 @@ export const updateStudent = async (
 
     toast.success("Student updated successfully!");
   } catch (error: any) {
-    console.error("Error updating student:", error);
     toast.error(
       parseError(error, "Failed to save student changes. Please try again."),
     );
@@ -190,7 +187,6 @@ export const deleteStudent = async (studentId: string) => {
     toast.success("Student deleted successfully!");
     return data;
   } catch (error: any) {
-    console.error("Error deleting student:", error);
     toast.error(
       parseError(error, "Failed to delete the student. Please try again."),
     );

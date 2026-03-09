@@ -12,7 +12,6 @@ export async function compressImage(file: File): Promise<File> {
   try {
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      console.warn("Not an image file, returning original");
       return file;
     }
 
@@ -74,9 +73,6 @@ export async function compressImage(file: File): Promise<File> {
                   },
                 );
 
-                console.log(
-                  `Image compressed: ${(file.size / 1024).toFixed(2)}KB → ${(compressedFile.size / 1024).toFixed(2)}KB`,
-                );
                 resolve(compressedFile);
               },
               "image/jpeg",
@@ -93,7 +89,6 @@ export async function compressImage(file: File): Promise<File> {
       reader.readAsDataURL(file);
     });
   } catch (error) {
-    console.error("Image compression failed:", error);
     return file; // Return original file if compression fails
   }
 }
@@ -107,9 +102,6 @@ export async function compressImage(file: File): Promise<File> {
 export async function compressAudio(file: File): Promise<File> {
   try {
     const fileSizeMB = file.size / (1024 * 1024);
-    console.log(
-      `Processing audio: ${file.name} (${fileSizeMB.toFixed(2)}MB, ${file.type})`,
-    );
 
     // Comprehensive list of already-compressed audio formats
     const compressedFormats = [
@@ -146,9 +138,6 @@ export async function compressAudio(file: File): Promise<File> {
     );
 
     if (isCompressedByMime || isCompressedByExtension) {
-      console.log(
-        `✓ Audio already compressed (${file.type || "detected by extension"}), using as-is`,
-      );
       return file;
     }
 
@@ -169,25 +158,15 @@ export async function compressAudio(file: File): Promise<File> {
     if (isUncompressed) {
       // Only try to compress if it's reasonably large
       if (fileSizeMB < 3) {
-        console.log(
-          `✓ Uncompressed audio is small (${fileSizeMB.toFixed(2)}MB), using as-is`,
-        );
         return file;
       }
 
-      // For large uncompressed files, we accept them but recommend server-side compression
-      // Client-side compression would require heavy codec libraries and block the UI
-      console.log(
-        `⚠ Large uncompressed audio (${fileSizeMB.toFixed(2)}MB) - accepting as-is. Server-side compression recommended.`,
-      );
       return file;
     }
 
     // Unknown format - accept it
-    console.log(`✓ Unknown audio format (${file.type}), accepting as-is`);
     return file;
   } catch (error) {
-    console.error("Audio processing failed:", error);
     return file; // Return original file on any error
   }
 }

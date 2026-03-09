@@ -218,7 +218,6 @@ export const fetchReviews = async (
 
     return reviews;
   } catch (error: any) {
-    console.error("Error loading reviews:", error);
     toast.error("Failed to load reviews");
     return [];
   }
@@ -240,7 +239,6 @@ export const deleteAttempt = async (
     toast.success("Attempt deleted successfully");
     return { success: true };
   } catch (error: any) {
-    console.error("Error deleting attempt:", error);
     toast.error("Failed to delete attempt");
     return { success: false };
   }
@@ -286,7 +284,6 @@ export const fetchAttemptDetails = async (
       })),
     };
   } catch (error: any) {
-    console.error("Error loading attempt details:", error);
     toast.error("Failed to load attempt details");
     return null;
   }
@@ -332,7 +329,6 @@ export const fetchGradeModuleDetails = async (
       paperTitle: data.paperTitle || "Untitled Paper",
     };
   } catch (error: any) {
-    console.error("Error loading module details:", error);
     toast.error(
       "Failed to load module details: " + (error.message || "Unknown error"),
     );
@@ -372,7 +368,6 @@ export const saveGrades = async (
 
     return data;
   } catch (error: any) {
-    console.error("Error saving grades:", error);
     throw error;
   }
 };

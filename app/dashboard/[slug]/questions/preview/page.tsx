@@ -155,7 +155,6 @@ export default function PreviewPage() {
       );
 
       if (error) {
-        console.error("Error fetching module hierarchy:", error);
         const message =
           error.code === "PGRST116"
             ? "Module not found or you do not have access."
@@ -181,7 +180,7 @@ export default function PreviewPage() {
   if (loading)
     return (
       <div className="h-screen flex items-center justify-center">
-        <Loader subtitle="Loading Preview..." />
+        <Loader />
       </div>
     );
   if (!data)

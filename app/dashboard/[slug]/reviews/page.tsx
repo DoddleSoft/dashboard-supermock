@@ -1,74 +1,114 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState, useRef } from "react";
-import { Filter, MoreVertical, Search, Eye, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { Search, MoreVertical, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCentre } from "@/context/CentreContext";
 import { SmallLoader } from "@/components/ui/SmallLoader";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   fetchReviews,
   deleteAttempt,
   formatReviewDate,
-  formatDuration,
   getReviewStatusColor,
-  ReviewAnswerItem as AnswerItem,
-  ReviewModuleEntry as ModuleReview,
   AttemptReview,
 } from "@/helpers/reviews";
+
+const PAGE_SIZES = [25, 50, 75, 100] as const;
+type PageSize = (typeof PAGE_SIZES)[number];
+
+/** Returns an array of page numbers and "…" separators for the paginator. */
+function buildPageNumbers(current: number, total: number): (number | "…")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+
+  const delta = 1;
+  const pages = new Set<number>();
+  pages.add(1);
+  pages.add(total);
+  for (let i = current - delta; i <= current + delta; i++) {
+    if (i > 1 && i < total) pages.add(i);
+  }
+
+  const sorted = [...pages].sort((a, b) => a - b);
+  const result: (number | "…")[] = [];
+  let prev = 0;
+  for (const p of sorted) {
+    if (p - prev > 1) result.push("…");
+    result.push(p);
+    prev = p;
+  }
+  return result;
+}
 
 export default function ReviewPage() {
   const { currentCenter } = useCentre();
   const params = useParams();
   const router = useRouter();
   const slug = params.slug as string;
+
+  const [reviews, setReviews] = useState<AttemptReview[]>([]);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState<PageSize>(25);
+
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedModule, setSelectedModule] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+
   const [loading, setLoading] = useState(true);
-  const [reviews, setReviews] = useState<AttemptReview[]>([]);
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [showActionMenu, setShowActionMenu] = useState(false);
+  const [actionMenuAttempt, setActionMenuAttempt] =
+    useState<AttemptReview | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [attemptToDelete, setAttemptToDelete] = useState<AttemptReview | null>(
+    null,
+  );
 
+  // Debounce search — 350 ms
   useEffect(() => {
-    if (!currentCenter?.center_id) return;
-    void loadReviews();
-  }, [currentCenter?.center_id]);
+    const id = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(id);
+  }, [searchQuery]);
 
+  // Reset to page 1 whenever filters change
+  const prevModule = useRef(selectedModule);
+  const prevStatus = useRef(selectedStatus);
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setOpenDropdown(null);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const handleDeleteAttempt = async (attemptId: string) => {
-    if (!confirm("Are you sure you want to delete this attempt?")) return;
-    const result = await deleteAttempt(attemptId);
-    if (result.success) {
-      await loadReviews();
+    if (
+      selectedModule !== prevModule.current ||
+      selectedStatus !== prevStatus.current
+    ) {
+      prevModule.current = selectedModule;
+      prevStatus.current = selectedStatus;
+      setPage(1);
     }
-  };
+  }, [selectedModule, selectedStatus]);
 
-  const loadReviews = async () => {
+  const loadReviews = useCallback(async () => {
     if (!currentCenter?.center_id) return;
     setLoading(true);
     const data = await fetchReviews(currentCenter.center_id);
     setReviews(data);
     setLoading(false);
-  };
+  }, [currentCenter?.center_id]);
 
+  useEffect(() => {
+    if (currentCenter?.center_id) {
+      loadReviews();
+    }
+  }, [loadReviews]);
+
+  // Client-side filtering
   const filteredReviews = useMemo(() => {
     return reviews.filter((attempt) => {
+      const q = debouncedSearch.toLowerCase();
       const matchesSearch =
-        attempt.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        attempt.studentEmail.toLowerCase().includes(searchQuery.toLowerCase());
+        !q ||
+        attempt.studentName.toLowerCase().includes(q) ||
+        attempt.studentEmail.toLowerCase().includes(q);
 
       const matchesModule =
         selectedModule === "all" ||
@@ -80,185 +120,383 @@ export default function ReviewPage() {
 
       return matchesSearch && matchesModule && matchesStatus;
     });
-  }, [reviews, searchQuery, selectedModule, selectedStatus]);
+  }, [reviews, debouncedSearch, selectedModule, selectedStatus]);
+
+  // Paginated slice
+  const total = filteredReviews.length;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const firstRow = total === 0 ? 0 : (page - 1) * limit + 1;
+  const lastRow = Math.min(page * limit, total);
+  const paginatedReviews = useMemo(
+    () => filteredReviews.slice((page - 1) * limit, page * limit),
+    [filteredReviews, page, limit],
+  );
+  const pageNumbers = buildPageNumbers(page, totalPages);
+
+  const toggleActionMenu = (attempt: AttemptReview, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (actionMenuAttempt?.attemptId === attempt.attemptId) {
+      setShowActionMenu((prev) => !prev);
+    } else {
+      setActionMenuAttempt(attempt);
+      setShowActionMenu(true);
+    }
+  };
+
+  const handleActionPreview = (attempt: AttemptReview) => {
+    setShowActionMenu(false);
+    router.push(
+      `/dashboard/${slug}/reviews/preview?attemptId=${attempt.attemptId}`,
+    );
+  };
+
+  const handleActionDelete = (attempt: AttemptReview) => {
+    setActionMenuAttempt(null);
+    setShowActionMenu(false);
+    setAttemptToDelete(attempt);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!attemptToDelete) return;
+    try {
+      setDeleting(true);
+      const result = await deleteAttempt(attemptToDelete.attemptId);
+      if (result.success) {
+        if (paginatedReviews.length === 1 && page > 1) setPage((p) => p - 1);
+        else await loadReviews();
+      }
+      setShowDeleteConfirm(false);
+      setAttemptToDelete(null);
+    } catch {
+      // Handled in helper
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setAttemptToDelete(null);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setShowActionMenu(false);
+    setPage(newPage);
+  };
+
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit as PageSize);
+    setPage(1);
+    setShowActionMenu(false);
+  };
 
   const formatDate = formatReviewDate;
   const getStatusColor = getReviewStatusColor;
 
+  const formatStatusLabel = (status: string) => {
+    return status
+      .replace(/[_-]/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="flex items-center gap-4">
-        <div className="flex-1 max-w-sm relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search by student or paper..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 text-sm"
-          />
+    <>
+      <div className="max-w-7xl mx-auto">
+        {/* Page Header */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between">
+            {/* Filters */}
+            <div className="flex items-center w-180 gap-3">
+              <div className="flex-1 max-w-sm relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name or email..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 text-sm"
+                />
+              </div>
+
+              <select
+                value={selectedModule}
+                onChange={(e) => setSelectedModule(e.target.value)}
+                className="px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 bg-white text-sm font-medium"
+              >
+                <option value="all">All Modules</option>
+                <option value="listening">Listening</option>
+                <option value="reading">Reading</option>
+                <option value="writing">Writing</option>
+                <option value="speaking">Speaking</option>
+              </select>
+
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 bg-white text-sm font-medium"
+              >
+                <option value="all">All Status</option>
+                <option value="completed">Completed</option>
+                <option value="pending">Pending</option>
+                <option value="in-progress">In Progress</option>
+              </select>
+            </div>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Filter className="w-5 h-5 text-slate-400" />
-          <select
-            value={selectedModule}
-            onChange={(e) => setSelectedModule(e.target.value)}
-            className="px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 bg-white"
-          >
-            <option value="all">All Modules</option>
-            <option value="listening">Listening</option>
-            <option value="reading">Reading</option>
-            <option value="writing">Writing</option>
-            <option value="speaking">Speaking</option>
-          </select>
+        {/* Loading State */}
+        {loading && <SmallLoader subtitle="Loading reviews..." />}
 
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 bg-white"
-          >
-            <option value="all">All Status</option>
-            <option value="completed">Completed</option>
-            <option value="pending">Pending</option>
-            <option value="in-progress">In Progress</option>
-          </select>
-        </div>
+        {/* Table */}
+        {!loading && (
+          <div className="flex flex-col gap-4">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+              <table className="w-full isolate">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      Student
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      Email
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      Modules
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      Started
+                    </th>
+                    <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {paginatedReviews.map((attempt) => (
+                    <tr
+                      key={attempt.attemptId}
+                      className={`hover:bg-slate-50 transition-colors duration-150 relative ${
+                        actionMenuAttempt?.attemptId === attempt.attemptId
+                          ? "z-40"
+                          : "z-0"
+                      }`}
+                    >
+                      <td className="px-6 py-1">
+                        <span className="font-medium text-slate-900 text-sm">
+                          {attempt.studentName || "N/A"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-1 text-slate-600 text-sm">
+                        {attempt.studentEmail || "N/A"}
+                      </td>
+                      <td className="px-6 py-1">
+                        <div className="flex flex-wrap gap-1.5">
+                          {attempt.modules.map((mod) => (
+                            <span
+                              key={mod.attemptModuleId}
+                              className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700"
+                            >
+                              {mod.moduleType}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-6 py-1">
+                        <span
+                          className={`inline-flex px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(
+                            attempt.status,
+                          )}`}
+                        >
+                          {formatStatusLabel(attempt.status)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-1 text-slate-600 text-sm">
+                        {formatDate(attempt.createdAt)}
+                      </td>
+                      <td className="px-6 py-1 text-right">
+                        <button
+                          onClick={(e) => toggleActionMenu(attempt, e)}
+                          className="p-2 hover:bg-slate-100 rounded-lg transition-colors duration-150 text-slate-600 hover:text-slate-900"
+                          title="More actions"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+
+                        {showActionMenu &&
+                          actionMenuAttempt?.attemptId ===
+                            attempt.attemptId && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-40 bg-transparent"
+                                onClick={() => setShowActionMenu(false)}
+                              />
+                              <div className="absolute right-10 top-0 mt-10 bg-white border border-slate-200 rounded-lg shadow-xl z-50 min-w-[140px] overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                                <button
+                                  onClick={() => {
+                                    handleActionPreview(attempt);
+                                    setShowActionMenu(false);
+                                  }}
+                                  className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors font-medium"
+                                >
+                                  Preview
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    handleActionDelete(attempt);
+                                    setShowActionMenu(false);
+                                  }}
+                                  disabled={deleting}
+                                  className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors font-medium border-t border-slate-100 disabled:opacity-50"
+                                >
+                                  {deleting ? "Deleting..." : "Delete"}
+                                </button>
+                              </div>
+                            </>
+                          )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {paginatedReviews.length === 0 && (
+                <div className="text-center py-16">
+                  <p className="text-slate-500 text-sm">
+                    No reviews found matching your criteria
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* ── Pagination bar ───────────────────────────────────────────── */}
+            <div className="flex items-center justify-between px-1">
+              {/* Results label */}
+              <p className="text-sm font-semibold text-slate-700 select-none">
+                Results:{" "}
+                <span className="font-bold">
+                  {firstRow} – {lastRow}
+                </span>{" "}
+                of <span className="font-bold">{total}</span>
+              </p>
+
+              {/* Page number buttons */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => handlePageChange(page - 1)}
+                  disabled={page === 1}
+                  className="w-10 h-10 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+
+                {pageNumbers.map((p, idx) =>
+                  p === "…" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="w-10 h-10 flex items-center justify-center text-slate-400 text-sm select-none"
+                    >
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => handlePageChange(p as number)}
+                      className={`w-10 h-10 flex items-center justify-center rounded-md border text-sm font-semibold transition-colors ${
+                        p === page
+                          ? "bg-white border-gray-500 text-blue-500 shadow-sm shadow-blue-200"
+                          : "border-slate-200 bg-white text-slate-900 hover:bg-slate-50"
+                      }`}
+                      aria-current={p === page ? "page" : undefined}
+                    >
+                      {p}
+                    </button>
+                  ),
+                )}
+
+                <button
+                  onClick={() => handlePageChange(page + 1)}
+                  disabled={page === totalPages}
+                  className="w-10 h-10 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Rows per page */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-500 select-none">Rows</span>
+                <select
+                  value={limit}
+                  onChange={(e) => handleLimitChange(Number(e.target.value))}
+                  className="h-10 px-3 pr-7 rounded-xl border border-slate-200 bg-white text-slate-800 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
+                >
+                  {PAGE_SIZES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {loading && <SmallLoader subtitle="Loading reviews..." />}
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && attemptToDelete && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4"
+          onClick={cancelDelete}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-sm animate-in fade-in zoom-in-95 duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-red-900 text-center mb-4">
+                Delete Review
+              </h3>
+              <p className="text-sm text-slate-600 text-center mb-6">
+                Are you sure you want to delete the review for{" "}
+                <span className="font-semibold text-slate-900">
+                  {attemptToDelete.studentName}
+                </span>
+                ? This action cannot be undone.
+              </p>
 
-      {!loading && (
-        <div className="bg-white rounded-xl border mt-6 border-slate-200 overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                  Student
-                </th>
-
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                  Modules
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                  Started
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {filteredReviews.map((attempt) => (
-                <Fragment key={attempt.attemptId}>
-                  <tr className="hover:bg-slate-50 transition-colors duration-150 text-sm">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-semibold text-sm">
-                          {attempt.studentName.charAt(0)}
-                        </div>
-                        <div className="ml-3">
-                          <p className="font-medium text-slate-900">
-                            {attempt.studentName}
-                          </p>
-                          <p className="text-sm text-slate-500">
-                            {attempt.studentEmail || "-"}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-slate-900">
-                      <div className="flex flex-wrap gap-2">
-                        {attempt.modules.map((mod) => (
-                          <span
-                            key={mod.attemptModuleId}
-                            className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700"
-                          >
-                            {mod.moduleType}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(
-                          attempt.status,
-                        )}`}
-                      >
-                        {attempt.status.replace(/_/g, " ")}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-slate-500 text-sm">
-                      {formatDate(attempt.createdAt)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <div
-                        className="relative"
-                        ref={
-                          openDropdown === attempt.attemptId
-                            ? dropdownRef
-                            : null
-                        }
-                      >
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOpenDropdown((prev) =>
-                              prev === attempt.attemptId
-                                ? null
-                                : attempt.attemptId,
-                            )
-                          }
-                          className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors"
-                          aria-label="Actions"
-                        >
-                          <MoreVertical className="w-4 h-4 text-slate-600" />
-                        </button>
-                        {openDropdown === attempt.attemptId && (
-                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-10">
-                            <button
-                              onClick={() => {
-                                router.push(
-                                  `/dashboard/${slug}/reviews/preview?attemptId=${attempt.attemptId}`,
-                                );
-                                setOpenDropdown(null);
-                              }}
-                              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                            >
-                              <Eye className="w-4 h-4 text-slate-500" />
-                              Preview
-                            </button>
-                            <button
-                              onClick={() => {
-                                handleDeleteAttempt(attempt.attemptId);
-                                setOpenDropdown(null);
-                              }}
-                              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
-
-          {filteredReviews.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-slate-500">No reviews found</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={cancelDelete}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2.5 border border-slate-300 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition-all duration-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium shadow-sm shadow-red-100 transition-all duration-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {deleting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Deleting...
+                    </>
+                  ) : (
+                    "Delete"
+                  )}
+                </button>
+              </div>
             </div>
-          )}
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

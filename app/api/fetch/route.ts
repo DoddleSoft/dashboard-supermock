@@ -105,7 +105,6 @@ export async function GET(request: NextRequest) {
   const { data, error: fetchError, count } = await query;
 
   if (fetchError) {
-    console.error("Error fetching students:", fetchError);
     return NextResponse.json(
       { error: "Failed to fetch students" },
       { status: 500 },

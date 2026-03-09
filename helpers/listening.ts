@@ -235,7 +235,6 @@ export const listeningHelpers = {
     for (const section of sections) {
       if (section.audioFile) {
         try {
-          console.log(`Uploading audio for section: ${section.title}`);
           const result = await uploadMediaFile(
             centerId,
             "listening",
@@ -244,9 +243,6 @@ export const listeningHelpers = {
           );
 
           if (result.success && result.url) {
-            console.log(
-              `✓ Audio uploaded successfully for section: ${section.title}`,
-            );
             updatedSections.push({
               ...section,
               audioPath: result.url,
@@ -256,10 +252,7 @@ export const listeningHelpers = {
             // Upload failed - throw error to prevent database insertion without audio
             uploadFailures++;
             const errorMsg = result.error || "Unknown upload error";
-            console.error(
-              `✗ Audio upload failed for section "${section.title}":`,
-              errorMsg,
-            );
+
             toast.error(
               `Failed to upload audio for "${section.title}": ${errorMsg}`,
             );
@@ -271,10 +264,7 @@ export const listeningHelpers = {
           // Re-throw to prevent module creation without audio
           const errorMsg =
             error instanceof Error ? error.message : "Audio upload failed";
-          console.error(
-            `Error uploading audio for section "${section.title}":`,
-            error,
-          );
+
           throw new Error(errorMsg);
         }
       } else {
@@ -310,8 +300,6 @@ export const listeningHelpers = {
           // Check if content is a base64 data URL
           if (block.content.startsWith("data:image/")) {
             try {
-              console.log(`Processing image in section: ${section.title}`);
-
               // Convert base64 to File
               const response = await fetch(block.content);
               const blob = await response.blob();
@@ -330,9 +318,6 @@ export const listeningHelpers = {
               );
 
               if (result.success && result.url) {
-                console.log(
-                  `✓ Image uploaded successfully in section: ${section.title}`,
-                );
                 updatedBlocks.push({
                   ...block,
                   content: result.url,
@@ -341,10 +326,7 @@ export const listeningHelpers = {
                 // Upload failed - throw error to prevent database insertion without image
                 uploadFailures++;
                 const errorMsg = result.error || "Unknown upload error";
-                console.error(
-                  `✗ Image upload failed in section "${section.title}":`,
-                  errorMsg,
-                );
+
                 toast.error(
                   `Failed to upload image in "${section.title}": ${errorMsg}`,
                 );
@@ -356,10 +338,7 @@ export const listeningHelpers = {
               // Re-throw to prevent module creation without image
               const errorMsg =
                 error instanceof Error ? error.message : "Image upload failed";
-              console.error(
-                `Error processing image in section "${section.title}":`,
-                error,
-              );
+
               throw new Error(errorMsg);
             }
           } else {

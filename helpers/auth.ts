@@ -41,89 +41,6 @@ class AuthService {
   private supabase = createClient();
 
   /**
-   * Sync user profile with auth session
-   */
-  async upsertUserFromSession(
-    session: Session | null,
-    opts?: {
-      fullName?: string;
-      role?: "student" | "examiner" | "admin";
-    },
-  ) {
-    try {
-      const user = session?.user;
-      if (!user) {
-        return;
-      }
-
-      const metadata: any = user.user_metadata || {};
-      const full_name =
-        opts?.fullName ??
-        metadata.full_name ??
-        metadata.name ??
-        user.email?.split("@")[0] ??
-        "User";
-
-      const nowIso = new Date().toISOString();
-
-      // First, try to check if user profile exists
-      const { data: existingProfile } = await this.supabase
-        .from("users")
-        .select("user_id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (existingProfile) {
-        // Profile exists, just update it
-        const { error } = await this.supabase
-          .from("users")
-          .update({
-            full_name,
-            updated_at: nowIso,
-            is_active: true,
-          })
-          .eq("user_id", user.id);
-
-        if (error) {
-          console.error("Error updating user profile:", error);
-        }
-      } else {
-        // Profile doesn't exist, create it (no center_id needed)
-        const { error } = await this.supabase.from("users").insert({
-          user_id: user.id,
-          email: user.email!,
-          role: opts?.role || "admin", // Use provided role or default to admin
-          full_name,
-          is_active: true,
-        });
-
-        if (error) {
-          console.error("Error creating user profile:", error);
-          // Try upsert as fallback
-          const { error: upsertError } = await this.supabase
-            .from("users")
-            .upsert(
-              {
-                user_id: user.id,
-                email: user.email!,
-                role: opts?.role || "admin",
-                full_name,
-                is_active: true,
-              },
-              { onConflict: "user_id" },
-            );
-
-          if (upsertError) {
-            console.error("Error upserting user profile:", upsertError);
-          }
-        }
-      }
-    } catch (e) {
-      console.error("Exception during user profile management:", e);
-    }
-  }
-
-  /**
    * Register a new user
    */
   async register(data: RegisterData): Promise<AuthResponse> {
@@ -448,12 +365,16 @@ class AuthService {
   }
 
   /**
-   * Reset password
+   * Reset password - sends a verification link to the user's email
    */
   async resetPassword(email: string): Promise<AuthResponse> {
     try {
+      const siteUrl =
+        process.env.NEXT_PUBLIC_SITE_URL ??
+        (typeof window !== "undefined" ? window.location.origin : "");
+
       const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo: `${siteUrl}/auth/callback?type=recovery`,
       });
 
       if (error) {
@@ -462,7 +383,6 @@ class AuthService {
 
       return {
         success: true,
-        error: "Password reset instructions sent to your email",
       };
     } catch (error) {
       const authError = error as AuthError;

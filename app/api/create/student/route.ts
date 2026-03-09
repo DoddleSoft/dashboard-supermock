@@ -166,10 +166,7 @@ export async function POST(req: NextRequest) {
           { status: 409 },
         );
       }
-      console.error(
-        "[create-student] auth.admin.createUser:",
-        createAuthError.message,
-      );
+
       return NextResponse.json(
         { error: "Failed to create user account. Please try again." },
         { status: 500 },
@@ -208,10 +205,7 @@ export async function POST(req: NextRequest) {
           { status: 409 },
         );
       }
-      console.error(
-        "[create-student] insert student_profiles:",
-        profileError.message,
-      );
+
       return NextResponse.json(
         { error: "Failed to enrol student. The auth account was rolled back." },
         { status: 500 },
@@ -224,7 +218,6 @@ export async function POST(req: NextRequest) {
       { status: 201 },
     );
   } catch (err) {
-    console.error("[create-student] unhandled:", err);
     return NextResponse.json(
       { error: "An unexpected error occurred." },
       { status: 500 },

@@ -78,7 +78,6 @@ export default function SupportPage() {
         );
       }
     } catch (error) {
-      console.error("Error submitting support message:", error);
       toast.error(
         parseError(
           error,

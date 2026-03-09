@@ -31,10 +31,6 @@ export default function DashboardRedirect() {
           .limit(1)
           .maybeSingle();
 
-        if (error) {
-          console.error("Error fetching centers:", error);
-        }
-
         if (centers?.slug) {
           router.push(`/dashboard/${centers.slug}`);
           return;
@@ -62,7 +58,6 @@ export default function DashboardRedirect() {
         // No center found at all
         router.push("/auth/login");
       } catch (error) {
-        console.error("Error in redirect:", error);
         router.push("/auth/login");
       }
     };

@@ -101,7 +101,6 @@ export const centerHelpers = {
 
       return { papers: summaries, stats };
     } catch (err) {
-      console.error("Error fetching module overview:", err);
       return {
         papers: [],
         stats: {

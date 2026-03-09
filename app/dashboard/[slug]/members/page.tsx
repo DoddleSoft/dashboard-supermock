@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Plus, Search } from "lucide-react";
 import { useCentre } from "@/context/CentreContext";
 import { useAccess } from "@/context/AccessContext";
@@ -18,18 +18,25 @@ import {
   updateCenterMember,
 } from "@/helpers/members";
 
+const PAGE_SIZES = [25, 50, 75, 100] as const;
+type PageSize = (typeof PAGE_SIZES)[number];
+
 export default function MembersPage() {
   const { currentCenter, loading: centerLoading } = useCentre();
   const { role } = useAccess();
   const isOwner = role === "owner";
 
   const [members, setMembers] = useState<CenterMember[]>([]);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState<PageSize>(25);
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [selectedMember, setSelectedMember] = useState<CenterMember | null>(
     null,
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedRole, setSelectedRole] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -39,7 +46,6 @@ export default function MembersPage() {
   const [actionMenuMember, setActionMenuMember] = useState<CenterMember | null>(
     null,
   );
-  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<CenterMember | null>(
     null,
@@ -58,6 +64,29 @@ export default function MembersPage() {
     role: "admin" as "admin" | "examiner",
     is_active: true,
   });
+
+  // Debounce search — 350 ms
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(id);
+  }, [searchQuery]);
+
+  // Reset to page 1 whenever filters change
+  const prevRole = useRef(selectedRole);
+  const prevStatus = useRef(selectedStatus);
+  useEffect(() => {
+    if (
+      selectedRole !== prevRole.current ||
+      selectedStatus !== prevStatus.current
+    ) {
+      prevRole.current = selectedRole;
+      prevStatus.current = selectedStatus;
+      setPage(1);
+    }
+  }, [selectedRole, selectedStatus]);
 
   useEffect(() => {
     if (currentCenter?.center_id) {
@@ -80,9 +109,10 @@ export default function MembersPage() {
   };
 
   const filteredMembers = useMemo(() => {
-    const query = searchQuery.toLowerCase();
+    const query = debouncedSearch.toLowerCase();
     return members.filter((member) => {
       const matchesSearch =
+        !query ||
         (member.full_name?.toLowerCase() || "").includes(query) ||
         (member.email?.toLowerCase() || "").includes(query);
       const matchesRole =
@@ -93,7 +123,14 @@ export default function MembersPage() {
         (selectedStatus === "inactive" && !member.is_active);
       return matchesSearch && matchesRole && matchesStatus;
     });
-  }, [members, searchQuery, selectedRole, selectedStatus]);
+  }, [members, debouncedSearch, selectedRole, selectedStatus]);
+
+  // Paginated slice
+  const total = filteredMembers.length;
+  const paginatedMembers = useMemo(
+    () => filteredMembers.slice((page - 1) * limit, page * limit),
+    [filteredMembers, page, limit],
+  );
 
   const handleCreateMember = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,18 +203,11 @@ export default function MembersPage() {
     e.stopPropagation();
     if (member.isOwner || !isOwner) return;
 
-    const button = e.currentTarget as HTMLElement;
-    const rect = button.getBoundingClientRect();
-
     if (actionMenuMember?.user_id === member.user_id) {
-      setShowActionMenu(!showActionMenu);
+      setShowActionMenu((prev) => !prev);
     } else {
       setActionMenuMember(member);
       setShowActionMenu(true);
-      setMenuPosition({
-        top: rect.bottom + 8,
-        right: window.innerWidth - rect.right,
-      });
     }
   };
 
@@ -233,6 +263,17 @@ export default function MembersPage() {
     setMemberToDelete(null);
   };
 
+  const handlePageChange = (newPage: number) => {
+    setShowActionMenu(false);
+    setPage(newPage);
+  };
+
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit as PageSize);
+    setPage(1);
+    setShowActionMenu(false);
+  };
+
   return (
     <>
       <div className="max-w-7xl mx-auto">
@@ -286,18 +327,23 @@ export default function MembersPage() {
 
         {!loading && (
           <MemberTable
-            members={filteredMembers}
+            members={paginatedMembers}
             loading={loading}
             onActionClick={toggleActionMenu}
             showActionMenu={showActionMenu}
             actionMenuMember={actionMenuMember}
-            menuPosition={menuPosition}
             isDeleting={deleting}
             onEdit={handleActionEdit}
             onDelete={handleActionDelete}
             onCloseMenu={() => setShowActionMenu(false)}
             formatLocalTime={formatLocalTime}
             getRelativeTime={getRelativeTime}
+            total={total}
+            currentPage={page}
+            pageSize={limit}
+            pageSizeOptions={[...PAGE_SIZES]}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handleLimitChange}
           />
         )}
       </div>

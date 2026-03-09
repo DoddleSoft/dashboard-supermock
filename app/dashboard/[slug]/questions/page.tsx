@@ -119,7 +119,6 @@ export default function PapersPage() {
     try {
       await handleDeletePaper(selectedPaperId);
     } catch (error) {
-      console.error("Failed to delete paper:", error);
       toast.error("Failed to delete the paper. Please try again.");
     } finally {
       setIsPaperDeleting(false);

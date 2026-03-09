@@ -96,7 +96,6 @@ export default function ListeningModule({
       };
       reader.readAsDataURL(compressedFile);
     } catch (error) {
-      console.error("Failed to process image:", error);
       setCompressingImages((prev) => {
         const next = new Set(prev);
         next.delete(blockKey);
@@ -116,7 +115,6 @@ export default function ListeningModule({
         const compressedFile = await compressAudio(file);
         onUpdateSectionAudio(sectionId, compressedFile);
       } catch (error) {
-        console.error("Failed to process audio:", error);
         onUpdateSectionAudio(sectionId, file);
       } finally {
         setCompressingAudio((prev) => {

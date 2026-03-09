@@ -7,7 +7,10 @@ import supabaseAdmin from "@/lib/supabase/admin";
 
 function sanitizeString(raw: unknown, maxLen = 255): string {
   if (typeof raw !== "string") return "";
-  return raw.replace(/[<>"'`\\]/g, "").trim().slice(0, maxLen);
+  return raw
+    .replace(/[<>"'`\\]/g, "")
+    .trim()
+    .slice(0, maxLen);
 }
 
 const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
@@ -22,8 +25,14 @@ const RATE_WINDOW_MS = 60_000;
 
 function checkRateLimit(userId: string): boolean {
   const now = Date.now();
-  const bucket = rateBucket.get(userId) ?? { count: 0, resetAt: now + RATE_WINDOW_MS };
-  if (now > bucket.resetAt) { bucket.count = 0; bucket.resetAt = now + RATE_WINDOW_MS; }
+  const bucket = rateBucket.get(userId) ?? {
+    count: 0,
+    resetAt: now + RATE_WINDOW_MS,
+  };
+  if (now > bucket.resetAt) {
+    bucket.count = 0;
+    bucket.resetAt = now + RATE_WINDOW_MS;
+  }
   bucket.count++;
   rateBucket.set(userId, bucket);
   return bucket.count <= RATE_LIMIT;
@@ -36,28 +45,41 @@ export async function POST(req: NextRequest) {
     // 1. Cap payload size
     const contentLength = req.headers.get("content-length");
     if (contentLength && parseInt(contentLength) > 8192) {
-      return NextResponse.json({ error: "Payload too large." }, { status: 413 });
+      return NextResponse.json(
+        { error: "Payload too large." },
+        { status: 413 },
+      );
     }
 
     let body: Record<string, unknown>;
-    try { body = await req.json(); }
-    catch { return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 }); }
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON body." },
+        { status: 400 },
+      );
+    }
 
     // 2. Validate & sanitise inputs
-    const fullName  = sanitizeString(body.full_name, 200);
-    const emailRaw  = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-    const password  = typeof body.password === "string" ? body.password : "";
-    const centerId  = sanitizeString(body.center_id, 100);
-    const role      = ["admin", "examiner"].includes(body.role as string)
+    const fullName = sanitizeString(body.full_name, 200);
+    const emailRaw =
+      typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const password = typeof body.password === "string" ? body.password : "";
+    const centerId = sanitizeString(body.center_id, 100);
+    const role = ["admin", "examiner"].includes(body.role as string)
       ? (body.role as "admin" | "examiner")
       : null;
 
     const errors: string[] = [];
-    if (!fullName)                       errors.push("Full name is required.");
-    if (!EMAIL_RE.test(emailRaw))        errors.push("Invalid email format.");
-    if (!PASSWORD_RE.test(password))     errors.push("Password must be at least 8 characters and include uppercase, lowercase, and a number.");
-    if (!centerId)                       errors.push("Center ID is required.");
-    if (!role)                           errors.push("Role must be 'admin' or 'examiner'.");
+    if (!fullName) errors.push("Full name is required.");
+    if (!EMAIL_RE.test(emailRaw)) errors.push("Invalid email format.");
+    if (!PASSWORD_RE.test(password))
+      errors.push(
+        "Password must be at least 8 characters and include uppercase, lowercase, and a number.",
+      );
+    if (!centerId) errors.push("Center ID is required.");
+    if (!role) errors.push("Role must be 'admin' or 'examiner'.");
 
     if (errors.length) {
       return NextResponse.json({ error: errors.join(" ") }, { status: 422 });
@@ -75,14 +97,23 @@ export async function POST(req: NextRequest) {
         },
       },
     );
-    const { data: { user: caller }, error: authError } = await callerClient.auth.getUser();
+    const {
+      data: { user: caller },
+      error: authError,
+    } = await callerClient.auth.getUser();
     if (authError || !caller) {
-      return NextResponse.json({ error: "Unauthorized. Please sign in." }, { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized. Please sign in." },
+        { status: 401 },
+      );
     }
 
     // 4. Rate limit
     if (!checkRateLimit(caller.id)) {
-      return NextResponse.json({ error: "Too many requests. Please wait a moment." }, { status: 429 });
+      return NextResponse.json(
+        { error: "Too many requests. Please wait a moment." },
+        { status: 429 },
+      );
     }
 
     // 5. Authorise: caller must be the center owner
@@ -130,22 +161,27 @@ export async function POST(req: NextRequest) {
 
       if (createAuthError) {
         const msg = createAuthError.message?.toLowerCase() ?? "";
-        if (msg.includes("already") || msg.includes("registered") || msg.includes("exists")) {
+        if (
+          msg.includes("already") ||
+          msg.includes("registered") ||
+          msg.includes("exists")
+        ) {
           // (c) Orphaned auth user — look them up via the secure RPC
           const { data: authRows, error: rpcError } = await supabaseAdmin.rpc(
             "admin_get_auth_user_by_email",
             { p_email: emailRaw },
           );
           if (rpcError || !authRows || authRows.length === 0) {
-            console.error("[create-member] RPC lookup failed:", rpcError?.message);
             return NextResponse.json(
-              { error: "An account with this email already exists and could not be linked." },
+              {
+                error:
+                  "An account with this email already exists and could not be linked.",
+              },
               { status: 409 },
             );
           }
           userId = authRows[0].id as string;
         } else {
-          console.error("[create-member] auth.admin.createUser:", createAuthError.message);
           return NextResponse.json(
             { error: "Failed to create auth account. Please try again." },
             { status: 500 },
@@ -161,27 +197,28 @@ export async function POST(req: NextRequest) {
       // We upsert to guarantee it — if trigger worked, ON CONFLICT is a no-op;
       // if the trigger failed silently, this creates the row for the first time.
       // Without this row, the center_members FK will fail.
-      const { error: upsertError } = await supabaseAdmin
-        .from("users")
-        .upsert(
-          {
-            user_id:   userId,
-            email:     emailRaw,
-            full_name: fullName,
-            role,
-            is_active: true,
-          },
-          { onConflict: "user_id" },
-        );
+      const { error: upsertError } = await supabaseAdmin.from("users").upsert(
+        {
+          user_id: userId,
+          email: emailRaw,
+          full_name: fullName,
+          role,
+          is_active: true,
+        },
+        { onConflict: "user_id" },
+      );
 
       if (upsertError) {
         // Roll back the auth user if we just created it
         if (createdNewAuthUser) {
           await supabaseAdmin.auth.admin.deleteUser(userId);
         }
-        console.error("[create-member] upsert users:", upsertError.message);
         return NextResponse.json(
-          { error: "Failed to create user profile." + (createdNewAuthUser ? " Auth account rolled back." : "") },
+          {
+            error:
+              "Failed to create user profile." +
+              (createdNewAuthUser ? " Auth account rolled back." : ""),
+          },
           { status: 500 },
         );
       }
@@ -214,21 +251,35 @@ export async function POST(req: NextRequest) {
         await supabaseAdmin.from("users").delete().eq("user_id", userId);
         await supabaseAdmin.auth.admin.deleteUser(userId);
       }
-      console.error("[create-member] insert center_members:", memberInsertError.message);
+
       return NextResponse.json(
-        { error: "Failed to link member to center." + (createdNewAuthUser ? " All changes rolled back." : "") },
+        {
+          error:
+            "Failed to link member to center." +
+            (createdNewAuthUser ? " All changes rolled back." : ""),
+        },
         { status: 500 },
       );
     }
 
     return NextResponse.json({ success: true, membership }, { status: 201 });
   } catch (err) {
-    console.error("[create-member] unhandled:", err);
-    return NextResponse.json({ error: "An unexpected error occurred." }, { status: 500 });
+    return NextResponse.json(
+      { error: "An unexpected error occurred." },
+      { status: 500 },
+    );
   }
 }
 
-export function GET()    { return NextResponse.json({ error: "Method not allowed." }, { status: 405 }); }
-export function PUT()    { return NextResponse.json({ error: "Method not allowed." }, { status: 405 }); }
-export function DELETE() { return NextResponse.json({ error: "Method not allowed." }, { status: 405 }); }
-export function PATCH()  { return NextResponse.json({ error: "Method not allowed." }, { status: 405 }); }
+export function GET() {
+  return NextResponse.json({ error: "Method not allowed." }, { status: 405 });
+}
+export function PUT() {
+  return NextResponse.json({ error: "Method not allowed." }, { status: 405 });
+}
+export function DELETE() {
+  return NextResponse.json({ error: "Method not allowed." }, { status: 405 });
+}
+export function PATCH() {
+  return NextResponse.json({ error: "Method not allowed." }, { status: 405 });
+}

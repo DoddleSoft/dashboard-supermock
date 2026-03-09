@@ -67,7 +67,6 @@ export async function createSupportRequest(
       .single();
 
     if (error) {
-      console.error("Error creating support request:", error);
       return {
         success: false,
         error: parseError(
@@ -79,7 +78,6 @@ export async function createSupportRequest(
 
     return { success: true, data: supportRequest };
   } catch (error) {
-    console.error("Unexpected error creating support request:", error);
     return {
       success: false,
       error: parseError(
@@ -106,7 +104,6 @@ export async function getUserSupportRequests(
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Error fetching support requests:", error);
       return {
         success: false,
         error: parseError(
@@ -118,7 +115,6 @@ export async function getUserSupportRequests(
 
     return { success: true, data: data || [] };
   } catch (error) {
-    console.error("Unexpected error fetching support requests:", error);
     return {
       success: false,
       error: parseError(
@@ -145,7 +141,6 @@ export async function getCenterSupportRequests(
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Error fetching center support requests:", error);
       return {
         success: false,
         error: parseError(
@@ -157,7 +152,6 @@ export async function getCenterSupportRequests(
 
     return { success: true, data: data || [] };
   } catch (error) {
-    console.error("Unexpected error fetching center support requests:", error);
     return {
       success: false,
       error: parseError(

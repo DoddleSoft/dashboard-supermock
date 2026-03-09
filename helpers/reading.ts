@@ -246,8 +246,6 @@ export const readingHelpers = {
           // Check if content is a base64 data URL
           if (block.content.startsWith("data:image/")) {
             try {
-              console.log(`Processing image in section: ${section.title}`);
-
               // Convert base64 to File
               const response = await fetch(block.content);
               const blob = await response.blob();
@@ -266,9 +264,6 @@ export const readingHelpers = {
               );
 
               if (result.success && result.url) {
-                console.log(
-                  `✓ Image uploaded successfully in section: ${section.title}`,
-                );
                 updatedBlocks.push({
                   ...block,
                   content: result.url,
@@ -277,10 +272,7 @@ export const readingHelpers = {
                 // Upload failed - throw error to prevent database insertion without image
                 uploadFailures++;
                 const errorMsg = result.error || "Unknown upload error";
-                console.error(
-                  `✗ Image upload failed in section "${section.title}":`,
-                  errorMsg,
-                );
+
                 toast.error(
                   `Failed to upload image in "${section.title}": ${errorMsg}`,
                 );
@@ -292,10 +284,7 @@ export const readingHelpers = {
               // Re-throw to prevent module creation without image
               const errorMsg =
                 error instanceof Error ? error.message : "Image upload failed";
-              console.error(
-                `Error processing image in section "${section.title}":`,
-                error,
-              );
+
               throw new Error(errorMsg);
             }
           } else {

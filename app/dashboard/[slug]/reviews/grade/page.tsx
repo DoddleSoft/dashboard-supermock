@@ -65,7 +65,6 @@ export default function GradePage() {
         setGradingDecisions(initialDecisions);
       }
     } catch (error: any) {
-      console.error("Error loading module details:", error);
       toast.error(
         "Unable to load module details. Please refresh and try again.",
       );
@@ -196,7 +195,6 @@ export default function GradePage() {
       // Clear decisions after successful save
       setGradingDecisions(new Map());
     } catch (error: any) {
-      console.error("Error saving grades:", error);
       toast.error("Failed to save grades. Please try again.");
     } finally {
       setSaving(false);

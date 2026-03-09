@@ -83,7 +83,6 @@ export const fetchPapers = async (centerId: string): Promise<Paper[]> => {
 
     return data || [];
   } catch (error) {
-    console.error("Error fetching papers:", error);
     toast.error("Failed to load papers");
     return [];
   }
@@ -110,7 +109,6 @@ export const fetchStandaloneModules = async (
 
     return data || [];
   } catch (error) {
-    console.error("Error fetching standalone modules:", error);
     toast.error("Failed to load modules");
     return [];
   }
@@ -137,7 +135,6 @@ export const fetchCenterModules = async (
 
     return data || [];
   } catch (error) {
-    console.error("Error fetching center modules:", error);
     toast.error("Failed to load modules");
     return [];
   }
@@ -190,7 +187,6 @@ export const createPaper = async (
     toast.success("Paper created successfully!");
     return { success: true, paperId: paper.id };
   } catch (error: any) {
-    console.error("Error creating paper:", error);
     toast.error("Failed to create paper. Please try again.");
     return { success: false, error: "Failed to create paper" };
   }
@@ -230,7 +226,6 @@ export const updatePaper = async (
     toast.success("Paper updated successfully!");
     return { success: true };
   } catch (error: any) {
-    console.error("Error updating paper:", error);
     toast.error("Failed to update paper. Please try again.");
     return { success: false, error: "Failed to update paper" };
   }
@@ -313,7 +308,6 @@ export const deletePaper = async (
     toast.success("Paper deleted successfully!");
     return { success: true };
   } catch (error: any) {
-    console.error("Error deleting paper:", error);
     toast.error("Failed to delete paper. Please try again.");
     return { success: false, error: "Failed to delete paper" };
   }
@@ -339,7 +333,6 @@ export const togglePaperStatus = async (
     toast.success(`Paper ${isActive ? "activated" : "deactivated"}`);
     return { success: true };
   } catch (error: any) {
-    console.error("Error toggling paper status:", error);
     toast.error("Failed to update paper status. Please try again.");
     return { success: false, error: "Failed to update paper status" };
   }

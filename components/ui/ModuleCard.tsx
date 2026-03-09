@@ -91,7 +91,7 @@ export function ModuleCard({
             </div>
 
             <div className="flex-1">
-              <h3 className="text-md font-bold text-slate-900 leading-tight line-clamp-1 group-hover:text-indigo-600 transition-colors">
+              <h3 className="text-sm md:text-sm lg:text-md font-bold text-slate-900 leading-tight line-clamp-2 group-hover:text-indigo-600 transition-colors">
                 {module.heading}
               </h3>
             </div>

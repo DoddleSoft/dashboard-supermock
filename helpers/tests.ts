@@ -107,7 +107,6 @@ export const fetchActivePapers = async (
         : p.speaking_module,
     }));
   } catch (error) {
-    console.error("Error fetching active papers:", error);
     toast.error("Failed to load papers. Please refresh the page.");
     return [];
   }
@@ -169,7 +168,6 @@ export const fetchScheduledTest = async (
       modules,
     };
   } catch (error) {
-    console.error("Error fetching scheduled test:", error);
     toast.error("Failed to load test data");
     return null;
   }
@@ -236,7 +234,6 @@ export const fetchScheduledTests = async (
 
     return testsWithDetails;
   } catch (error) {
-    console.error("Error fetching scheduled tests:", error);
     toast.error("Failed to load tests");
     return [];
   }
@@ -267,14 +264,6 @@ export const createScheduledTest = async (
       return { success: false, error: "Paper is required" };
     }
 
-    console.log("Creating scheduled test with payload:", {
-      center_id: payload.centerId,
-      paper_id: payload.paperId,
-      title: payload.title,
-      scheduled_at: payload.scheduledAt,
-      duration_minutes: payload.durationMinutes || 180,
-    });
-
     // Calculate ended_at based on scheduled_at and duration
     const durationMinutes = payload.durationMinutes || 180;
     const scheduledDate = new Date(payload.scheduledAt);
@@ -298,7 +287,6 @@ export const createScheduledTest = async (
       .single();
 
     if (testError) {
-      console.error("Test creation error:", testError);
       throw testError;
     }
 
@@ -309,14 +297,6 @@ export const createScheduledTest = async (
     toast.success("Test scheduled successfully!");
     return { success: true, testId: test.id };
   } catch (error: any) {
-    console.error("Error creating scheduled test:", error);
-    console.error("Error details:", {
-      message: error?.message,
-      code: error?.code,
-      details: error?.details,
-      hint: error?.hint,
-    });
-
     let errorMessage = "Failed to schedule test";
 
     if (error?.code === "42P01") {
@@ -386,7 +366,6 @@ export const updateScheduledTest = async (
     toast.success("Test updated successfully!");
     return { success: true };
   } catch (error: any) {
-    console.error("Error updating scheduled test:", error);
     toast.error("Failed to update test. Please try again.");
     return { success: false, error: "Failed to update test" };
   }
@@ -410,7 +389,6 @@ export const deleteScheduledTest = async (
 
     return { success: true };
   } catch (error: any) {
-    console.error("Error deleting scheduled test:", error);
     toast.error("Failed to delete test. Please try again.");
     return { success: false, error: "Failed to delete test" };
   }
@@ -435,7 +413,6 @@ export const cancelScheduledTest = async (
     toast.success("Test cancelled successfully!");
     return { success: true };
   } catch (error: any) {
-    console.error("Error cancelling scheduled test:", error);
     toast.error("Failed to cancel test. Please try again.");
     return { success: false, error: "Failed to cancel test" };
   }
@@ -464,7 +441,6 @@ export const generateScheduledTestOtp = async (
 
     return { success: true, otp: data.otp };
   } catch (error: any) {
-    console.error("Error generating OTP:", error);
     toast.error("Failed to generate OTP. Please try again.");
     return { success: false, error: "Failed to generate OTP" };
   }
@@ -530,7 +506,6 @@ export const fetchTestStudents = async (
       student: Array.isArray(row.student) ? row.student[0] : row.student,
     }));
   } catch (error) {
-    console.error("Error fetching test students:", error);
     toast.error("Failed to load students for this test");
     return [];
   }
