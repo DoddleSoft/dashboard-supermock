@@ -2,10 +2,19 @@ export function cn(...classes: (string | undefined | null | false)[]) {
   return classes.filter(Boolean).join(" ");
 }
 
+// Ensure a timestamp string from the DB is treated as UTC.
+// Supabase "timestamp without time zone" columns are stored as UTC
+// but returned without a trailing "Z", so JS Date() would parse them
+// as local time, causing a +6 h offset for Asia/Dhaka users.
+function ensureUtc(ts: string): string {
+  if (/Z$/i.test(ts) || /[+-]\d{2}:\d{2}$/.test(ts)) return ts;
+  return ts + "Z";
+}
+
 // Helper function to format timestamp to local time
 export const formatLocalTime = (isoString: string) => {
   try {
-    const date = new Date(isoString);
+    const date = new Date(ensureUtc(isoString));
     // Format as: "Jan 16, 2025, 2:30 PM"
     return new Intl.DateTimeFormat("en-US", {
       year: "numeric",
@@ -24,7 +33,7 @@ export const formatLocalTime = (isoString: string) => {
 // Helper function to get relative time (e.g., "2 hours ago")
 export const getRelativeTime = (isoString: string) => {
   try {
-    const date = new Date(isoString);
+    const date = new Date(ensureUtc(isoString));
     const now = new Date();
     const secondsAgo = Math.floor((now.getTime() - date.getTime()) / 1000);
 

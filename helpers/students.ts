@@ -32,7 +32,7 @@ export const fetchStudents = async (centerId: string): Promise<Student[]> => {
       grade: student.grade,
       status: student.status || "active",
       enrollment_type: student.enrollment_type || "regular",
-      testsCompleted: 0, // You'll need to calculate this from tests table
+      testsCompleted: student.tests_taken || 0,
       enrolled_at: student.enrolled_at,
       updated_at: student.updated_at,
     }));

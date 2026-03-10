@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
     grade: s.grade,
     status: s.status ?? "active",
     enrollment_type: s.enrollment_type ?? "regular",
-    testsCompleted: 0,
+    testsCompleted: (s.tests_taken as number) || 0,
     enrolled_at: s.enrolled_at,
     updated_at: s.updated_at,
   }));

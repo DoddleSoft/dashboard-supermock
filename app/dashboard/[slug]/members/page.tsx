@@ -183,7 +183,11 @@ export default function MembersPage() {
 
     try {
       setSubmitting(true);
-      await updateCenterMember(selectedMember.user_id, editData);
+      await updateCenterMember(
+        currentCenter.center_id,
+        selectedMember.user_id,
+        editData,
+      );
       await loadMembers();
       closeEditDrawer();
     } catch (error) {

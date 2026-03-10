@@ -145,6 +145,7 @@ export const createCenterMember = async (
 };
 
 export const updateCenterMember = async (
+  centerId: string,
   userId: string,
   updateData: {
     full_name?: string;
@@ -154,23 +155,32 @@ export const updateCenterMember = async (
   },
 ) => {
   try {
-    const { error } = await supabase
-      .from("users")
-      .update({
+    const res = await fetch("/api/create/members/update", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: userId,
+        center_id: centerId,
         full_name: updateData.full_name,
         email: updateData.email,
         role: updateData.role,
         is_active: updateData.is_active,
-      })
-      .eq("user_id", userId);
+      }),
+    });
 
-    if (error) throw error;
+    const json = await res.json();
+    if (!res.ok) {
+      toast.error(json.error ?? "Failed to update member.");
+      throw new Error(json.error ?? "api error");
+    }
 
     toast.success("Member updated successfully!");
   } catch (error: any) {
-    toast.error(
-      parseError(error, "Failed to save member changes. Please try again."),
-    );
+    if (error.message !== "api error") {
+      toast.error(
+        parseError(error, "Failed to save member changes. Please try again."),
+      );
+    }
     throw error;
   }
 };
