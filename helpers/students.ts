@@ -19,7 +19,7 @@ export const fetchStudents = async (centerId: string): Promise<Student[]> => {
     if (error) throw error;
 
     // Map database fields to component fields
-    const mappedStudents: Student[] = (data || []).map((student) => ({
+    const mappedStudents: Student[] = (data || []).map((student: Record<string, any>) => ({
       student_id: student.student_id,
       center_id: student.center_id,
       name: student.name,

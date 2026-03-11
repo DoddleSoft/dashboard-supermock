@@ -14,61 +14,60 @@ export const centerHelpers = {
     const supabase = createClient();
 
     try {
+      // Single query using Supabase foreign key joins instead of 2 separate queries
       const { data: papers, error: papersError } = await supabase
         .from("papers")
         .select(
-          "id,title,paper_type,is_active,created_at,reading_module_id,listening_module_id,writing_module_id,speaking_module_id",
+          `id,title,paper_type,is_active,created_at,
+           reading_module_id,listening_module_id,writing_module_id,speaking_module_id,
+           reading_module:modules!papers_reading_fk(id,module_type,heading),
+           listening_module:modules!papers_listening_fk(id,module_type,heading),
+           writing_module:modules!papers_writing_fk(id,module_type,heading),
+           speaking_module:modules!papers_speaking_fk(id,module_type,heading)`,
         )
         .eq("center_id", centerId)
         .order("created_at", { ascending: false });
 
       if (papersError) throw papersError;
 
-      const { data: modules, error: modulesError } = await supabase
-        .from("modules")
-        .select("id,module_type,heading")
-        .eq("center_id", centerId);
+      const moduleIdSet = new Set<string>();
 
-      if (modulesError) throw modulesError;
-
-      // Create a map of module IDs to their types
-      const moduleTypeMap: Record<string, string> = {};
-      const moduleNameMap: Record<string, string> = {};
-      (modules || []).forEach((mod) => {
-        if (mod.id && mod.module_type) {
-          moduleTypeMap[mod.id] = mod.module_type;
-        }
-        if (mod.id && mod.heading) {
-          moduleNameMap[mod.id] = mod.heading;
-        }
-      });
-
-      const summaries: PaperSummary[] = (papers || []).map((paper) => {
+      const summaries: PaperSummary[] = (papers || []).map((paper: any) => {
         const moduleTypes: string[] = [];
         let modulesCount = 0;
 
-        // Check each module reference in the paper
-        if (paper.reading_module_id && moduleTypeMap[paper.reading_module_id]) {
-          moduleTypes.push(moduleTypeMap[paper.reading_module_id]);
+        const rm = Array.isArray(paper.reading_module)
+          ? paper.reading_module[0]
+          : paper.reading_module;
+        const lm = Array.isArray(paper.listening_module)
+          ? paper.listening_module[0]
+          : paper.listening_module;
+        const wm = Array.isArray(paper.writing_module)
+          ? paper.writing_module[0]
+          : paper.writing_module;
+        const sm = Array.isArray(paper.speaking_module)
+          ? paper.speaking_module[0]
+          : paper.speaking_module;
+
+        if (rm) {
+          moduleTypes.push(rm.module_type);
           modulesCount++;
+          moduleIdSet.add(rm.id);
         }
-        if (
-          paper.listening_module_id &&
-          moduleTypeMap[paper.listening_module_id]
-        ) {
-          moduleTypes.push(moduleTypeMap[paper.listening_module_id]);
+        if (lm) {
+          moduleTypes.push(lm.module_type);
           modulesCount++;
+          moduleIdSet.add(lm.id);
         }
-        if (paper.writing_module_id && moduleTypeMap[paper.writing_module_id]) {
-          moduleTypes.push(moduleTypeMap[paper.writing_module_id]);
+        if (wm) {
+          moduleTypes.push(wm.module_type);
           modulesCount++;
+          moduleIdSet.add(wm.id);
         }
-        if (
-          paper.speaking_module_id &&
-          moduleTypeMap[paper.speaking_module_id]
-        ) {
-          moduleTypes.push(moduleTypeMap[paper.speaking_module_id]);
+        if (sm) {
+          moduleTypes.push(sm.module_type);
           modulesCount++;
+          moduleIdSet.add(sm.id);
         }
 
         return {
@@ -83,10 +82,10 @@ export const centerHelpers = {
           listeningModuleId: paper.listening_module_id ?? null,
           writingModuleId: paper.writing_module_id ?? null,
           speakingModuleId: paper.speaking_module_id ?? null,
-          readingModuleName: moduleNameMap[paper.reading_module_id] ?? null,
-          listeningModuleName: moduleNameMap[paper.listening_module_id] ?? null,
-          writingModuleName: moduleNameMap[paper.writing_module_id] ?? null,
-          speakingModuleName: moduleNameMap[paper.speaking_module_id] ?? null,
+          readingModuleName: rm?.heading ?? null,
+          listeningModuleName: lm?.heading ?? null,
+          writingModuleName: wm?.heading ?? null,
+          speakingModuleName: sm?.heading ?? null,
         };
       });
 
@@ -94,7 +93,7 @@ export const centerHelpers = {
 
       const stats: ModuleOverviewStats = {
         totalPapers: summaries.length,
-        totalModules: (modules || []).length,
+        totalModules: moduleIdSet.size,
         publishedPapers,
         draftPapers: summaries.length - publishedPapers,
       };

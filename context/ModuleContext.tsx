@@ -325,11 +325,12 @@ const getDefaultModuleData = (): ModuleData => ({
   },
 });
 
+const supabase = createClient();
+
 // Provider component
 export function ModuleProvider({ children }: { children: ReactNode }) {
   const idCounterRef = useRef(2);
   const { currentCenter } = useCentre();
-  const supabase = createClient();
 
   const [centerPapers, setCenterPapers] = useState<PaperSummary[]>([]);
   const [centerModuleStats, setCenterModuleStats] =

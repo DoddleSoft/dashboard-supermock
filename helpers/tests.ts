@@ -204,7 +204,7 @@ export const fetchScheduledTests = async (
 
     // Fetch students for each test and build modules array from paper
     const testsWithDetails = await Promise.all(
-      (data || []).map(async (test) => {
+      (data || []).map(async (test: Record<string, any>) => {
         // Build modules array from paper module references
         const modules: Array<{
           id: string;

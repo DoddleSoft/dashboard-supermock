@@ -237,7 +237,7 @@ export default function AddStudentsPanel({
         }
 
         if (createdStudents && createdStudents.length > 0) {
-          allStudentIds = createdStudents.map((s) => s.student_id);
+          allStudentIds = createdStudents.map((s: { student_id: string }) => s.student_id);
         }
       }
 

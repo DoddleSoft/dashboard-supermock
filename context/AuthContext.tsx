@@ -49,42 +49,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load initial session
+  // Load initial session and subscribe to auth state changes in a single effect
   useEffect(() => {
+    let mounted = true;
+
+    // 1. Seed state from the persisted session (fast, no network call)
     const loadSession = async () => {
       try {
-        setLoading(true);
         const session = await authService.getSession();
-        setSession(session);
+        if (!mounted) return;
 
+        setSession(session);
         if (session?.user) {
           setUser(session.user);
-          // Don't block on user profile loading
           loadUserProfile(session.user.id).catch(console.error);
         }
       } catch (error) {
         console.error("Error loading session:", error);
       } finally {
-        // Always set loading to false after 1 second max
-        setTimeout(() => setLoading(false), 100);
+        if (mounted) setLoading(false);
       }
     };
 
     loadSession();
-  }, []);
 
-  // Subscribe to auth state changes
-  useEffect(() => {
+    // 2. Subscribe to future auth state changes (sign-in, sign-out, token refresh)
     const {
       data: { subscription },
     } = authService.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event, !!session);
+      if (!mounted) return;
 
       setSession(session);
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        // Don't block on user profile loading
         loadUserProfile(session.user.id).catch(console.error);
       } else {
         setUserProfile(null);
@@ -93,7 +91,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Load user profile from public.users table
@@ -165,9 +166,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           error: result.error || "Login failed",
         };
       }
-
-      // Wait briefly for auth state to update
-      await new Promise((resolve) => setTimeout(resolve, 300));
 
       // Get redirect path
       const redirectResult = await authService.getUserRedirectPath();

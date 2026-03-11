@@ -45,11 +45,12 @@ export interface CentreContextType {
 
 const CentreContext = createContext<CentreContextType | undefined>(undefined);
 
+const supabase = createClient();
+
 export function CentreProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const params = useParams();
   const slug = params?.slug as string | undefined;
-  const supabase = createClient();
 
   const [currentCenter, setCurrentCenter] = useState<Center | null>(null);
   const [allCenters, setAllCenters] = useState<Center[]>([]);
@@ -118,7 +119,7 @@ export function CentreProvider({ children }: { children: ReactNode }) {
       setAllCenters(centersData || []);
 
       // Find center with matching slug
-      const center = centersData?.find((c) => c.slug === slugToCheck);
+      const center = centersData?.find((c: Center) => c.slug === slugToCheck);
 
       if (!center) {
         // Not an owner — check if user is a member of any center with this slug

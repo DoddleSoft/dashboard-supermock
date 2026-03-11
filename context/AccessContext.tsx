@@ -35,6 +35,8 @@ export interface AccessContextType {
 
 const AccessContext = createContext<AccessContextType | undefined>(undefined);
 
+const supabase = createClient();
+
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function AccessProvider({ children }: { children: ReactNode }) {
@@ -42,7 +44,6 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   const { currentCenter, isOwner, loading: centerLoading } = useCentre();
   const params = useParams();
   const slug = params?.slug as string | undefined;
-  const supabase = createClient();
 
   const [role, setRole] = useState<CenterRole | null>(null);
   const [loading, setLoading] = useState(true);
