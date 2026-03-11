@@ -103,7 +103,7 @@ export function LoginForm() {
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
             Welcome Back
           </h1>
-          <p className="text-gray-600 font-semibold ">
+          <p className="text-gray-600">
             New to SuperMock?{" "}
             <Link
               href="/auth/register"

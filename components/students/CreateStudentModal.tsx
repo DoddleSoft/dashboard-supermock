@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import { Loader2, X } from "lucide-react";
+import { useState } from "react";
+import { Eye, EyeOff, Loader2, X } from "lucide-react";
 
 interface CreateStudentModalProps {
   isOpen: boolean;
@@ -29,6 +30,8 @@ export function CreateStudentModal({
   onSubmit,
   onChange,
 }: CreateStudentModalProps) {
+  const [showPassword, setShowPassword] = useState(false);
+
   if (!isOpen) return null;
 
   return (
@@ -81,16 +84,30 @@ export function CreateStudentModal({
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Password *{" "}
               </label>
-              <input
-                type="password"
-                maxLength={20}
-                placeholder="Enter password"
-                value={formData.password}
-                onChange={(e) => onChange("password", e.target.value)}
-                required
-                autoComplete="new-password"
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 text-sm"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  maxLength={20}
+                  placeholder="Enter password"
+                  value={formData.password}
+                  onChange={(e) => onChange("password", e.target.value)}
+                  required
+                  autoComplete="new-password"
+                  className="w-full px-4 py-2.5 pr-10 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
               <p className="mt-1 text-xs text-slate-400">
                 The student will use this to log in on the exam portal.
               </p>

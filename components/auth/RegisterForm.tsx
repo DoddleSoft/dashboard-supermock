@@ -106,7 +106,7 @@ export function RegisterForm() {
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
             Create Account
           </h1>
-          <p className="text-gray-600 font-semibold">
+          <p className="text-gray-600">
             Already have an account?{" "}
             <Link
               href="/auth/login"

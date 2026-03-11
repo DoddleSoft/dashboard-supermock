@@ -106,11 +106,21 @@ export const createCenterMember = async (
       toast.error("Please enter a valid email address.");
       throw new Error("validation");
     }
-    const passwordRe = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-    if (!passwordRe.test(data.password)) {
-      toast.error(
-        "Password must be at least 8 characters and include uppercase, lowercase, and a number.",
-      );
+    const pwd = data.password;
+    if (!pwd || pwd.length < 8) {
+      toast.error("Password must be at least 8 characters.");
+      throw new Error("validation");
+    }
+    if (!/[a-z]/.test(pwd)) {
+      toast.error("Password must include at least one lowercase letter.");
+      throw new Error("validation");
+    }
+    if (!/[A-Z]/.test(pwd)) {
+      toast.error("Password must include at least one uppercase letter.");
+      throw new Error("validation");
+    }
+    if (!/\d/.test(pwd)) {
+      toast.error("Password must include at least one number.");
       throw new Error("validation");
     }
 

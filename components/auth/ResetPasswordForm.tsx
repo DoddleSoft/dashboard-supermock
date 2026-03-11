@@ -2,10 +2,11 @@
 
 import { useState, useRef } from "react";
 import Link from "next/link";
-import { Mail } from "lucide-react";
+import { ArrowLeft, CheckCircle, Mail } from "lucide-react";
 import { authService } from "@/helpers/auth";
 import { toast } from "sonner";
 import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile";
+import { BrandedSection } from "./BrandedSection";
 
 export function ResetPasswordForm() {
   const [email, setEmail] = useState("");
@@ -49,45 +50,68 @@ export function ResetPasswordForm() {
     }
   };
 
-  return (
-    <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12">
-      <div className="w-full max-w-md">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Reset Password
-          </h1>
-          <p className="text-gray-600 font-semibold">
-            Remember your password?{" "}
-            <Link
-              href="/auth/login"
-              className="text-red-600 hover:text-red-700 font-semibold transition-colors"
-            >
-              Log in
-            </Link>
-          </p>
-        </div>
-
-        {sent ? (
-          <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center space-y-3">
-            <p className="text-green-800 font-semibold">Reset link sent!</p>
-            <p className="text-sm text-green-700">
-              We&apos;ve sent a password reset link to{" "}
-              <span className="font-semibold">{email}</span>. Please check your
-              inbox and click the link to set a new password.
+  if (sent) {
+    return (
+      <div className="flex w-full min-h-screen bg-white">
+        <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12">
+          <div className="w-full max-w-md text-center">
+            <div className="flex justify-center mb-6">
+              <div className="bg-green-100 rounded-full p-4">
+                <CheckCircle className="h-12 w-12 text-green-600" />
+              </div>
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-3">
+              Check Your Email
+            </h1>
+            <p className="text-gray-500 mb-2">
+              We&apos;ve sent a password reset link to
             </p>
+            <p className="text-gray-900 font-medium mb-6">{email}</p>
+            <p className="text-sm text-gray-500 mb-8">
+              Click the link in the email to reset your password. If you
+              don&apos;t see the email, check your spam folder.
+            </p>
+
             <button
               onClick={() => {
-                setSent(false);
                 setEmail("");
                 turnstileRef.current?.reset();
                 // setCaptchaToken(null);
               }}
-              className="text-sm text-red-600 hover:text-red-700 font-semibold transition-colors"
+              className="text-red-600 hover:text-red-700 text-sm font-medium underline mb-4"
             >
-              Send again
+              Didn&apos;t receive the email? Try again
             </button>
+
+            <div className="mt-6">
+              <Link
+                href="/auth/login"
+                className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
+              >
+                <ArrowLeft size={16} />
+                Back to Login
+              </Link>
+            </div>
           </div>
-        ) : (
+        </div>
+        <BrandedSection />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex w-full min-h-screen bg-white">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12">
+        <div className="w-full max-w-md">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Forgot Password?
+            </h1>
+            <p className="text-gray-600">
+              No worries, we&apos;ll send you reset instructions.
+            </p>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -105,9 +129,6 @@ export function ResetPasswordForm() {
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500"
                 />
               </div>
-              <p className="mt-1.5 text-xs text-gray-500">
-                We&apos;ll send a password reset link to this email address.
-              </p>
             </div>
 
             {/* <Turnstile
@@ -121,13 +142,25 @@ export function ResetPasswordForm() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg disabled:opacity-50"
             >
               {isLoading ? "Sending..." : "Send Reset Link"}
             </button>
           </form>
-        )}
+
+          <div className="mt-6 text-center">
+            <Link
+              href="/auth/login"
+              className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft size={16} />
+              Back to Login
+            </Link>
+          </div>
+        </div>
       </div>
+
+      <BrandedSection />
     </div>
   );
 }

@@ -70,9 +70,7 @@ export function ChangePasswordForm() {
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
             Set New Password
           </h1>
-          <p className="text-gray-600 font-semibold">
-            Enter your new password below.
-          </p>
+          <p className="text-gray-600">Enter your new password below.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
