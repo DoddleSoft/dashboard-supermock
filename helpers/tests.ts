@@ -89,7 +89,29 @@ export const fetchActivePapers = async (
 
     if (error) throw error;
 
-    return (data || []).map((p: any) => ({
+    type PaperRow = {
+      id: string;
+      title: string;
+      paper_type: string;
+      reading_module:
+        | { id: string; heading: string; module_type: string }
+        | { id: string; heading: string; module_type: string }[]
+        | null;
+      listening_module:
+        | { id: string; heading: string; module_type: string }
+        | { id: string; heading: string; module_type: string }[]
+        | null;
+      writing_module:
+        | { id: string; heading: string; module_type: string }
+        | { id: string; heading: string; module_type: string }[]
+        | null;
+      speaking_module:
+        | { id: string; heading: string; module_type: string }
+        | { id: string; heading: string; module_type: string }[]
+        | null;
+    };
+
+    return (data || []).map((p: PaperRow) => ({
       id: p.id,
       title: p.title,
       paper_type: p.paper_type,
@@ -202,37 +224,22 @@ export const fetchScheduledTests = async (
 
     if (error) throw error;
 
-    // Fetch students for each test and build modules array from paper
-    const testsWithDetails = await Promise.all(
-      (data || []).map(async (test: Record<string, any>) => {
-        // Build modules array from paper module references
-        const modules: Array<{
-          id: string;
-          module_type: string;
-          heading: string;
-        }> = [];
+    // Build modules array from paper module references (synchronous — no N+1 queries)
+    return (data || []).map((test: Record<string, unknown>) => {
+      const paper = test.paper as ScheduledTest["paper"] | undefined;
+      const modules: Array<{
+        id: string;
+        module_type: string;
+        heading: string;
+      }> = [];
 
-        if (test.paper?.reading_module) {
-          modules.push(test.paper.reading_module);
-        }
-        if (test.paper?.listening_module) {
-          modules.push(test.paper.listening_module);
-        }
-        if (test.paper?.writing_module) {
-          modules.push(test.paper.writing_module);
-        }
-        if (test.paper?.speaking_module) {
-          modules.push(test.paper.speaking_module);
-        }
+      if (paper?.reading_module) modules.push(paper.reading_module);
+      if (paper?.listening_module) modules.push(paper.listening_module);
+      if (paper?.writing_module) modules.push(paper.writing_module);
+      if (paper?.speaking_module) modules.push(paper.speaking_module);
 
-        return {
-          ...test,
-          modules,
-        };
-      }),
-    );
-
-    return testsWithDetails;
+      return { ...test, modules } as ScheduledTest;
+    });
   } catch (error) {
     toast.error("Failed to load tests");
     return [];
@@ -264,14 +271,7 @@ export const createScheduledTest = async (
       return { success: false, error: "Paper is required" };
     }
 
-    // Calculate ended_at based on scheduled_at and duration
-    const durationMinutes = payload.durationMinutes || 180;
-    const scheduledDate = new Date(payload.scheduledAt);
-    const endedDate = new Date(
-      scheduledDate.getTime() + durationMinutes * 60000,
-    );
-
-    // Create the test
+    // Create the test — ended_at is computed server-side by a DB trigger
     const { data: test, error: testError } = await supabase
       .from("scheduled_tests")
       .insert({
@@ -279,8 +279,7 @@ export const createScheduledTest = async (
         paper_id: payload.paperId,
         title: payload.title.trim(),
         scheduled_at: payload.scheduledAt,
-        ended_at: endedDate.toISOString(),
-        duration_minutes: durationMinutes,
+        duration_minutes: payload.durationMinutes || 180,
         status: "scheduled",
       })
       .select()
@@ -326,35 +325,20 @@ export const updateScheduledTest = async (
   try {
     const supabase = createClient();
 
-    const updateData: any = {};
+    // ended_at is auto-computed by a DB trigger when scheduled_at or duration_minutes change
+    const updateData: Partial<{
+      title: string;
+      scheduled_at: string;
+      duration_minutes: number;
+      paper_id: string;
+      status: string;
+    }> = {};
     if (updates.title) updateData.title = updates.title;
     if (updates.scheduledAt) updateData.scheduled_at = updates.scheduledAt;
     if (updates.durationMinutes)
       updateData.duration_minutes = updates.durationMinutes;
     if (updates.paperId) updateData.paper_id = updates.paperId;
     if (updates.status) updateData.status = updates.status;
-
-    // Calculate ended_at whenever scheduled_at or duration changes
-    if (updates.scheduledAt || updates.durationMinutes) {
-      // Fetch current test data to get missing values
-      const { data: currentTest } = await supabase
-        .from("scheduled_tests")
-        .select("scheduled_at, duration_minutes")
-        .eq("id", testId)
-        .single();
-
-      const scheduledAt = updates.scheduledAt || currentTest?.scheduled_at;
-      const durationMinutes =
-        updates.durationMinutes || currentTest?.duration_minutes || 180;
-
-      if (scheduledAt) {
-        const scheduledDate = new Date(scheduledAt);
-        const endedDate = new Date(
-          scheduledDate.getTime() + durationMinutes * 60000,
-        );
-        updateData.ended_at = endedDate.toISOString();
-      }
-    }
 
     const { error: testError } = await supabase
       .from("scheduled_tests")
@@ -363,7 +347,6 @@ export const updateScheduledTest = async (
 
     if (testError) throw testError;
 
-    toast.success("Test updated successfully!");
     return { success: true };
   } catch (error: any) {
     toast.error("Failed to update test. Please try again.");
@@ -434,9 +417,9 @@ export const generateScheduledTestOtp = async (
 
     if (error) throw error;
 
-    // Handle manual error returns from function (e.g. invalid ID)
-    if (!data.success) {
-      throw new Error(data.error);
+    // Handle null/undefined response or manual error returns
+    if (!data || !data.success) {
+      throw new Error(data?.error ?? "No response from OTP generator");
     }
 
     return { success: true, otp: data.otp };

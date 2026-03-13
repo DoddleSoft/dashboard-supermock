@@ -144,9 +144,7 @@ export default function PreviewPage() {
       setFetchError(null);
       const supabase = createClient();
 
-      // NOTE: Ensure the `get_module_hierarchy` RPC function uses SECURITY INVOKER
-      // so it respects RLS policies, or explicitly verifies center ownership
-      // within the PL/pgSQL function body before returning data.
+      // Try the RPC first (works for center-owned modules)
       const { data: rpcData, error } = await supabase.rpc(
         "get_module_hierarchy",
         {
@@ -154,23 +152,106 @@ export default function PreviewPage() {
         },
       );
 
-      if (error) {
+      if (!error && rpcData) {
+        const hierarchy = rpcData as ModuleHierarchy;
+        setData(hierarchy);
+        if (hierarchy.sections.length > 0) {
+          setSelectedSectionId(hierarchy.sections[0].id);
+        }
+        setLoading(false);
+        return;
+      }
+
+      // RPC failed — check if this is a public module and fetch directly
+      const { data: moduleRow } = await supabase
+        .from("modules")
+        .select("id, module_type, heading, subheading, view_option")
+        .eq("id", moduleId)
+        .eq("view_option", "public")
+        .maybeSingle();
+
+      if (!moduleRow) {
         const message =
-          error.code === "PGRST116"
+          error?.code === "PGRST116"
             ? "Module not found or you do not have access."
-            : error.message || "Failed to load module data.";
+            : error?.message || "Failed to load module data.";
         setFetchError(message);
         toast.error(message);
         setLoading(false);
         return;
       }
 
-      if (rpcData) {
-        const hierarchy = rpcData as ModuleHierarchy;
-        setData(hierarchy);
-        if (hierarchy.sections.length > 0) {
-          setSelectedSectionId(hierarchy.sections[0].id);
-        }
+      // Fetch sections for the public module
+      const { data: sections } = await supabase
+        .from("sections")
+        .select("*")
+        .eq("module_id", moduleId)
+        .order("section_index", { ascending: true });
+
+      const sectionIds = (sections || []).map((s: any) => s.id);
+      let subSections: any[] = [];
+      if (sectionIds.length > 0) {
+        const { data: subs } = await supabase
+          .from("sub_sections")
+          .select("*")
+          .in("section_id", sectionIds)
+          .order("sub_section_index", { ascending: true });
+        subSections = subs || [];
+      }
+
+      const subSectionIds = subSections.map((s: any) => s.id);
+      let questions: any[] = [];
+      if (subSectionIds.length > 0) {
+        const { data: qa } = await supabase
+          .from("question_answers")
+          .select("*")
+          .in("sub_section_id", subSectionIds);
+        questions = qa || [];
+      }
+
+      // Build the hierarchy
+      const hierarchy: ModuleHierarchy = {
+        id: moduleRow.id,
+        module_type: moduleRow.module_type,
+        heading: moduleRow.heading,
+        subheading: moduleRow.subheading,
+        sections: (sections || []).map((sec: any) => ({
+          id: sec.id,
+          section_title: sec.title,
+          title: sec.title,
+          subtext: sec.subtext,
+          heading: sec.subtext,
+          resource_url: sec.resource_url,
+          content_text: sec.content_text,
+          content_type: sec.content_type,
+          instruction: sec.instruction,
+          sub_sections: subSections
+            .filter((sub: any) => sub.section_id === sec.id)
+            .map((sub: any) => ({
+              id: sub.id,
+              sub_section_index: sub.sub_section_index,
+              sub_section_title: sub.sub_section_title || sub.boundary_text,
+              boundary_text: sub.boundary_text,
+              instruction: sub.instruction,
+              content_template: sub.content_template,
+              questions: questions
+                .filter((q: any) => q.sub_section_id === sub.id)
+                .map((q: any) => ({
+                  id: q.id,
+                  question_number: 0,
+                  question_ref: q.question_ref,
+                  correct_answers: q.correct_answers,
+                  options: q.options,
+                  explanation: q.explanation,
+                  question_type: q.question_type,
+                })),
+            })),
+        })),
+      };
+
+      setData(hierarchy);
+      if (hierarchy.sections.length > 0) {
+        setSelectedSectionId(hierarchy.sections[0].id);
       }
       setLoading(false);
     };

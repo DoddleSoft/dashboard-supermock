@@ -1,50 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
-import { Student } from "@/types/student";
 import { toast } from "sonner";
 import { parseError } from "@/lib/utils";
-
-const supabase = createClient();
-
-/**
- * Fetch all students for a specific center
- */
-export const fetchStudents = async (centerId: string): Promise<Student[]> => {
-  try {
-    const { data, error } = await supabase
-      .from("student_profiles")
-      .select("*")
-      .eq("center_id", centerId)
-      .order("enrolled_at", { ascending: false });
-
-    if (error) throw error;
-
-    // Map database fields to component fields
-    const mappedStudents: Student[] = (data || []).map((student: Record<string, any>) => ({
-      student_id: student.student_id,
-      center_id: student.center_id,
-      name: student.name,
-      email: student.email,
-      phone: student.phone,
-      guardian: student.guardian,
-      guardian_phone: student.guardian_phone,
-      date_of_birth: student.date_of_birth,
-      address: student.address,
-      grade: student.grade,
-      status: student.status || "active",
-      enrollment_type: student.enrollment_type || "regular",
-      testsCompleted: student.tests_taken || 0,
-      enrolled_at: student.enrolled_at,
-      updated_at: student.updated_at,
-    }));
-
-    return mappedStudents;
-  } catch (error) {
-    toast.error(
-      parseError(error, "Unable to load students. Please refresh the page."),
-    );
-    throw error;
-  }
-};
 
 /**
  * Create a new student by calling the secure backend API route.
@@ -145,6 +101,7 @@ export const updateStudent = async (
     status?: "active" | "cancelled" | "archived" | "passed";
   },
 ) => {
+  const supabase = createClient();
   try {
     const { error } = await supabase
       .from("student_profiles")
@@ -162,8 +119,6 @@ export const updateStudent = async (
       .eq("student_id", studentId);
 
     if (error) throw error;
-
-    toast.success("Student updated successfully!");
   } catch (error: any) {
     toast.error(
       parseError(error, "Failed to save student changes. Please try again."),
@@ -172,11 +127,8 @@ export const updateStudent = async (
   }
 };
 
-/**
- * Delete a student and all related records (mock attempts, attempt modules, student answers)
- * Uses a SECURITY DEFINER RPC to handle the full cascade cleanup safely
- */
 export const deleteStudent = async (studentId: string) => {
+  const supabase = createClient();
   try {
     const { data, error } = await supabase.rpc("delete_student_cascade", {
       p_student_id: studentId,

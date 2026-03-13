@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Search, MoreVertical, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCentre } from "@/context/CentreContext";
 import { SmallLoader } from "@/components/ui/SmallLoader";
 import { useParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
-  fetchReviews,
-  deleteAttempt,
   formatReviewDate,
   getReviewStatusColor,
   AttemptReview,
@@ -46,6 +45,7 @@ export default function ReviewPage() {
   const slug = params.slug as string;
 
   const [reviews, setReviews] = useState<AttemptReview[]>([]);
+  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState<PageSize>(25);
 
@@ -63,9 +63,19 @@ export default function ReviewPage() {
   const [attemptToDelete, setAttemptToDelete] = useState<AttemptReview | null>(
     null,
   );
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(
+    null,
+  );
 
-  // Debounce search — 350 ms
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isInitialMount = useRef(true);
+
+  // Debounce search — 350 ms (skip initial mount to avoid resetting page)
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     const id = setTimeout(() => {
       setDebouncedSearch(searchQuery);
       setPage(1);
@@ -89,58 +99,101 @@ export default function ReviewPage() {
 
   const loadReviews = useCallback(async () => {
     if (!currentCenter?.center_id) return;
-    setLoading(true);
-    const data = await fetchReviews(currentCenter.center_id);
-    setReviews(data);
-    setLoading(false);
-  }, [currentCenter?.center_id]);
+
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    try {
+      setLoading(true);
+      const params = new URLSearchParams({
+        centerId: currentCenter.center_id,
+        page: String(page),
+        limit: String(limit),
+        search: debouncedSearch,
+        module: selectedModule,
+        status: selectedStatus,
+      });
+
+      const res = await fetch(`/api/reviews?${params.toString()}`, {
+        credentials: "include",
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        let message = "Failed to load reviews";
+        const contentType = res.headers.get("content-type");
+        if (contentType?.includes("application/json")) {
+          try {
+            const body = await res.json();
+            if (body.error) message = body.error;
+          } catch {
+            /* non-JSON despite header */
+          }
+        }
+        throw new Error(message);
+      }
+
+      let json;
+      try {
+        json = await res.json();
+      } catch {
+        throw new Error("Invalid response from server");
+      }
+
+      setReviews(json.reviews);
+      setTotal(json.total);
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      const message =
+        error instanceof Error ? error.message : "Failed to load reviews";
+      toast.error(message);
+    } finally {
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
+    }
+  }, [
+    currentCenter?.center_id,
+    page,
+    limit,
+    debouncedSearch,
+    selectedModule,
+    selectedStatus,
+  ]);
 
   useEffect(() => {
     if (currentCenter?.center_id) {
       loadReviews();
     }
+    return () => {
+      abortControllerRef.current?.abort();
+    };
   }, [loadReviews]);
 
-  // Client-side filtering
-  const filteredReviews = useMemo(() => {
-    return reviews.filter((attempt) => {
-      const q = debouncedSearch.toLowerCase();
-      const matchesSearch =
-        !q ||
-        attempt.studentName.toLowerCase().includes(q) ||
-        attempt.studentEmail.toLowerCase().includes(q);
-
-      const matchesModule =
-        selectedModule === "all" ||
-        attempt.modules.some((mod) => mod.moduleType === selectedModule);
-
-      const statusKey = attempt.status.toLowerCase().replace(/[\s_]+/g, "-");
-      const matchesStatus =
-        selectedStatus === "all" || statusKey === selectedStatus;
-
-      return matchesSearch && matchesModule && matchesStatus;
-    });
-  }, [reviews, debouncedSearch, selectedModule, selectedStatus]);
-
-  // Paginated slice
-  const total = filteredReviews.length;
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const firstRow = total === 0 ? 0 : (page - 1) * limit + 1;
   const lastRow = Math.min(page * limit, total);
-  const paginatedReviews = useMemo(
-    () => filteredReviews.slice((page - 1) * limit, page * limit),
-    [filteredReviews, page, limit],
-  );
   const pageNumbers = buildPageNumbers(page, totalPages);
 
-  const toggleActionMenu = (attempt: AttemptReview, e: React.MouseEvent) => {
+  const handleActionClick = (attempt: AttemptReview, e: React.MouseEvent) => {
     e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setMenuPos({
+      top: rect.bottom + 4,
+      left: Math.min(rect.right - 140, window.innerWidth - 148),
+    });
     if (actionMenuAttempt?.attemptId === attempt.attemptId) {
       setShowActionMenu((prev) => !prev);
     } else {
       setActionMenuAttempt(attempt);
       setShowActionMenu(true);
     }
+  };
+
+  const closeMenu = () => {
+    setShowActionMenu(false);
+    setMenuPos(null);
   };
 
   const handleActionPreview = (attempt: AttemptReview) => {
@@ -161,15 +214,35 @@ export default function ReviewPage() {
     if (!attemptToDelete) return;
     try {
       setDeleting(true);
-      const result = await deleteAttempt(attemptToDelete.attemptId);
-      if (result.success) {
-        if (paginatedReviews.length === 1 && page > 1) setPage((p) => p - 1);
-        else await loadReviews();
+      const res = await fetch("/api/reviews", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ attemptId: attemptToDelete.attemptId }),
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        let message = "Failed to delete review";
+        const contentType = res.headers.get("content-type");
+        if (contentType?.includes("application/json")) {
+          try {
+            const body = await res.json();
+            if (body.error) message = body.error;
+          } catch {
+            /* non-JSON despite header */
+          }
+        }
+        throw new Error(message);
       }
+
+      if (reviews.length === 1 && page > 1) setPage((p) => p - 1);
+      else await loadReviews();
       setShowDeleteConfirm(false);
       setAttemptToDelete(null);
-    } catch {
-      // Handled in helper
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to delete review";
+      toast.error(message);
     } finally {
       setDeleting(false);
     }
@@ -276,14 +349,10 @@ export default function ReviewPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {paginatedReviews.map((attempt) => (
+                  {reviews.map((attempt) => (
                     <tr
                       key={attempt.attemptId}
-                      className={`hover:bg-slate-50 transition-colors duration-150 relative ${
-                        actionMenuAttempt?.attemptId === attempt.attemptId
-                          ? "z-40"
-                          : "z-0"
-                      }`}
+                      className="hover:bg-slate-50 transition-colors duration-150"
                     >
                       <td className="px-6 py-1">
                         <span className="font-medium text-slate-900 text-sm">
@@ -319,51 +388,19 @@ export default function ReviewPage() {
                       </td>
                       <td className="px-6 py-1 text-right">
                         <button
-                          onClick={(e) => toggleActionMenu(attempt, e)}
+                          onClick={(e) => handleActionClick(attempt, e)}
                           className="p-2 hover:bg-slate-100 rounded-lg transition-colors duration-150 text-slate-600 hover:text-slate-900"
                           title="More actions"
                         >
                           <MoreVertical className="w-4 h-4" />
                         </button>
-
-                        {showActionMenu &&
-                          actionMenuAttempt?.attemptId ===
-                            attempt.attemptId && (
-                            <>
-                              <div
-                                className="fixed inset-0 z-40 bg-transparent"
-                                onClick={() => setShowActionMenu(false)}
-                              />
-                              <div className="absolute right-10 top-0 mt-10 bg-white border border-slate-200 rounded-lg shadow-xl z-50 min-w-[140px] overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right">
-                                <button
-                                  onClick={() => {
-                                    handleActionPreview(attempt);
-                                    setShowActionMenu(false);
-                                  }}
-                                  className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors font-medium"
-                                >
-                                  Preview
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    handleActionDelete(attempt);
-                                    setShowActionMenu(false);
-                                  }}
-                                  disabled={deleting}
-                                  className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors font-medium border-t border-slate-100 disabled:opacity-50"
-                                >
-                                  {deleting ? "Deleting..." : "Delete"}
-                                </button>
-                              </div>
-                            </>
-                          )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
 
-              {paginatedReviews.length === 0 && (
+              {reviews.length === 0 && (
                 <div className="text-center py-16">
                   <p className="text-slate-500 text-sm">
                     No reviews found matching your criteria
@@ -371,6 +408,40 @@ export default function ReviewPage() {
                 </div>
               )}
             </div>
+
+            {/* Action dropdown — fixed positioning to avoid overflow clipping */}
+            {showActionMenu && actionMenuAttempt && menuPos && (
+              <>
+                <div
+                  className="fixed inset-0 z-40 bg-transparent"
+                  onClick={closeMenu}
+                />
+                <div
+                  className="fixed bg-white border border-slate-200 rounded-lg shadow-xl z-50 min-w-[140px] overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right"
+                  style={{ top: menuPos.top, left: menuPos.left }}
+                >
+                  <button
+                    onClick={() => {
+                      handleActionPreview(actionMenuAttempt);
+                      closeMenu();
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors font-medium"
+                  >
+                    Preview
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleActionDelete(actionMenuAttempt);
+                      closeMenu();
+                    }}
+                    disabled={deleting}
+                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors font-medium border-t border-slate-100 disabled:opacity-50"
+                  >
+                    {deleting ? "Deleting..." : "Delete"}
+                  </button>
+                </div>
+              </>
+            )}
 
             {/* ── Pagination bar ───────────────────────────────────────────── */}
             <div className="flex items-center justify-between px-1">

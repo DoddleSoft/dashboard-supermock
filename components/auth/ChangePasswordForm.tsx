@@ -51,8 +51,6 @@ export function ChangePasswordForm() {
         return;
       }
 
-      toast.success("Password updated successfully! Redirecting to login...");
-
       setTimeout(() => {
         router.push("/auth/login");
       }, 2000);

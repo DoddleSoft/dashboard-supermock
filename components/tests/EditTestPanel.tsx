@@ -44,9 +44,7 @@ export default function EditTestPanel({
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  /* ── form state (initialised from test prop on mount) ── */
-  const initDate = new Date(test.scheduled_at);
-
+  /* ── form state ── */
   const [testTitle, setTestTitle] = useState(test.title);
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(
     test.paper
@@ -62,15 +60,38 @@ export default function EditTestPanel({
       : null,
   );
   const [scheduledDate, setScheduledDate] = useState(
-    initDate.toISOString().split("T")[0],
+    new Date(test.scheduled_at).toISOString().split("T")[0],
   );
   const [scheduledTime, setScheduledTime] = useState(
-    initDate.toTimeString().slice(0, 5),
+    new Date(test.scheduled_at).toTimeString().slice(0, 5),
   );
   const [duration, setDuration] = useState(test.duration_minutes);
   const [status, setStatus] = useState<
     "scheduled" | "in_progress" | "completed" | "cancelled"
   >(test.status);
+
+  // Keep form in sync when the test prop updates (e.g. after a background refresh)
+  useEffect(() => {
+    const d = new Date(test.scheduled_at);
+    setTestTitle(test.title);
+    setSelectedPaper(
+      test.paper
+        ? {
+            id: test.paper_id,
+            title: test.paper.title,
+            paper_type: test.paper.paper_type,
+            reading_module: test.paper.reading_module,
+            listening_module: test.paper.listening_module,
+            writing_module: test.paper.writing_module,
+            speaking_module: test.paper.speaking_module,
+          }
+        : null,
+    );
+    setScheduledDate(d.toISOString().split("T")[0]);
+    setScheduledTime(d.toTimeString().slice(0, 5));
+    setDuration(test.duration_minutes);
+    setStatus(test.status);
+  }, [test]);
 
   const [papers, setPapers] = useState<Paper[]>([]);
   const [showPaperDropdown, setShowPaperDropdown] = useState(false);

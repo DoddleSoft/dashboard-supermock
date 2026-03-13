@@ -1,41 +1,75 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { Student } from "@/types/student";
+
+interface EditData {
+  name: string;
+  email: string;
+  phone: string;
+  guardian: string;
+  guardian_phone: string;
+  date_of_birth: string;
+  address: string;
+  grade: string;
+  status: "active" | "cancelled" | "archived" | "passed";
+}
 
 interface EditStudentDrawerProps {
   isOpen: boolean;
   student: Student | null;
-  editData: {
-    name: string;
-    email: string;
-    phone: string;
-    guardian: string;
-    guardian_phone: string;
-    date_of_birth: string;
-    address: string;
-    grade: string;
-    status: "active" | "cancelled" | "archived" | "passed";
-  };
   isSubmitting: boolean;
   isDeleting: boolean;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (editData: EditData) => void;
   onDelete: () => void;
-  onChange: (field: string, value: string) => void;
   formatLocalTime: (isoString: string) => string;
 }
 
 export function EditStudentDrawer({
   isOpen,
   student,
-  editData,
   isSubmitting,
   isDeleting,
   onClose,
   onSave,
   onDelete,
-  onChange,
   formatLocalTime,
 }: EditStudentDrawerProps) {
+  const [editData, setEditData] = useState<EditData>({
+    name: "",
+    email: "",
+    phone: "",
+    guardian: "",
+    guardian_phone: "",
+    date_of_birth: "",
+    address: "",
+    grade: "",
+    status: "active",
+  });
+
+  // Sync internal state with the selected student when the drawer opens
+  useEffect(() => {
+    if (isOpen && student) {
+      setEditData({
+        name: student.name || "",
+        email: student.email || "",
+        phone: student.phone || "",
+        guardian: student.guardian || "",
+        guardian_phone: student.guardian_phone || "",
+        date_of_birth: student.date_of_birth || "",
+        address: student.address || "",
+        grade: student.grade || "",
+        status: student.status,
+      });
+    }
+  }, [isOpen, student]);
+
+  const onChange = (field: string, value: string) => {
+    setEditData((prev) => ({ ...prev, [field]: value }));
+  };
+
   if (!isOpen || !student) return null;
 
   return (
@@ -175,7 +209,7 @@ export function EditStudentDrawer({
                     | "active"
                     | "cancelled"
                     | "archived"
-                    | "passed"
+                    | "passed",
                 )
               }
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 bg-white text-sm"
@@ -226,7 +260,7 @@ export function EditStudentDrawer({
             )}
           </button>
           <button
-            onClick={onSave}
+            onClick={() => onSave(editData)}
             disabled={isSubmitting}
             className="w-full px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium shadow-sm shadow-red-100 transition-all duration-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >

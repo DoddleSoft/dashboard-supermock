@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { ChevronLeft, ChevronRight, MoreVertical } from "lucide-react";
 import { Student } from "@/types/student";
 import { SmallLoader } from "@/components/ui/SmallLoader";
@@ -65,6 +68,25 @@ export function StudentTable({
   onPageChange,
   onPageSizeChange,
 }: StudentTableProps) {
+  const [menuPos, setMenuPos] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+
+  const handleActionClick = (student: Student, e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setMenuPos({
+      top: rect.bottom + 4,
+      left: Math.min(rect.right - 140, window.innerWidth - 148),
+    });
+    onActionClick(student, e);
+  };
+
+  const handleCloseMenu = () => {
+    setMenuPos(null);
+    onCloseMenu();
+  };
+
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const firstRow = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const lastRow = Math.min(currentPage * pageSize, total);
@@ -125,11 +147,7 @@ export function StudentTable({
             {students.map((student) => (
               <tr
                 key={student.student_id}
-                className={`hover:bg-slate-50 transition-colors duration-150 relative ${
-                  actionMenuStudent?.student_id === student.student_id
-                    ? "z-40"
-                    : "z-0"
-                }`}
+                className="hover:bg-slate-50 transition-colors duration-150"
               >
                 <td className="px-6 py-1">
                   <div className="flex items-center gap-3">
@@ -163,43 +181,12 @@ export function StudentTable({
                 </td>
                 <td className="px-6 py-1 text-right">
                   <button
-                    onClick={(e) => onActionClick(student, e)}
+                    onClick={(e) => handleActionClick(student, e)}
                     className="p-2 hover:bg-slate-100 rounded-lg transition-colors duration-150 text-slate-600 hover:text-slate-900"
                     title="More actions"
                   >
                     <MoreVertical className="w-4 h-4" />
                   </button>
-
-                  {showActionMenu &&
-                    actionMenuStudent?.student_id === student.student_id && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-40 bg-transparent"
-                          onClick={onCloseMenu}
-                        />
-                        <div className="absolute right-10 top-0 mt-10 bg-white border border-slate-200 rounded-lg shadow-xl z-50 min-w-[140px] overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right">
-                          <button
-                            onClick={() => {
-                              onEdit(student);
-                              onCloseMenu();
-                            }}
-                            className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors font-medium"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => {
-                              onDelete(student);
-                              onCloseMenu();
-                            }}
-                            disabled={isDeleting}
-                            className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors font-medium border-t border-slate-100 disabled:opacity-50"
-                          >
-                            {isDeleting ? "Deleting..." : "Delete"}
-                          </button>
-                        </div>
-                      </>
-                    )}
                 </td>
               </tr>
             ))}
@@ -214,6 +201,40 @@ export function StudentTable({
           </div>
         )}
       </div>
+
+      {/* Action dropdown — rendered with fixed positioning to avoid overflow clipping */}
+      {showActionMenu && actionMenuStudent && menuPos && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-transparent"
+            onClick={handleCloseMenu}
+          />
+          <div
+            className="fixed bg-white border border-slate-200 rounded-lg shadow-xl z-50 min-w-[140px] overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right"
+            style={{ top: menuPos.top, left: menuPos.left }}
+          >
+            <button
+              onClick={() => {
+                onEdit(actionMenuStudent);
+                handleCloseMenu();
+              }}
+              className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors font-medium"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => {
+                onDelete(actionMenuStudent);
+                handleCloseMenu();
+              }}
+              disabled={isDeleting}
+              className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors font-medium border-t border-slate-100 disabled:opacity-50"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </button>
+          </div>
+        </>
+      )}
 
       {/* ── Pagination bar ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-1">

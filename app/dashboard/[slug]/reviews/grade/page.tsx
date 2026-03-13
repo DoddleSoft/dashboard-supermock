@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Save, Check, X } from "lucide-react";
@@ -27,7 +27,8 @@ export default function GradePage() {
   const [feedback, setFeedback] = useState("");
   const [bandScore, setBandScore] = useState<number | null>(null);
 
-  // Grading decisions map
+  // Track if feedback was modified from the original loaded value
+  const [originalFeedback, setOriginalFeedback] = useState("");
   const [gradingDecisions, setGradingDecisions] = useState<
     Map<string, GradingDecision>
   >(new Map());
@@ -49,20 +50,8 @@ export default function GradePage() {
       if (detail) {
         setModuleDetail(detail);
         setFeedback(detail.feedback || "");
+        setOriginalFeedback(detail.feedback || "");
         setBandScore(detail.band_score);
-
-        // Initialize grading decisions from existing marks
-        const initialDecisions = new Map<string, GradingDecision>();
-        detail.answers.forEach((ans) => {
-          if (ans.is_correct !== null) {
-            initialDecisions.set(ans.id, {
-              answerId: ans.id,
-              isCorrect: ans.is_correct,
-              marksAwarded: ans.marks_awarded || 0,
-            });
-          }
-        });
-        setGradingDecisions(initialDecisions);
       }
     } catch (error: any) {
       toast.error(
@@ -71,19 +60,6 @@ export default function GradePage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleMarkChange = (answerId: string, value: number) => {
-    if (!moduleDetail) return;
-    setModuleDetail((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        answers: prev.answers.map((answer) =>
-          answer.id === answerId ? { ...answer, marks_awarded: value } : answer,
-        ),
-      };
-    });
   };
 
   const handleQuickGrade = (answerId: string, isCorrect: boolean) => {
@@ -117,6 +93,9 @@ export default function GradePage() {
     return total;
   };
 
+  const hasPendingChanges =
+    gradingDecisions.size > 0 || feedback !== originalFeedback;
+
   const handleSaveGrades = async () => {
     if (!moduleDetail) return;
 
@@ -132,8 +111,8 @@ export default function GradePage() {
         }),
       );
 
-      if (answersToUpdate.length === 0) {
-        toast.error("No grades to save. Please grade at least one answer.");
+      if (answersToUpdate.length === 0 && feedback === originalFeedback) {
+        toast.error("No changes to save.");
         return;
       }
 
@@ -194,6 +173,7 @@ export default function GradePage() {
 
       // Clear decisions after successful save
       setGradingDecisions(new Map());
+      setOriginalFeedback(feedback);
     } catch (error: any) {
       toast.error("Failed to save grades. Please try again.");
     } finally {
@@ -296,7 +276,7 @@ export default function GradePage() {
         </div>
         <button
           onClick={handleSaveGrades}
-          disabled={saving || gradingDecisions.size === 0}
+          disabled={saving || !hasPendingChanges}
           className="inline-flex items-center gap-2 px-6 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
         >
           {saving ? (
@@ -309,6 +289,7 @@ export default function GradePage() {
               <Save className="w-4 h-4" />
               Upload {gradingDecisions.size}{" "}
               {gradingDecisions.size === 1 ? "Change" : "Changes"}
+              {feedback !== originalFeedback && " & Feedback"}
             </>
           )}
         </button>
@@ -434,7 +415,7 @@ export default function GradePage() {
             </div>
           </div>
           <div className="space-y-4">
-            {moduleDetail.answers
+            {[...moduleDetail.answers]
               .sort((a, b) => {
                 const numA =
                   parseInt(a.question_ref.replace(/\D/g, ""), 10) || 0;
@@ -506,22 +487,13 @@ export default function GradePage() {
                               const value = e.target.value
                                 ? parseFloat(e.target.value)
                                 : 0;
-                              handleQuickGrade(answer.id, value > 0);
                               setGradingDecisions((prev) => {
                                 const newMap = new Map(prev);
-                                const existing = newMap.get(answer.id);
-                                if (existing) {
-                                  newMap.set(answer.id, {
-                                    ...existing,
-                                    marksAwarded: value,
-                                  });
-                                } else {
-                                  newMap.set(answer.id, {
-                                    answerId: answer.id,
-                                    isCorrect: value > 0,
-                                    marksAwarded: value,
-                                  });
-                                }
+                                newMap.set(answer.id, {
+                                  answerId: answer.id,
+                                  isCorrect: value > 0,
+                                  marksAwarded: value,
+                                });
                                 return newMap;
                               });
                             }}
@@ -561,7 +533,7 @@ export default function GradePage() {
       <div className="flex justify-end">
         <button
           onClick={handleSaveGrades}
-          disabled={saving || gradingDecisions.size === 0}
+          disabled={saving || !hasPendingChanges}
           className="inline-flex items-center gap-2 px-8 py-3 bg-red-600 hover:bg-red-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors shadow-lg"
         >
           {saving ? (
@@ -573,7 +545,8 @@ export default function GradePage() {
             <>
               <Save className="w-5 h-5" />
               Upload {gradingDecisions.size}{" "}
-              {gradingDecisions.size === 1 ? "Answer" : "Answers"} & Feedback
+              {gradingDecisions.size === 1 ? "Answer" : "Answers"}
+              {feedback !== originalFeedback && " & Feedback"}
             </>
           )}
         </button>

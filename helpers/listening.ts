@@ -305,7 +305,7 @@ export const listeningHelpers = {
               const blob = await response.blob();
               const file = new File(
                 [blob],
-                `image_${Date.now()}.${blob.type.split("/")[1] || "jpg"}`,
+                `image_${crypto.randomUUID()}.${blob.type.split("/")[1] || "jpg"}`,
                 { type: blob.type },
               );
 

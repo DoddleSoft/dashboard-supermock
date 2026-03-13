@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useDeferredValue,
+} from "react";
 import { Search, Plus, FileText, Package, BookOpen } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
@@ -25,11 +31,18 @@ import { formatDateShort } from "../../../../lib/utils";
 
 const formatDate = formatDateShort;
 
-export default function PapersPage() {
+type PaperModalState =
+  | { kind: "closed" }
+  | { kind: "view"; paperId: string }
+  | { kind: "edit"; paperId: string }
+  | { kind: "delete"; paperId: string };
+
+export default function ModulesPage() {
   const params = useParams();
   const router = useRouter();
   const slug = params.slug as string;
   const [searchQuery, setSearchQuery] = useState("");
+  const deferredSearch = useDeferredValue(searchQuery);
   const [filterType, setFilterType] = useState("all");
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [showCreateModuleModal, setShowCreateModuleModal] = useState(false);
@@ -39,6 +52,9 @@ export default function PapersPage() {
   const [activeView, setActiveView] = useState<"all" | "papers" | "modules">(
     "all",
   );
+  const [ownershipFilter, setOwnershipFilter] = useState<
+    "all" | "private" | "public"
+  >("all");
   const [deleteConfirm, setDeleteConfirm] = useState<{
     open: boolean;
     moduleId: string | null;
@@ -50,12 +66,14 @@ export default function PapersPage() {
   });
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Paper modal state
-  const [selectedPaperId, setSelectedPaperId] = useState<string | null>(null);
-  const [showPaperViewModal, setShowPaperViewModal] = useState(false);
-  const [showPaperEditModal, setShowPaperEditModal] = useState(false);
-  const [showPaperDeleteDialog, setShowPaperDeleteDialog] = useState(false);
+  // Unified paper modal state — only one modal can be open at a time
+  const [paperModal, setPaperModal] = useState<PaperModalState>({
+    kind: "closed",
+  });
   const [isPaperDeleting, setIsPaperDeleting] = useState(false);
+
+  const selectedPaperId =
+    paperModal.kind !== "closed" ? paperModal.paperId : null;
 
   const { centerPapers, centerModulesLoading, refreshCenterModules } =
     useModuleContext();
@@ -77,57 +95,6 @@ export default function PapersPage() {
     }
   }, [currentCenter?.center_id, refreshLocalModules]);
 
-  const handleUpdatePaper = async (
-    paperId: string,
-    data: {
-      title: string;
-      paperType: string;
-      isActive: boolean;
-      readingModuleId?: string | null;
-      listeningModuleId?: string | null;
-      writingModuleId?: string | null;
-      speakingModuleId?: string | null;
-    },
-  ) => {
-    const result = await updatePaper(paperId, {
-      title: data.title,
-      paperType: data.paperType as "IELTS" | "OIETC" | "GRE",
-      readingModuleId: data.readingModuleId || undefined,
-      listeningModuleId: data.listeningModuleId || undefined,
-      writingModuleId: data.writingModuleId || undefined,
-      speakingModuleId: data.speakingModuleId || undefined,
-      instruction: undefined,
-    });
-
-    if (result.success) {
-      await Promise.all([refreshCenterModules(), refreshLocalModules()]);
-    }
-
-    return result;
-  };
-
-  const handleDeletePaper = async (paperId: string) => {
-    const result = await deletePaper(paperId);
-    if (result.success) {
-      await Promise.all([refreshCenterModules(), refreshLocalModules()]);
-    }
-  };
-
-  const handleConfirmDeletePaper = async () => {
-    if (!selectedPaperId) return;
-    setIsPaperDeleting(true);
-    try {
-      await handleDeletePaper(selectedPaperId);
-    } catch (error) {
-      toast.error("Failed to delete the paper. Please try again.");
-    } finally {
-      setIsPaperDeleting(false);
-      setShowPaperDeleteDialog(false);
-      setSelectedPaperId(null);
-      setActiveMenu(null);
-    }
-  };
-
   const handleSavePaper = async (data: {
     title: string;
     paperType: string;
@@ -141,13 +108,47 @@ export default function PapersPage() {
       return { success: false, error: "No paper selected" };
     }
     try {
-      const result = await handleUpdatePaper(selectedPaperId, data);
+      const result = await updatePaper(selectedPaperId, {
+        title: data.title,
+        paperType: data.paperType as "IELTS" | "OIETC" | "GRE",
+        readingModuleId: data.readingModuleId || undefined,
+        listeningModuleId: data.listeningModuleId || undefined,
+        writingModuleId: data.writingModuleId || undefined,
+        speakingModuleId: data.speakingModuleId || undefined,
+        instruction: undefined,
+      });
+
+      if (result.success) {
+        // Refresh context data in background — no loading spinner
+        refreshCenterModules();
+        refreshLocalModules();
+      }
+
       return result;
     } catch (error) {
       return {
         success: false,
         error: "Failed to update paper. Please try again.",
       };
+    }
+  };
+
+  const handleConfirmDeletePaper = async () => {
+    if (!selectedPaperId) return;
+    setIsPaperDeleting(true);
+    try {
+      const result = await deletePaper(selectedPaperId);
+      if (result.success) {
+        // Refresh context data in background
+        refreshCenterModules();
+        refreshLocalModules();
+      }
+    } catch (error) {
+      toast.error("Failed to delete the paper. Please try again.");
+    } finally {
+      setIsPaperDeleting(false);
+      setPaperModal({ kind: "closed" });
+      setActiveMenu(null);
     }
   };
 
@@ -176,33 +177,28 @@ export default function PapersPage() {
     setActiveMenu(null);
   };
 
-  const filteredPapers = useMemo(
-    () =>
-      centerPapers.filter((paper) => {
-        const matchesSearch = paper.title
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase());
-        const matchesFilter =
-          filterType === "all" ||
-          paper.moduleTypes.map((t) => t.toLowerCase()).includes(filterType);
-        return matchesSearch && matchesFilter;
-      }),
-    [centerPapers, searchQuery, filterType],
-  );
+  const filteredPapers = useMemo(() => {
+    const q = deferredSearch.toLowerCase();
+    return centerPapers.filter((paper) => {
+      const matchesSearch = paper.title.toLowerCase().includes(q);
+      const matchesFilter =
+        filterType === "all" ||
+        paper.moduleTypes.some((t) => t.toLowerCase() === filterType);
+      return matchesSearch && matchesFilter;
+    });
+  }, [centerPapers, deferredSearch, filterType]);
 
-  const filteredModules = useMemo(
-    () =>
-      standaloneModules.filter((module) => {
-        const matchesSearch = module.heading
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase());
-        const matchesFilter =
-          filterType === "all" ||
-          module.module_type.toLowerCase() === filterType;
-        return matchesSearch && matchesFilter;
-      }),
-    [standaloneModules, searchQuery, filterType],
-  );
+  const filteredModules = useMemo(() => {
+    const q = deferredSearch.toLowerCase();
+    return standaloneModules.filter((module) => {
+      const matchesSearch = module.heading.toLowerCase().includes(q);
+      const matchesFilter =
+        filterType === "all" || module.module_type.toLowerCase() === filterType;
+      const matchesOwnership =
+        ownershipFilter === "all" || module.view_option === ownershipFilter;
+      return matchesSearch && matchesFilter && matchesOwnership;
+    });
+  }, [standaloneModules, deferredSearch, filterType, ownershipFilter]);
 
   const totalItems = filteredPapers.length + filteredModules.length;
 
@@ -217,10 +213,18 @@ export default function PapersPage() {
     [centerPapers, selectedPaperId],
   );
 
-  const getModuleNameById = (moduleId?: string | null) => {
-    if (!moduleId) return null;
-    return allModules.find((m) => m.id === moduleId)?.heading ?? null;
-  };
+  const getModuleNameById = useCallback(
+    (moduleId?: string | null) => {
+      if (!moduleId) return null;
+      return allModules.find((m) => m.id === moduleId)?.heading ?? null;
+    },
+    [allModules],
+  );
+
+  const closePaperModal = useCallback(
+    () => setPaperModal({ kind: "closed" }),
+    [],
+  );
 
   // Show single loading state while data is loading
   if (centerModulesLoading || modulesLoading) {
@@ -257,6 +261,19 @@ export default function PapersPage() {
             <option value="writing">Writing</option>
             <option value="listening">Listening</option>
             <option value="speaking">Speaking</option>
+          </select>
+
+          {/* Ownership Filter */}
+          <select
+            value={ownershipFilter}
+            onChange={(e) =>
+              setOwnershipFilter(e.target.value as "all" | "private" | "public")
+            }
+            className="px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 bg-white text-sm font-medium"
+          >
+            <option value="all">All Modules</option>
+            <option value="private">My Modules</option>
+            <option value="public">Public Modules</option>
           </select>
 
           {/* Header with View Toggle */}
@@ -329,16 +346,15 @@ export default function PapersPage() {
                   onMenuClose={() => setActiveMenu(null)}
                   formatDate={formatDate}
                   onCardClick={(paperId) => {
-                    setSelectedPaperId(paperId);
-                    setShowPaperViewModal(true);
+                    // Refresh modules to get fresh names before viewing
+                    refreshLocalModules();
+                    setPaperModal({ kind: "view", paperId });
                   }}
                   onEditClick={(paperId) => {
-                    setSelectedPaperId(paperId);
-                    setShowPaperEditModal(true);
+                    setPaperModal({ kind: "edit", paperId });
                   }}
                   onDeleteClick={(paperId) => {
-                    setSelectedPaperId(paperId);
-                    setShowPaperDeleteDialog(true);
+                    setPaperModal({ kind: "delete", paperId });
                   }}
                 />
               ))}
@@ -368,12 +384,15 @@ export default function PapersPage() {
                     setActiveMenu(activeMenu === moduleId ? null : moduleId)
                   }
                   onCardClick={handleViewModule}
-                  onDeleteModule={(moduleId, moduleName) =>
-                    setDeleteConfirm({
-                      open: true,
-                      moduleId,
-                      moduleName,
-                    })
+                  onDeleteModule={
+                    module.view_option === "public"
+                      ? undefined
+                      : (moduleId, moduleName) =>
+                          setDeleteConfirm({
+                            open: true,
+                            moduleId,
+                            moduleName,
+                          })
                   }
                   formatDate={formatDate}
                 />
@@ -433,11 +452,8 @@ export default function PapersPage() {
               selectedPaper.speakingModuleName ??
               getModuleNameById(selectedPaper.speakingModuleId),
           }}
-          isOpen={showPaperViewModal}
-          onClose={() => {
-            setShowPaperViewModal(false);
-            setSelectedPaperId(null);
-          }}
+          isOpen={paperModal.kind === "view"}
+          onClose={closePaperModal}
         />
       )}
 
@@ -445,11 +461,8 @@ export default function PapersPage() {
       {selectedPaper && (
         <EditPaperModal
           paper={selectedPaper}
-          isOpen={showPaperEditModal}
-          onClose={() => {
-            setShowPaperEditModal(false);
-            setSelectedPaperId(null);
-          }}
+          isOpen={paperModal.kind === "edit"}
+          onClose={closePaperModal}
           availableModules={allModules}
           onSave={handleSavePaper}
         />
@@ -458,16 +471,13 @@ export default function PapersPage() {
       {/* Paper Delete Confirmation Dialog */}
       {selectedPaper && (
         <DeleteConfirmationDialog
-          isOpen={showPaperDeleteDialog}
+          isOpen={paperModal.kind === "delete"}
           title="Delete Paper"
           description="This action will permanently remove the paper."
           itemName={selectedPaper.title}
           isDeleting={isPaperDeleting}
           onConfirm={handleConfirmDeletePaper}
-          onCancel={() => {
-            setShowPaperDeleteDialog(false);
-            setSelectedPaperId(null);
-          }}
+          onCancel={closePaperModal}
         />
       )}
     </div>

@@ -183,8 +183,6 @@ export const updateCenterMember = async (
       toast.error(json.error ?? "Failed to update member.");
       throw new Error(json.error ?? "api error");
     }
-
-    toast.success("Member updated successfully!");
   } catch (error: any) {
     if (error.message !== "api error") {
       toast.error(
@@ -204,8 +202,6 @@ export const deleteCenterMember = async (centerId: string, userId: string) => {
       .eq("user_id", userId);
 
     if (error) throw error;
-
-    toast.success("Member removed successfully!");
   } catch (error: any) {
     toast.error(
       parseError(error, "Failed to remove the member. Please try again."),

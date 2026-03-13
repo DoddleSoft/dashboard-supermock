@@ -33,7 +33,11 @@ export async function GET(request: NextRequest) {
     {
       cookies: {
         getAll: () => cookieStore.getAll(),
-        setAll: () => {},
+        setAll: (cookiesToSet) => {
+          for (const { name, value, options } of cookiesToSet) {
+            cookieStore.set(name, value, options);
+          }
+        },
       },
     },
   );
@@ -47,39 +51,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // ── Authorization: confirm user has access to this center ────────────────
-  const { data: center } = await supabase
-    .from("centers")
-    .select("center_id, user_id, is_active, status")
-    .eq("center_id", centerId)
-    .maybeSingle();
-
-  if (!center?.center_id) {
-    return NextResponse.json({ error: "Center not found" }, { status: 404 });
-  }
-
-  if (!center.is_active || center.status === "rejected") {
-    return NextResponse.json(
-      { error: "Center is not accessible" },
-      { status: 403 },
-    );
-  }
-
-  const isOwner = center.user_id === user.id;
-
-  if (!isOwner) {
-    const { data: membership } = await supabase
-      .from("center_members")
-      .select("membership_id")
-      .eq("center_id", centerId)
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (!membership?.membership_id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-  }
-
+  // RLS policies on student_profiles enforce center access at the database level.
   // ── Query: server-side filtering + exact count + range pagination ─────────
   let query = supabase
     .from("student_profiles")

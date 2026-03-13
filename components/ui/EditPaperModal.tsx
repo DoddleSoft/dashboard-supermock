@@ -19,6 +19,7 @@ interface EditPaperModalProps {
     module_type: string;
     heading: string;
     subheading?: string;
+    view_option?: "private" | "public";
   }[];
   onSave: (data: {
     title: string;
@@ -127,7 +128,13 @@ export function EditPaperModal({
   };
 
   const getModulesByType = (type: string) =>
-    availableModules.filter((m) => m.module_type === type);
+    availableModules
+      .filter((m) => m.module_type === type)
+      .sort((a, b) => {
+        const aVal = a.view_option === "private" ? 0 : 1;
+        const bVal = b.view_option === "private" ? 0 : 1;
+        return aVal - bVal;
+      });
 
   const moduleOptions = [
     { key: "reading", label: "Reading" },
@@ -302,6 +309,7 @@ export function EditPaperModal({
                       {modules.map((module) => (
                         <option key={module.id} value={module.id}>
                           {module.heading}
+                          {module.view_option === "public" ? " (Public)" : ""}
                         </option>
                       ))}
                     </select>

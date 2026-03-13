@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   Plus,
@@ -23,7 +23,6 @@ import { SmallLoader } from "@/components/ui/SmallLoader";
 
 export default function TestsPage() {
   const params = useParams();
-  const router = useRouter();
   const slug = params.slug as string;
   const { currentCenter } = useCentre();
 
@@ -32,6 +31,7 @@ export default function TestsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [otpLoadingId, setOtpLoadingId] = useState<string | null>(null);
+  const loadVersionRef = useRef(0);
 
   useEffect(() => {
     if (currentCenter?.center_id) {
@@ -44,21 +44,29 @@ export default function TestsPage() {
       setLoading(false);
       return;
     }
+    const version = ++loadVersionRef.current;
     setLoading(true);
     const testsData = await fetchScheduledTests(currentCenter.center_id);
+
+    // Discard result if a newer load was triggered (e.g. rapid center switch)
+    if (version !== loadVersionRef.current) return;
 
     setTests(testsData);
     setLoading(false);
   };
 
-  const filteredTests = tests.filter((test: ScheduledTest) => {
-    const matchesSearch = test.title
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesStatus =
-      selectedStatus === "all" || test.status === selectedStatus;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredTests = useMemo(
+    () =>
+      tests.filter((test) => {
+        const matchesSearch = test.title
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase());
+        const matchesStatus =
+          selectedStatus === "all" || test.status === selectedStatus;
+        return matchesSearch && matchesStatus;
+      }),
+    [tests, searchQuery, selectedStatus],
+  );
 
   const handleGenerateOtp = async (testId: string) => {
     const test = tests.find((t: ScheduledTest) => t.id === testId);
@@ -75,6 +83,7 @@ export default function TestsPage() {
         ),
       );
     }
+    // Failure is already surfaced via toast inside generateScheduledTestOtp
   };
 
   const getStatusColor = getTestStatusColor;
@@ -136,17 +145,17 @@ export default function TestsPage() {
           {filteredTests.map((test: ScheduledTest) => (
             <div
               key={test.id}
-              className="bg-white rounded-xl border border-slate-200 hover:shadow-lg transition-all duration-200 cursor-pointer"
-              onClick={() => {
-                router.push(`/dashboard/${slug}/tests/${test.id}`);
-              }}
+              className="bg-white rounded-xl border border-slate-200 hover:shadow-lg transition-all duration-200 group"
             >
               <div className="px-6 py-4">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                    <Link
+                      href={`/dashboard/${slug}/tests/${test.id}`}
+                      className="text-lg font-semibold text-slate-900 mb-2 hover:text-red-600 transition-colors block"
+                    >
                       {test.title}
-                    </h3>
+                    </Link>
                     <div className="flex items-center gap-2 mb-3">
                       <span
                         className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border ${getStatusColor(
@@ -186,10 +195,7 @@ export default function TestsPage() {
 
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleGenerateOtp(test.id);
-                        }}
+                        onClick={() => handleGenerateOtp(test.id)}
                         disabled={!!test.otp || otpLoadingId === test.id}
                         className="hover:bg-slate-100 rounded-lg transition-colors p-2 disabled:opacity-60"
                         title={test.otp ? "OTP generated" : "Generate OTP"}

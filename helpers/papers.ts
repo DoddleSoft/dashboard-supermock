@@ -48,6 +48,8 @@ export interface CreatePaperPayload {
   speakingModuleId?: string;
 }
 
+export type ModuleViewOption = "private" | "public";
+
 export interface Module {
   id: string;
   module_type: string;
@@ -56,6 +58,7 @@ export interface Module {
   center_id: string;
   paper_id?: string | null;
   created_at: string;
+  view_option: ModuleViewOption;
 }
 
 /**
@@ -90,6 +93,7 @@ export const fetchPapers = async (centerId: string): Promise<Paper[]> => {
 
 /**
  * Fetch standalone modules (not assigned to any paper)
+ * Returns both center-owned (private) and public modules, private first
  */
 export const fetchStandaloneModules = async (
   centerId: string,
@@ -99,15 +103,23 @@ export const fetchStandaloneModules = async (
 
     const { data, error } = await supabase
       .from("modules")
-      .select("*")
-      .eq("center_id", centerId)
+      .select(
+        "id, module_type, heading, subheading, center_id, paper_id, created_at, view_option",
+      )
       .is("paper_id", null)
+      .or(`center_id.eq.${centerId},view_option.eq.public`)
       .order("module_type")
       .order("created_at", { ascending: false });
 
     if (error) throw error;
 
-    return data || [];
+    const modules: Module[] = data || [];
+    // Private (center-owned) first, then public
+    return modules.sort((a, b) => {
+      const aIsPrivate = a.view_option === "private" ? 0 : 1;
+      const bIsPrivate = b.view_option === "private" ? 0 : 1;
+      return aIsPrivate - bIsPrivate;
+    });
   } catch (error) {
     toast.error("Failed to load modules");
     return [];
@@ -116,6 +128,7 @@ export const fetchStandaloneModules = async (
 
 /**
  * Fetch all modules for a center (both standalone and paper-assigned)
+ * Also includes public modules available to all centers
  */
 export const fetchCenterModules = async (
   centerId: string,
@@ -126,14 +139,20 @@ export const fetchCenterModules = async (
     const { data, error } = await supabase
       .from("modules")
       .select(
-        "id, module_type, heading, subheading, created_at, paper_id, center_id",
+        "id, module_type, heading, subheading, created_at, paper_id, center_id, view_option",
       )
-      .eq("center_id", centerId)
+      .or(`center_id.eq.${centerId},view_option.eq.public`)
       .order("created_at", { ascending: false });
 
     if (error) throw error;
 
-    return data || [];
+    const modules: Module[] = data || [];
+    // Private (center-owned) first, then public
+    return modules.sort((a, b) => {
+      const aIsPrivate = a.view_option === "private" ? 0 : 1;
+      const bIsPrivate = b.view_option === "private" ? 0 : 1;
+      return aIsPrivate - bIsPrivate;
+    });
   } catch (error) {
     toast.error("Failed to load modules");
     return [];
@@ -223,7 +242,6 @@ export const updatePaper = async (
 
     if (error) throw error;
 
-    toast.success("Paper updated successfully!");
     return { success: true };
   } catch (error: any) {
     toast.error("Failed to update paper. Please try again.");

@@ -153,8 +153,7 @@ export async function createModule(
       toast.success("Module created successfully!");
       return { success: true, moduleId, paperId: payload.paperId };
     } catch (subsectionError) {
-      toast.error("Module creation failed. Rolling back changes...");
-
+      // Rollback: delete the module we just created
       const { error: deleteError } = await supabase
         .from("modules")
         .delete()
@@ -190,9 +189,7 @@ async function createReadingSections(
     return;
   }
 
-  const sectionIds = sections.map(() => crypto.randomUUID());
   const sectionsToInsert = sections.map((section, sectionIndex) => ({
-    id: sectionIds[sectionIndex],
     module_id: moduleId,
     title: section.title,
     section_index: sectionIndex + 1,
@@ -202,13 +199,15 @@ async function createReadingSections(
     subtext: section.heading || null,
   }));
 
+  const sectionIds: string[] = [];
   const sectionChunks = chunkArray(sectionsToInsert, INSERT_CHUNK_SIZE);
-  const sectionResults = await Promise.all(
-    sectionChunks.map((chunk) => supabase.from("sections").insert(chunk)),
-  );
-
-  for (const result of sectionResults) {
-    if (result.error) throw result.error;
+  for (const chunk of sectionChunks) {
+    const { data, error } = await supabase
+      .from("sections")
+      .insert(chunk)
+      .select("id");
+    if (error) throw error;
+    sectionIds.push(...(data || []).map((r: { id: string }) => r.id));
   }
 
   // Batch all sub_sections and questions across all sections into single inserts
@@ -231,9 +230,7 @@ async function createListeningSections(
     return;
   }
 
-  const sectionIds = sections.map(() => crypto.randomUUID());
   const sectionsToInsert = sections.map((section, sectionIndex) => ({
-    id: sectionIds[sectionIndex],
     module_id: moduleId,
     title: section.title,
     section_index: sectionIndex + 1,
@@ -242,13 +239,15 @@ async function createListeningSections(
     instruction: section.instruction || null,
   }));
 
+  const sectionIds: string[] = [];
   const sectionChunks = chunkArray(sectionsToInsert, INSERT_CHUNK_SIZE);
-  const sectionResults = await Promise.all(
-    sectionChunks.map((chunk) => supabase.from("sections").insert(chunk)),
-  );
-
-  for (const result of sectionResults) {
-    if (result.error) throw result.error;
+  for (const chunk of sectionChunks) {
+    const { data, error } = await supabase
+      .from("sections")
+      .insert(chunk)
+      .select("id");
+    if (error) throw error;
+    sectionIds.push(...(data || []).map((r: { id: string }) => r.id));
   }
 
   // Batch all sub_sections and questions across all sections into single inserts
@@ -275,7 +274,6 @@ async function createWritingSections(
   // All blocks from the same WritingSection share the same metadata (title, subheading, instruction, params)
 
   const sectionsToInsert: Array<{
-    id: string;
     module_id: string;
     title: string;
     section_index: number;
@@ -305,7 +303,6 @@ async function createWritingSections(
           : null;
 
       sectionsToInsert.push({
-        id: crypto.randomUUID(),
         module_id: moduleId,
         title: section.heading,
         section_index: globalIndex,
@@ -334,10 +331,6 @@ async function createWritingSections(
   }
 }
 
-/**
- * Batch-collect sub_sections and questions across multiple sections,
- * then insert them in at most 2 DB calls (1 for sub_sections, 1 for questions).
- */
 async function batchCreateSubSectionsAndQuestions(
   supabase: ReturnType<typeof createClient>,
   sectionEntries: Array<{
@@ -347,7 +340,6 @@ async function batchCreateSubSectionsAndQuestions(
   }>,
 ): Promise<void> {
   const allSubSections: Array<{
-    id: string;
     section_id: string;
     boundary_text: string | null;
     sub_type: string;
@@ -357,51 +349,54 @@ async function batchCreateSubSectionsAndQuestions(
     sub_section_index: number;
   }> = [];
 
-  // Track which sub_section ids belong to which section entry for question mapping
-  const sectionSubSectionIds: Array<Array<{ id: string; blockIndex: number }>> =
-    [];
+  // Track which sub_section belongs to which section entry for question mapping
+  const subSectionMeta: Array<{
+    entryIndex: number;
+    originalBlockIndex: number;
+  }> = [];
 
-  for (const entry of sectionEntries) {
+  for (let entryIndex = 0; entryIndex < sectionEntries.length; entryIndex++) {
+    const entry = sectionEntries[entryIndex];
     const hasMeaningfulContent = (block: RenderBlock) => {
       const content = (block.content || "").trim();
       const boundary = (block.questions || "").trim();
       return content.length > 0 || boundary.length > 0;
     };
 
-    const meaningfulBlocks = entry.renderBlocks.filter(hasMeaningfulContent);
-    const subIds: Array<{ id: string; blockIndex: number }> = [];
-
-    meaningfulBlocks.forEach((block, blockIndex) => {
-      const subSectionId = crypto.randomUUID();
-      subIds.push({ id: subSectionId, blockIndex });
+    // Track the original renderBlocks index for each meaningful block
+    let filteredIdx = 0;
+    entry.renderBlocks.forEach((block, originalIndex) => {
+      if (!hasMeaningfulContent(block)) return;
 
       allSubSections.push({
-        id: subSectionId,
         section_id: entry.sectionId,
         boundary_text: block.questions || null,
         sub_type: block.type,
         content_template: block.content || "",
         resource_url: block.type === "image" ? block.content : null,
         instruction: block.instruction || null,
-        sub_section_index: blockIndex + 1,
+        sub_section_index: filteredIdx + 1,
       });
+      subSectionMeta.push({ entryIndex, originalBlockIndex: originalIndex });
+      filteredIdx++;
     });
-
-    sectionSubSectionIds.push(subIds);
   }
 
-  // Bulk insert all sub_sections in one go
+  // Bulk insert all sub_sections and collect DB-generated IDs
+  const subSectionIds: string[] = [];
   if (allSubSections.length > 0) {
     const chunks = chunkArray(allSubSections, INSERT_CHUNK_SIZE);
-    const results = await Promise.all(
-      chunks.map((chunk) => supabase.from("sub_sections").insert(chunk)),
-    );
-    for (const result of results) {
-      if (result.error) throw result.error;
+    for (const chunk of chunks) {
+      const { data, error } = await supabase
+        .from("sub_sections")
+        .insert(chunk)
+        .select("id");
+      if (error) throw error;
+      subSectionIds.push(...(data || []).map((r: { id: string }) => r.id));
     }
   }
 
-  // Now collect all questions
+  // Now collect all questions using DB-generated sub_section IDs
   const allQuestions: Array<{
     sub_section_id: string;
     question_ref: string;
@@ -412,14 +407,17 @@ async function batchCreateSubSectionsAndQuestions(
   }> = [];
 
   sectionEntries.forEach((entry, entryIndex) => {
-    const subIds = sectionSubSectionIds[entryIndex];
-    if (!subIds || subIds.length === 0) return;
-
     Object.entries(entry.questions).forEach(([ref, questionDef]) => {
       if (!questionDef) return;
 
       const blockIndex = questionDef.createdInBlockIndex ?? 0;
-      const subSectionId = subIds[blockIndex]?.id;
+      // Find the sub_section ID by matching entryIndex and originalBlockIndex
+      const subSectionIdx = subSectionMeta.findIndex(
+        (m) =>
+          m.entryIndex === entryIndex && m.originalBlockIndex === blockIndex,
+      );
+      const subSectionId =
+        subSectionIdx >= 0 ? subSectionIds[subSectionIdx] : undefined;
       if (!subSectionId) return;
 
       const isTrueFalse =
@@ -459,138 +457,6 @@ async function batchCreateSubSectionsAndQuestions(
     );
     for (const result of results) {
       if (result.error) throw result.error;
-    }
-  }
-}
-
-async function createSubSectionsFromBlocks(
-  supabase: ReturnType<typeof createClient>,
-  sectionId: string,
-  renderBlocks: RenderBlock[],
-  questions: Record<string, QuestionDefinition>,
-): Promise<void> {
-  const subSectionsToInsert: Array<{
-    id: string;
-    section_id: string;
-    boundary_text: string | null;
-    sub_type: string;
-    content_template: string;
-    resource_url: string | null;
-    instruction: string | null;
-    sub_section_index: number;
-  }> = [];
-
-  const hasMeaningfulContent = (block: RenderBlock) => {
-    const content = (block.content || "").trim();
-    const boundary = (block.questions || "").trim();
-    return content.length > 0 || boundary.length > 0;
-  };
-
-  const meaningfulBlocks = renderBlocks.filter(hasMeaningfulContent);
-
-  if (meaningfulBlocks.length === 0) {
-    if (Object.keys(questions).length > 0) {
-    }
-    return;
-  }
-
-  // Create one sub_section per render block - NO deduplication
-  meaningfulBlocks.forEach((block, blockIndex) => {
-    const boundaryText = block.questions || null;
-    const contentTemplate = block.content || "";
-    const resourceUrl = block.type === "image" ? block.content : null;
-    const instruction = block.instruction || null;
-
-    // Create a unique sub_section for THIS render block
-    const subSectionId = crypto.randomUUID();
-
-    subSectionsToInsert.push({
-      id: subSectionId,
-      section_id: sectionId,
-      boundary_text: boundaryText,
-      sub_type: block.type,
-      content_template: contentTemplate,
-      resource_url: resourceUrl,
-      instruction: instruction,
-      sub_section_index: blockIndex + 1,
-    });
-  });
-
-  if (subSectionsToInsert.length > 0) {
-    const subSectionChunks = chunkArray(subSectionsToInsert, INSERT_CHUNK_SIZE);
-    const subSectionResults = await Promise.all(
-      subSectionChunks.map((chunk) =>
-        supabase.from("sub_sections").insert(chunk),
-      ),
-    );
-
-    for (const result of subSectionResults) {
-      if (result.error) {
-        throw result.error;
-      }
-    }
-  }
-
-  const questionsToInsert: Array<{
-    sub_section_id: string;
-    question_ref: string;
-    correct_answers: string[] | null;
-    options: string[] | null;
-    explanation: string | null;
-    marks: number;
-  }> = [];
-
-  // Process all questions and assign them to sub_sections based on createdInBlockIndex
-  Object.entries(questions).forEach(([ref, questionDef]) => {
-    if (!questionDef) return;
-
-    // Determine which block this question belongs to
-    const blockIndex = questionDef.createdInBlockIndex ?? 0;
-    const subSectionId = subSectionsToInsert[blockIndex]?.id;
-
-    if (!subSectionId) {
-      return;
-    }
-
-    const isTrueFalse =
-      questionDef.type === "true-false" ||
-      (questionDef.answer &&
-        ["TRUE", "FALSE", "NOT GIVEN"].includes(
-          questionDef.answer.toUpperCase(),
-        ));
-
-    const finalOptions =
-      isTrueFalse && (!questionDef.options || questionDef.options.length === 0)
-        ? ["TRUE", "FALSE", "NOT GIVEN"]
-        : (questionDef.options ?? null);
-
-    questionsToInsert.push({
-      sub_section_id: subSectionId,
-      question_ref: ref,
-      correct_answers:
-        questionDef.correctAnswers && questionDef.correctAnswers.length
-          ? questionDef.correctAnswers
-          : questionDef.answer
-            ? [questionDef.answer]
-            : null,
-      options: finalOptions,
-      explanation: questionDef.explanation || null,
-      marks: 1.0,
-    });
-  });
-
-  if (questionsToInsert.length > 0) {
-    const questionChunks = chunkArray(questionsToInsert, INSERT_CHUNK_SIZE);
-    const questionResults = await Promise.all(
-      questionChunks.map((chunk) =>
-        supabase.from("question_answers").insert(chunk),
-      ),
-    );
-
-    for (const result of questionResults) {
-      if (result.error) {
-        throw result.error;
-      }
     }
   }
 }
@@ -792,13 +658,13 @@ export async function uploadMediaFile(
       }
     }
 
-    // Construct file path: {user_id}/{center_id}/{module_type}/{type}/{timestamp}_{filename}
-    const timestamp = Date.now();
+    // Construct file path: {user_id}/{center_id}/{module_type}/{type}/{uuid}_{filename}
+    const uniqueId = crypto.randomUUID();
     const sanitizedFileName = processedFile.name.replace(
       /[^a-zA-Z0-9.-]/g,
       "_",
     );
-    const fileName = `${user.id}/${centerId}/${moduleType}/${fileType}/${timestamp}_${sanitizedFileName}`;
+    const fileName = `${user.id}/${centerId}/${moduleType}/${fileType}/${uniqueId}_${sanitizedFileName}`;
 
     // Upload to Supabase storage with retry logic
     let uploadAttempts = 0;
@@ -845,14 +711,6 @@ export async function uploadMediaFile(
       error: errorMessage,
     };
   }
-}
-
-export async function uploadAudioFile(
-  centerId: string,
-  sectionId: string,
-  file: File,
-): Promise<{ success: boolean; url?: string; error?: string }> {
-  return uploadMediaFile(centerId, "listening", file, "audio");
 }
 
 export const moduleHelpers = {
@@ -1013,65 +871,16 @@ export const moduleHelpers = {
   },
 };
 
-/**
- * Delete a module by ID
- */
 export const deleteModule = async (
   moduleId: string,
 ): Promise<{ success: boolean; error?: string }> => {
   try {
     const supabase = createClient();
 
-    // 1. Verify the current user is authenticated
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return { success: false, error: "Not authenticated" };
-    }
-
-    // 2. Fetch the module with its center's owner in a single query
-    const { data: mod, error: fetchError } = await supabase
-      .from("modules")
-      .select("center_id, centers!inner(user_id)")
-      .eq("id", moduleId)
-      .single();
-
-    if (fetchError || !mod) {
-      return { success: false, error: "Module not found" };
-    }
-
-    const centerData = Array.isArray((mod as any).centers)
-      ? (mod as any).centers[0]
-      : (mod as any).centers;
-    const isOwner = centerData?.user_id === user.id;
-
-    // 3. If not owner, check membership + admin role in one query
-    if (!isOwner) {
-      const { data: membership } = await supabase
-        .from("center_members")
-        .select("membership_id, users!inner(role)")
-        .eq("center_id", mod.center_id)
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      const memberRole = membership
-        ? Array.isArray((membership as any).users)
-          ? (membership as any).users[0]?.role
-          : (membership as any).users?.role
-        : null;
-
-      if (!membership || memberRole !== "admin") {
-        return { success: false, error: "Unauthorized" };
-      }
-    }
-
-    // 4. Delete scoped to center_id for defense-in-depth
     const { error } = await supabase
       .from("modules")
       .delete()
-      .eq("id", moduleId)
-      .eq("center_id", mod.center_id);
+      .eq("id", moduleId);
 
     if (error) throw error;
 

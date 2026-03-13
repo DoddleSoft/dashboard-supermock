@@ -42,7 +42,9 @@ export default function AddStudentsPanel({
 
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<
+    { student_id: string; name: string; email: string }[]
+  >([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
 
@@ -82,9 +84,7 @@ export default function AddStudentsPanel({
 
       const { data, error } = await supabase
         .from("student_profiles")
-        .select(
-          "student_id, name, email, phone, guardian, guardian_phone, enrollment_type",
-        )
+        .select("student_id, name, email")
         .eq("center_id", currentCenter.center_id)
         .eq("enrollment_type", "regular")
         .or(`name.ilike.%${sanitized}%,email.ilike.%${sanitized}%`)
@@ -106,18 +106,15 @@ export default function AddStudentsPanel({
     student_id: string;
     name: string;
     email: string;
-    phone: string;
-    guardian: string;
-    guardian_phone: string;
   }) => {
     setCurrentStudent({
       student_id: student.student_id,
       name: student.name || "",
       email: student.email || "",
-      phone: student.phone || "",
+      phone: "",
       enrollment_type: "regular",
-      guardian: student.guardian || "",
-      guardian_phone: student.guardian_phone || "",
+      guardian: "",
+      guardian_phone: "",
       isExisting: true,
     });
     setSearchQuery("");
@@ -200,12 +197,9 @@ export default function AddStudentsPanel({
         (s: StudentFormData) => s.isExisting,
       );
 
-      let allStudentIds: string[] = [];
-
-      /* insert new student profiles */
-      if (newStudents.length > 0) {
-        const studentInserts = newStudents.map((student: StudentFormData) => ({
-          center_id: currentCenter.center_id,
+      // Build the payload for the atomic RPC
+      const newStudentPayloads = newStudents.map(
+        (student: StudentFormData) => ({
           name: student.name,
           email: student.email || null,
           phone: student.phone || null,
@@ -217,69 +211,37 @@ export default function AddStudentsPanel({
               ? student.guardian_phone
               : null,
           visitor_exam_date: visitorExamDate,
-          status: "active",
-        }));
+        }),
+      );
 
-        const { data: createdStudents, error: studentError } = await supabase
-          .from("student_profiles")
-          .insert(studentInserts)
-          .select("student_id");
+      const existingIds = existingStudents
+        .map((s: StudentFormData) => s.student_id)
+        .filter(Boolean) as string[];
 
-        if (studentError) {
-          console.error("Error creating students:", studentError);
-          toast.error(
-            studentError.code === "23505"
-              ? "One or more students are already enrolled in this center."
-              : "Failed to create student profiles. Please check the details and try again.",
-          );
-          setSubmitting(false);
-          return;
-        }
+      const { data, error } = await supabase.rpc("add_students_to_test", {
+        p_test_id: testId,
+        p_paper_id: test.paper_id,
+        p_center_id: currentCenter.center_id,
+        p_new_students: newStudentPayloads,
+        p_existing_student_ids: existingIds,
+      });
 
-        if (createdStudents && createdStudents.length > 0) {
-          allStudentIds = createdStudents.map((s: { student_id: string }) => s.student_id);
-        }
-      }
-
-      /* add existing student IDs */
-      if (existingStudents.length > 0) {
-        allStudentIds = [
-          ...allStudentIds,
-          ...existingStudents.map((s: StudentFormData) => s.student_id!),
-        ];
-      }
-
-      if (allStudentIds.length === 0) {
-        toast.error("Failed to process students");
-        setSubmitting(false);
-        return;
-      }
-
-      /* create mock_attempts */
-      const mockAttemptInserts = allStudentIds.map((student_id) => ({
-        student_id,
-        paper_id: test.paper_id,
-        scheduled_test_id: testId,
-        attempt_type: "full_mock",
-        status: "in_progress",
-      }));
-
-      const { error: mockAttemptError } = await supabase
-        .from("mock_attempts")
-        .insert(mockAttemptInserts);
-
-      if (mockAttemptError) {
-        console.error("Error creating mock attempts:", mockAttemptError);
+      if (error) {
+        console.error("RPC error:", error);
         toast.error(
-          mockAttemptError.code === "23505"
-            ? "Some students already have attempts for this test."
-            : "Failed to assign students to the test. Please try again.",
+          error.code === "23505"
+            ? "Some students are already enrolled or have attempts for this test."
+            : "Failed to add students to the test. Please try again.",
         );
         setSubmitting(false);
         return;
       }
 
-      toast.success(`Student successfully added to the test`);
+      if (!data || !data.success) {
+        toast.error(data?.error ?? "Failed to process students");
+        setSubmitting(false);
+        return;
+      }
 
       onSaved();
     } catch (error) {
@@ -349,9 +311,6 @@ export default function AddStudentsPanel({
                             student_id: string;
                             name: string;
                             email: string;
-                            phone: string;
-                            guardian: string;
-                            guardian_phone: string;
                           }) => (
                             <button
                               key={student.student_id}

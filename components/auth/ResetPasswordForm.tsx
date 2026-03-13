@@ -42,7 +42,6 @@ export function ResetPasswordForm() {
       }
 
       setSent(true);
-      toast.success("Password reset link sent! Check your email.");
     } catch {
       toast.error("An unexpected error occurred. Please try again.");
     } finally {

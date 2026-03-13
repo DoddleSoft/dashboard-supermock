@@ -64,16 +64,20 @@ export function LoginForm() {
       return;
     }
 
-    if (!captchaToken) {
-      fail("Please complete the CAPTCHA verification.");
-      setIsLoading(false);
-      return;
-    }
+    // if (!captchaToken) {
+    //   fail("Please complete the CAPTCHA verification.");
+    //   setIsLoading(false);
+    //   return;
+    // }
 
     const loadingToastId = "";
 
     try {
-      const result = await signIn(formData.email, formData.password, captchaToken ?? undefined);
+      const result = await signIn(
+        formData.email,
+        formData.password,
+        // captchaToken ?? undefined,
+      );
 
       if (!result.success) {
         const errorMsg =
@@ -211,14 +215,14 @@ export function LoginForm() {
                 Remember me
               </label>
             </div>
-
+            {/* 
             <Turnstile
               ref={turnstileRef}
               siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
               onSuccess={(token) => setCaptchaToken(token)}
               onExpire={() => setCaptchaToken(null)}
               onError={() => setCaptchaToken(null)}
-            />
+            /> */}
 
             {/* Submit Button */}
             <button

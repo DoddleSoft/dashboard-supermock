@@ -45,30 +45,7 @@ export default function StudentsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    phone: "",
-    guardian: "",
-    guardian_phone: "",
-    date_of_birth: "",
-    address: "",
-    enrollment_type: "regular",
-  });
-
-  const [editData, setEditData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    guardian: "",
-    guardian_phone: "",
-    date_of_birth: "",
-    address: "",
-    grade: "",
-    status: "active" as "active" | "cancelled" | "archived" | "passed",
-    enrollment_type: "regular",
-  });
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Debounce search — 350 ms
   useEffect(() => {
@@ -91,6 +68,10 @@ export default function StudentsPage() {
   const loadStudents = useCallback(async () => {
     if (!currentCenter?.center_id) return;
 
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -103,22 +84,41 @@ export default function StudentsPage() {
 
       const res = await fetch(`/api/fetch?${params.toString()}`, {
         credentials: "include",
+        signal: controller.signal,
       });
 
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? "Failed to load students");
+        let message = "Failed to load students";
+        const contentType = res.headers.get("content-type");
+        if (contentType?.includes("application/json")) {
+          try {
+            const body = await res.json();
+            if (body.error) message = body.error;
+          } catch {
+            /* non-JSON despite header */
+          }
+        }
+        throw new Error(message);
       }
 
-      const { students: rows, total: count } = await res.json();
-      setStudents(rows);
-      setTotal(count);
+      let json;
+      try {
+        json = await res.json();
+      } catch {
+        throw new Error("Invalid response from server");
+      }
+
+      setStudents(json.students);
+      setTotal(json.total);
     } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
       const message =
         error instanceof Error ? error.message : "Failed to load students";
       toast.error(message);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   }, [currentCenter?.center_id, page, limit, debouncedSearch, selectedStatus]);
 
@@ -126,16 +126,27 @@ export default function StudentsPage() {
     if (currentCenter?.center_id) {
       loadStudents();
     }
+    return () => {
+      abortControllerRef.current?.abort();
+    };
   }, [loadStudents]);
 
-  const handleCreateStudent = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.email?.trim()) {
+  const handleCreateStudent = async (data: {
+    name: string;
+    email: string;
+    password: string;
+    phone: string;
+    guardian: string;
+    guardian_phone: string;
+    date_of_birth: string;
+    address: string;
+    enrollment_type: string;
+  }) => {
+    if (!data.email?.trim()) {
       toast.error("Student email is required.");
       return;
     }
-    if (!formData.name?.trim()) {
+    if (!data.name?.trim()) {
       toast.error("Student name is required");
       return;
     }
@@ -147,9 +158,9 @@ export default function StudentsPage() {
 
     try {
       setSubmitting(true);
-      await createStudent(currentCenter.center_id, formData);
+      await createStudent(currentCenter.center_id, data);
       await loadStudents();
-      handleCloseCreateModal();
+      setShowCreateModal(false);
     } catch {
       // Handled in helper
     } finally {
@@ -159,44 +170,30 @@ export default function StudentsPage() {
 
   const openEditDrawer = (student: Student) => {
     setSelectedStudent(student);
-    setEditData({
-      name: student.name || "",
-      email: student.email || "",
-      phone: student.phone || "",
-      guardian: student.guardian || "",
-      guardian_phone: student.guardian_phone || "",
-      date_of_birth: student.date_of_birth || "",
-      address: student.address || "",
-      grade: student.grade || "",
-      status: student.status,
-      enrollment_type: "regular",
-    });
     setShowEditDrawer(true);
   };
 
   const closeEditDrawer = () => {
     setShowEditDrawer(false);
     setSelectedStudent(null);
-    setEditData({
-      name: "",
-      email: "",
-      phone: "",
-      guardian: "",
-      guardian_phone: "",
-      date_of_birth: "",
-      address: "",
-      grade: "",
-      status: "active",
-      enrollment_type: "regular",
-    });
   };
 
-  const handleSaveChanges = async () => {
+  const handleSaveChanges = async (data: {
+    name: string;
+    email: string;
+    phone: string;
+    guardian: string;
+    guardian_phone: string;
+    date_of_birth: string;
+    address: string;
+    grade: string;
+    status: "active" | "cancelled" | "archived" | "passed";
+  }) => {
     if (!selectedStudent) return;
 
     try {
       setSubmitting(true);
-      await updateStudent(selectedStudent.student_id, editData);
+      await updateStudent(selectedStudent.student_id, data);
       await loadStudents();
       closeEditDrawer();
     } catch {
@@ -232,29 +229,6 @@ export default function StudentsPage() {
     setShowActionMenu(false);
     setStudentToDelete(student);
     setShowDeleteConfirm(true);
-  };
-
-  const handleEditChange = (field: string, value: string) => {
-    setEditData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleCreateChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleCloseCreateModal = () => {
-    setShowCreateModal(false);
-    setFormData({
-      name: "",
-      email: "",
-      password: "",
-      phone: "",
-      guardian: "",
-      guardian_phone: "",
-      date_of_birth: "",
-      address: "",
-      enrollment_type: "regular",
-    });
   };
 
   const confirmDelete = async () => {
@@ -365,23 +339,19 @@ export default function StudentsPage() {
       <EditStudentDrawer
         isOpen={showEditDrawer}
         student={selectedStudent}
-        editData={editData}
         isSubmitting={submitting}
         isDeleting={deleting}
         onClose={closeEditDrawer}
         onSave={handleSaveChanges}
         onDelete={handleDeleteStudent}
-        onChange={handleEditChange}
         formatLocalTime={formatLocalTime}
       />
 
       <CreateStudentModal
         isOpen={showCreateModal}
-        formData={formData}
         isSubmitting={submitting}
-        onClose={handleCloseCreateModal}
+        onClose={() => setShowCreateModal(false)}
         onSubmit={handleCreateStudent}
-        onChange={handleCreateChange}
       />
 
       {/* Delete Confirmation Dialog */}

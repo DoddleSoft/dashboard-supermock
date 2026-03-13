@@ -1,36 +1,64 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Eye, EyeOff, Loader2, X } from "lucide-react";
+
+interface FormData {
+  name: string;
+  email: string;
+  password: string;
+  phone: string;
+  guardian: string;
+  guardian_phone: string;
+  date_of_birth: string;
+  address: string;
+  enrollment_type: string;
+}
+
+const INITIAL_FORM: FormData = {
+  name: "",
+  email: "",
+  password: "",
+  phone: "",
+  guardian: "",
+  guardian_phone: "",
+  date_of_birth: "",
+  address: "",
+  enrollment_type: "regular",
+};
 
 interface CreateStudentModalProps {
   isOpen: boolean;
-  formData: {
-    name: string;
-    email: string;
-    password: string;
-    phone: string;
-    guardian: string;
-    guardian_phone: string;
-    date_of_birth: string;
-    address: string;
-    enrollment_type: string;
-  };
   isSubmitting: boolean;
   onClose: () => void;
-  onSubmit: (e: React.FormEvent) => void;
-  onChange: (field: string, value: string) => void;
+  onSubmit: (formData: FormData) => void;
 }
 
 export function CreateStudentModal({
   isOpen,
-  formData,
   isSubmitting,
   onClose,
   onSubmit,
-  onChange,
 }: CreateStudentModalProps) {
+  const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Reset form when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setFormData(INITIAL_FORM);
+      setShowPassword(false);
+    }
+  }, [isOpen]);
+
+  const onChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(formData);
+  };
 
   if (!isOpen) return null;
 
@@ -61,7 +89,7 @@ export function CreateStudentModal({
           </button>
         </div>
 
-        <form onSubmit={onSubmit} className="px-6 py-5 space-y-5">
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-5">
           <div className="grid grid-cols-2 gap-4">
             {/* Email + Password row */}
             <div className="col-span-2">

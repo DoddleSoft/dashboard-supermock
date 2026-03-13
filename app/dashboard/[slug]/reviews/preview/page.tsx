@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Edit3, CheckCircle, XCircle } from "lucide-react";
@@ -29,23 +29,28 @@ export default function PreviewPage() {
   );
   const [selectedModuleIndex, setSelectedModuleIndex] = useState(0);
 
+  const loadAttemptDetails = useCallback(async () => {
+    if (!attemptId) return;
+    try {
+      setLoading(true);
+      const data = await fetchAttemptDetails(attemptId);
+      if (data) {
+        setAttemptDetail(data);
+      }
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to load attempt details");
+    } finally {
+      setLoading(false);
+    }
+  }, [attemptId]);
+
   useEffect(() => {
     if (!attemptId) {
       toast.error("Missing attempt information");
       return;
     }
-    void loadAttemptDetails();
-  }, [attemptId]);
-
-  const loadAttemptDetails = async () => {
-    if (!attemptId) return;
-    setLoading(true);
-    const data = await fetchAttemptDetails(attemptId);
-    if (data) {
-      setAttemptDetail(data);
-    }
-    setLoading(false);
-  };
+    loadAttemptDetails();
+  }, [attemptId, loadAttemptDetails]);
 
   const formatDate = formatReviewDate;
   const formatDuration = formatDurationDetailed;
@@ -194,7 +199,7 @@ export default function PreviewPage() {
           {isWriting ? (
             // Writing Module - Show detailed responses
             <div className="space-y-4">
-              {selectedModule.answers
+              {[...selectedModule.answers]
                 .sort((a, b) => {
                   const numA =
                     parseInt(a.question_ref.replace(/\D/g, ""), 10) || 0;
@@ -229,7 +234,7 @@ export default function PreviewPage() {
                       <p className="text-xs font-semibold text-slate-500 uppercase mb-2">
                         Student Response:
                       </p>
-                      <div className="text-sm text-slate-900 whitespace-pre-line">
+                      <div className="text-sm text-slate-900 whitespace-pre-line break-words">
                         {answer.student_response || (
                           <span className="text-slate-400 italic">
                             No response provided
@@ -244,15 +249,18 @@ export default function PreviewPage() {
             // Other Modules - Show table format with two columns
             <div className="grid grid-cols-2 gap-6">
               {(() => {
-                const sortedAnswers = selectedModule.answers.sort((a, b) => {
-                  const numA =
-                    parseInt(a.question_ref.replace(/\D/g, ""), 10) || 0;
-                  const numB =
-                    parseInt(b.question_ref.replace(/\D/g, ""), 10) || 0;
-                  return numA - numB;
-                });
-                const firstColumn = sortedAnswers.slice(0, 20);
-                const secondColumn = sortedAnswers.slice(20);
+                const sortedAnswers = [...selectedModule.answers].sort(
+                  (a, b) => {
+                    const numA =
+                      parseInt(a.question_ref.replace(/\D/g, ""), 10) || 0;
+                    const numB =
+                      parseInt(b.question_ref.replace(/\D/g, ""), 10) || 0;
+                    return numA - numB;
+                  },
+                );
+                const mid = Math.ceil(sortedAnswers.length / 2);
+                const firstColumn = sortedAnswers.slice(0, mid);
+                const secondColumn = sortedAnswers.slice(mid);
 
                 return (
                   <>

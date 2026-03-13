@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -52,16 +52,19 @@ export default function TestDetailPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   /* ── load / reload test ── */
-  const loadTest = async () => {
-    setLoading(true);
-    const testData = await fetchScheduledTest(testId);
-    setTest(testData);
-    setLoading(false);
-  };
+  const loadTest = useCallback(
+    async (background = false) => {
+      if (!background) setLoading(true);
+      const testData = await fetchScheduledTest(testId);
+      setTest(testData);
+      if (!background) setLoading(false);
+    },
+    [testId],
+  );
 
   useEffect(() => {
     if (testId) loadTest();
-  }, [testId]);
+  }, [testId, loadTest]);
 
   /* ── actions ── */
   const handleGenerateOtp = async () => {
@@ -98,8 +101,8 @@ export default function TestDetailPage() {
   };
 
   /** Called by EditTestPanel / AddStudentsPanel after a save */
-  const handleSaved = () => {
-    loadTest();
+  const handleSaved = async () => {
+    await loadTest(true);
     setActivePanel("details");
   };
 
@@ -122,11 +125,11 @@ export default function TestDetailPage() {
 
   /* ── render ── */
   return (
-    <div className="flex -m-8 h-[calc(100vh-57px)]">
+    <div className="flex -m-8 h-[calc(100dvh-var(--navbar-height,57px))]">
       {/* ── Secondary Sidebar ── */}
-      <aside className="w-56 shrink-0 bg-white border-r border-slate-200 flex flex-col">
+      <aside className="w-56 shrink-0 bg-white border-r border-slate-200 flex flex-col min-h-0">
         {/* Nav Items */}
-        <nav className="flex-1 p-2 space-y-0.5">
+        <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
           {sidebarNavItems.map((item) => {
             const isActive = activePanel === item.key;
             return (
@@ -147,7 +150,7 @@ export default function TestDetailPage() {
         </nav>
 
         {/* Action Buttons */}
-        <div className="p-2 border-t border-slate-100 space-y-0.5">
+        <div className="p-2 border-t border-slate-100 space-y-0.5 shrink-0">
           <button
             onClick={handleGenerateOtp}
             disabled={Boolean(test.otp) || otpLoading}

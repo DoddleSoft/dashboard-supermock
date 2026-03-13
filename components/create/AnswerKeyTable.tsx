@@ -190,7 +190,7 @@ export default function AnswerKeyTable({
               )
             }
             disabled={isAtLimit}
-            className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:bg-slate-50 disabled:text-slate-400"
+            className="w-16 px-2 py-1.5 text-gray-600 border border-slate-200 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:bg-slate-50 disabled:text-slate-400"
           />
           <button
             onClick={handleAddQuestions}
@@ -291,7 +291,7 @@ export default function AnswerKeyTable({
                             handleFieldChange(ref, "answer", e.target.value)
                           }
                           placeholder="A, B"
-                          className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 placeholder:text-slate-300"
+                          className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 placeholder:text-slate-400"
                         />
                       )}
                     </td>
@@ -306,7 +306,7 @@ export default function AnswerKeyTable({
                         }
                         placeholder={isMcq ? "A, B, C, D" : "—"}
                         disabled={!isMcq}
-                        className={`w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 placeholder:text-slate-300 ${
+                        className={`w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 placeholder:text-slate-400 ${
                           !isMcq
                             ? "bg-slate-50 text-slate-400 cursor-not-allowed"
                             : ""
@@ -323,7 +323,7 @@ export default function AnswerKeyTable({
                           handleFieldChange(ref, "explanation", e.target.value)
                         }
                         placeholder="Why is this correct?"
-                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 placeholder:text-slate-300"
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 placeholder:text-slate-400"
                       />
                     </td>
 

@@ -317,7 +317,8 @@ export default function ListeningModule({
                         Choose Audio File
                       </p>
                       <p className="text-sm text-slate-400 mt-1">
-                        Upload MP3, WAV, or other audio formats
+                        Upload MP3, WAV, or other audio formats. It should not
+                        exceed 10 MB and 7 sec duration.
                       </p>
                     </label>
                   </div>

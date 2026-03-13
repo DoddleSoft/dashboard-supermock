@@ -2,8 +2,10 @@
 
 import React, {
   createContext,
+  useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   ReactNode,
@@ -325,8 +327,6 @@ const getDefaultModuleData = (): ModuleData => ({
   },
 });
 
-const supabase = createClient();
-
 // Provider component
 export function ModuleProvider({ children }: { children: ReactNode }) {
   const idCounterRef = useRef(2);
@@ -348,13 +348,13 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const clearSaveError = () => setSaveError(null);
+  const clearSaveError = useCallback(() => setSaveError(null), []);
 
-  const generateId = () => {
+  const generateId = useCallback(() => {
     const id = idCounterRef.current.toString();
     idCounterRef.current += 1;
     return id;
-  };
+  }, []);
 
   // Initialize module data with default values
   const [moduleData, setModuleData] = useState<ModuleData>(
@@ -362,10 +362,10 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
   );
 
   // Reset module data to defaults
-  const resetModuleData = () => {
+  const resetModuleData = useCallback(() => {
     setModuleData(getDefaultModuleData());
     idCounterRef.current = 2;
-  };
+  }, []);
 
   // Module Titles
   const setModuleTitle = (
@@ -412,6 +412,7 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
 
     setIsLoadingModules(true);
     try {
+      const supabase = createClient();
       const { data, error } = await supabase.rpc("get_center_modules_v2", {
         p_center_id: currentCenter.center_id,
       });
@@ -444,11 +445,53 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Fetch summary data first (faster)
-    fetchCenterModules(currentCenter.center_id);
+    let cancelled = false;
+    const centerId = currentCenter.center_id;
 
-    // Load full modules data in background (doesn't block UI)
-    loadAllModules();
+    const load = async () => {
+      // Fetch summary data
+      setCenterModulesLoading(true);
+      setCenterModulesError(null);
+      const result = await centerHelpers.fetchCenterModules(centerId);
+      if (cancelled) return;
+      setCenterPapers(result.papers);
+      setCenterModuleStats(result.stats);
+      if (result.error) setCenterModulesError(result.error);
+      setCenterModulesLoading(false);
+
+      // Load full modules data
+      setIsLoadingModules(true);
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase.rpc("get_center_modules_v2", {
+          p_center_id: centerId,
+        });
+        if (cancelled) return;
+        if (error) {
+          console.error("Error loading modules:", error);
+          setCenterModulesError(error.message);
+          setStoredModules([]);
+        } else {
+          setStoredModules(data || []);
+          setCenterModulesError(null);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        console.error("Failed to load modules:", err);
+        setCenterModulesError(
+          err instanceof Error ? err.message : "Failed to load modules",
+        );
+        setStoredModules([]);
+      } finally {
+        if (!cancelled) setIsLoadingModules(false);
+      }
+    };
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
   }, [currentCenter?.center_id]);
 
   // ========== READING MODULE METHODS ==========
@@ -883,16 +926,6 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
 
   // ========== SAVE/CREATE METHODS ==========
 
-  /**
-   * Upload audio files for listening sections and update paths
-   */
-  const uploadListeningAudioFiles = async (
-    centerId: string,
-    sections: ListeningSection[],
-  ): Promise<ListeningSection[]> => {
-    return await listeningHelpers.uploadAudioFiles(centerId, sections);
-  };
-
   const saveModule = async (
     moduleType: ModuleType,
     moduleTitle: string,
@@ -960,19 +993,13 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
     setSaveError(null);
 
     try {
-      // Upload listening audio files
-      const uploadedListeningSections = await uploadListeningAudioFiles(
-        currentCenter.center_id,
-        moduleData.listening.sections,
-      );
-
       const result = await moduleHelpers.saveCompletePaper(
         currentCenter.center_id,
         paperTitle,
         paperType,
         moduleData.moduleTitles,
         moduleData.reading.sections,
-        uploadedListeningSections,
+        moduleData.listening.sections,
         moduleData.writing.sections,
       );
 
@@ -995,81 +1022,96 @@ export function ModuleProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const value: ModuleContextType = {
-    moduleData,
-    moduleTitles: moduleData.moduleTitles,
-    setModuleTitle,
+  const value = useMemo<ModuleContextType>(
+    () => ({
+      moduleData,
+      moduleTitles: moduleData.moduleTitles,
+      setModuleTitle,
 
-    centerPapers,
-    centerModuleStats,
-    centerModulesLoading,
-    centerModulesError,
-    refreshCenterModules,
+      centerPapers,
+      centerModuleStats,
+      centerModulesLoading,
+      centerModulesError,
+      refreshCenterModules,
 
-    storedModules,
-    loadAllModules,
-    isLoadingModules,
+      storedModules,
+      loadAllModules,
+      isLoadingModules,
 
-    // Reading
-    readingSections: moduleData.reading.sections,
-    readingExpandedSections: moduleData.reading.expandedSections,
-    addReadingSection,
-    updateReadingSectionTitle,
-    updateReadingSectionHeading,
-    updateReadingSectionInstruction,
-    updateReadingSectionPassageText,
-    addReadingRenderBlock,
-    updateReadingRenderBlock,
-    deleteReadingRenderBlock,
-    updateReadingQuestion,
-    updateReadingQuestionRef,
-    deleteReadingQuestion,
-    toggleReadingSection,
-    deleteReadingSection,
+      // Reading
+      readingSections: moduleData.reading.sections,
+      readingExpandedSections: moduleData.reading.expandedSections,
+      addReadingSection,
+      updateReadingSectionTitle,
+      updateReadingSectionHeading,
+      updateReadingSectionInstruction,
+      updateReadingSectionPassageText,
+      addReadingRenderBlock,
+      updateReadingRenderBlock,
+      deleteReadingRenderBlock,
+      updateReadingQuestion,
+      updateReadingQuestionRef,
+      deleteReadingQuestion,
+      toggleReadingSection,
+      deleteReadingSection,
 
-    // Listening
-    listeningSections: moduleData.listening.sections,
-    listeningExpandedSections: moduleData.listening.expandedSections,
-    addListeningSection,
-    updateListeningSectionTitle,
-    updateListeningSectionInstruction,
-    updateListeningSectionAudioPath,
-    updateListeningSectionAudio,
-    addListeningRenderBlock,
-    updateListeningRenderBlock,
-    deleteListeningRenderBlock,
-    updateListeningQuestion,
-    updateListeningQuestionRef,
-    deleteListeningQuestion,
-    toggleListeningSection,
-    deleteListeningSection,
+      // Listening
+      listeningSections: moduleData.listening.sections,
+      listeningExpandedSections: moduleData.listening.expandedSections,
+      addListeningSection,
+      updateListeningSectionTitle,
+      updateListeningSectionInstruction,
+      updateListeningSectionAudioPath,
+      updateListeningSectionAudio,
+      addListeningRenderBlock,
+      updateListeningRenderBlock,
+      deleteListeningRenderBlock,
+      updateListeningQuestion,
+      updateListeningQuestionRef,
+      deleteListeningQuestion,
+      toggleListeningSection,
+      deleteListeningSection,
 
-    // Writing
-    writingSections: moduleData.writing.sections,
-    writingExpandedSections: moduleData.writing.expandedSections,
-    addWritingSection,
-    deleteWritingSection,
-    toggleWritingSection,
-    updateWritingSectionHeading,
-    updateWritingSectionSubheading,
-    updateWritingSectionInstruction,
-    updateWritingSectionTime,
-    updateWritingSectionMinWords,
-    addWritingRenderBlock,
-    updateWritingRenderBlock,
-    deleteWritingRenderBlock,
+      // Writing
+      writingSections: moduleData.writing.sections,
+      writingExpandedSections: moduleData.writing.expandedSections,
+      addWritingSection,
+      deleteWritingSection,
+      toggleWritingSection,
+      updateWritingSectionHeading,
+      updateWritingSectionSubheading,
+      updateWritingSectionInstruction,
+      updateWritingSectionTime,
+      updateWritingSectionMinWords,
+      addWritingRenderBlock,
+      updateWritingRenderBlock,
+      deleteWritingRenderBlock,
 
-    // Save/Create
-    saveModule,
-    saveCompletePaper,
-    isSaving,
-    saveError,
-    clearSaveError,
-    resetModuleData,
+      // Save/Create
+      saveModule,
+      saveCompletePaper,
+      isSaving,
+      saveError,
+      clearSaveError,
+      resetModuleData,
 
-    // Utility
-    generateId,
-  };
+      // Utility
+      generateId,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      moduleData,
+      centerPapers,
+      centerModuleStats,
+      centerModulesLoading,
+      centerModulesError,
+      storedModules,
+      isLoadingModules,
+      isSaving,
+      saveError,
+      currentCenter?.center_id,
+    ],
+  );
 
   return (
     <ModuleContext.Provider value={value}>{children}</ModuleContext.Provider>

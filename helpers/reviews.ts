@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/client";
-import { toast } from "sonner";
 
 // ----- Types from reviews/page.tsx -----
 
@@ -178,162 +177,142 @@ export const getReviewStatusColor = (status: string): string => {
   }
 };
 
+// ----- RPC response shapes (for typed mappers) -----
+
+interface PreviewRpcModule {
+  attemptModuleId: string;
+  moduleType: string | null;
+  heading: string | null;
+  status: string | null;
+  score_obtained: number | null;
+  band_score: number | null;
+  time_spent_seconds: number | null;
+  completed_at: string | null;
+  answers: PreviewAnswerDetail[];
+}
+
+interface PreviewRpcResponse {
+  attemptId: string;
+  studentId: string | null;
+  studentName: string | null;
+  studentEmail: string | null;
+  paperTitle: string | null;
+  status: string | null;
+  createdAt: string | null;
+  modules: PreviewRpcModule[];
+  error?: string;
+}
+
+interface GradeRpcAnswer {
+  id: string;
+  question_ref: string;
+  student_response: string | null;
+  marks_awarded: number | null;
+  is_correct: boolean | null;
+  reference_id: string;
+  correct_answer: string | null;
+}
+
+interface GradeRpcResponse {
+  attemptModuleId: string;
+  moduleType: string | null;
+  heading: string | null;
+  status: string | null;
+  feedback: string | null;
+  band_score: number | null;
+  score_obtained: number | null;
+  answers: GradeRpcAnswer[];
+  studentName: string | null;
+  studentEmail: string | null;
+  paperTitle: string | null;
+  error?: string;
+}
+
 // ----- Data fetching functions -----
 
 /**
- * Fetch all reviews for a center (single RPC call)
- */
-export const fetchReviews = async (
-  centerId: string,
-): Promise<AttemptReview[]> => {
-  try {
-    const supabase = createClient();
-
-    const { data, error } = await supabase.rpc("get_center_reviews", {
-      p_center_id: centerId,
-    });
-
-    if (error) throw error;
-
-    // RPC returns jsonb array directly with the right shape
-    const reviews: AttemptReview[] = (data || []).map((item: any) => ({
-      attemptId: item.attemptId,
-      studentId: item.studentId,
-      studentName: item.studentName || "Student",
-      studentEmail: item.studentEmail || "",
-      status: item.status || "unknown",
-      createdAt: item.createdAt,
-      modules: (item.modules || []).map((mod: any) => ({
-        attemptModuleId: mod.attemptModuleId,
-        moduleType: mod.moduleType || "unknown",
-        heading: mod.heading,
-        status: mod.status,
-        score: mod.score,
-        band: mod.band,
-        timeSpentSeconds: mod.timeSpentSeconds,
-        completedAt: mod.completedAt,
-        answers: [], // Reviews listing doesn't need individual answers
-      })),
-    }));
-
-    return reviews;
-  } catch (error: any) {
-    toast.error("Failed to load reviews");
-    return [];
-  }
-};
-
-/**
- * Delete a mock attempt
- */
-export const deleteAttempt = async (
-  attemptId: string,
-): Promise<{ success: boolean }> => {
-  try {
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("mock_attempts")
-      .delete()
-      .eq("id", attemptId);
-    if (error) throw error;
-    toast.success("Attempt deleted successfully");
-    return { success: true };
-  } catch (error: any) {
-    toast.error("Failed to delete attempt");
-    return { success: false };
-  }
-};
-
-/**
- * Fetch attempt details for preview (single RPC call)
+ * Fetch attempt details for preview (single RPC call).
+ * Throws on failure — callers should catch and display errors.
  */
 export const fetchAttemptDetails = async (
   attemptId: string,
 ): Promise<AttemptDetail | null> => {
-  try {
-    const supabase = createClient();
+  const supabase = createClient();
 
-    const { data, error } = await supabase.rpc("get_attempt_preview", {
-      p_attempt_id: attemptId,
-    });
+  const { data, error } = await supabase.rpc("get_attempt_preview", {
+    p_attempt_id: attemptId,
+  });
 
-    if (error) throw error;
-    if (!data || data.error) {
-      toast.error("No modules found for this attempt");
-      return null;
-    }
+  if (error) throw error;
 
-    return {
-      attemptId: data.attemptId,
-      studentId: data.studentId || null,
-      studentName: data.studentName || "Unknown Student",
-      studentEmail: data.studentEmail || "",
-      paperTitle: data.paperTitle || "Untitled Paper",
-      status: data.status || "unknown",
-      createdAt: data.createdAt || null,
-      modules: (data.modules || []).map((mod: any) => ({
-        attemptModuleId: mod.attemptModuleId,
-        moduleType: mod.moduleType || "unknown",
-        heading: mod.heading,
-        status: mod.status,
-        score_obtained: mod.score_obtained,
-        band_score: mod.band_score,
-        time_spent_seconds: mod.time_spent_seconds,
-        completed_at: mod.completed_at,
-        answers: mod.answers || [],
-      })),
-    };
-  } catch (error: any) {
-    toast.error("Failed to load attempt details");
-    return null;
+  const rpc = data as PreviewRpcResponse | null;
+  if (!rpc || rpc.error) {
+    throw new Error(rpc?.error || "No modules found for this attempt");
   }
+
+  return {
+    attemptId: rpc.attemptId,
+    studentId: rpc.studentId ?? null,
+    studentName: rpc.studentName ?? "Unknown Student",
+    studentEmail: rpc.studentEmail ?? "",
+    paperTitle: rpc.paperTitle ?? "Untitled Paper",
+    status: rpc.status ?? "unknown",
+    createdAt: rpc.createdAt ?? null,
+    modules: (rpc.modules || []).map((mod: PreviewRpcModule) => ({
+      attemptModuleId: mod.attemptModuleId,
+      moduleType: mod.moduleType ?? "unknown",
+      heading: mod.heading,
+      status: mod.status,
+      score_obtained: mod.score_obtained,
+      band_score: mod.band_score,
+      time_spent_seconds: mod.time_spent_seconds,
+      completed_at: mod.completed_at,
+      answers: mod.answers || [],
+    })),
+  };
 };
 
 /**
- * Fetch module details for grading (single RPC call)
+ * Fetch module details for grading (single RPC call).
+ * Throws on failure — callers should catch and display errors.
  */
 export const fetchGradeModuleDetails = async (
   moduleId: string,
 ): Promise<GradeModuleDetail | null> => {
-  try {
-    const supabase = createClient();
+  const supabase = createClient();
 
-    const { data, error } = await supabase.rpc("get_grading_data", {
-      p_attempt_module_id: moduleId,
-    });
+  const { data, error } = await supabase.rpc("get_grading_data", {
+    p_attempt_module_id: moduleId,
+  });
 
-    if (error) throw error;
-    if (!data || data.error) {
-      throw new Error(data?.error || "No module data found");
-    }
+  if (error) throw error;
 
-    return {
-      attemptModuleId: data.attemptModuleId,
-      moduleType: data.moduleType || "unknown",
-      heading: data.heading || null,
-      status: data.status,
-      feedback: data.feedback,
-      band_score: data.band_score,
-      score_obtained: data.score_obtained,
-      answers: (data.answers || []).map((ans: any) => ({
-        id: ans.id,
-        question_ref: ans.question_ref,
-        student_response: ans.student_response,
-        marks_awarded: ans.marks_awarded,
-        is_correct: ans.is_correct,
-        reference_id: ans.reference_id,
-        correct_answer: ans.correct_answer || "N/A",
-      })),
-      studentName: data.studentName || "Unknown Student",
-      studentEmail: data.studentEmail || "",
-      paperTitle: data.paperTitle || "Untitled Paper",
-    };
-  } catch (error: any) {
-    toast.error(
-      "Failed to load module details: " + (error.message || "Unknown error"),
-    );
-    return null;
+  const rpc = data as GradeRpcResponse | null;
+  if (!rpc || rpc.error) {
+    throw new Error(rpc?.error || "No module data found");
   }
+
+  return {
+    attemptModuleId: rpc.attemptModuleId,
+    moduleType: rpc.moduleType ?? "unknown",
+    heading: rpc.heading ?? null,
+    status: rpc.status,
+    feedback: rpc.feedback,
+    band_score: rpc.band_score,
+    score_obtained: rpc.score_obtained,
+    answers: (rpc.answers || []).map((ans: GradeRpcAnswer) => ({
+      id: ans.id,
+      question_ref: ans.question_ref,
+      student_response: ans.student_response,
+      marks_awarded: ans.marks_awarded,
+      is_correct: ans.is_correct,
+      reference_id: ans.reference_id,
+      correct_answer: ans.correct_answer ?? "N/A",
+    })),
+    studentName: rpc.studentName ?? "Unknown Student",
+    studentEmail: rpc.studentEmail ?? "",
+    paperTitle: rpc.paperTitle ?? "Untitled Paper",
+  };
 };
 
 /**
