@@ -12,7 +12,7 @@ export function ResetPasswordForm() {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [sent, setSent] = useState(false);
-  // const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const turnstileRef = useRef<TurnstileInstance>(null);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -24,10 +24,10 @@ export function ResetPasswordForm() {
       return;
     }
 
-    // if (!captchaToken) {
-    //   toast.error("Please complete the CAPTCHA verification.");
-    //   return;
-    // }
+    if (!captchaToken) {
+      toast.error("Please complete the CAPTCHA verification.");
+      return;
+    }
 
     setIsLoading(true);
 
@@ -37,7 +37,7 @@ export function ResetPasswordForm() {
       if (!result.success) {
         toast.error(result.error || "Failed to send reset link.");
         turnstileRef.current?.reset();
-        // setCaptchaToken(null);
+        setCaptchaToken(null);
         return;
       }
 
@@ -76,7 +76,8 @@ export function ResetPasswordForm() {
               onClick={() => {
                 setEmail("");
                 turnstileRef.current?.reset();
-                // setCaptchaToken(null);
+                setCaptchaToken(null);
+                setSent(false);
               }}
               className="text-red-600 hover:text-red-700 text-sm font-medium underline mb-4"
             >
@@ -131,13 +132,13 @@ export function ResetPasswordForm() {
               </div>
             </div>
 
-            {/* <Turnstile
+            <Turnstile
               ref={turnstileRef}
               siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
               onSuccess={(token) => setCaptchaToken(token)}
               onExpire={() => setCaptchaToken(null)}
               onError={() => setCaptchaToken(null)}
-            /> */}
+            />
 
             <button
               type="submit"

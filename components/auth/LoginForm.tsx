@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile";
 
 export function LoginForm() {
   const router = useRouter();
@@ -14,6 +15,8 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileInstance>(null);
 
   const [formData, setFormData] = useState({
     email: "",
@@ -61,6 +64,12 @@ export function LoginForm() {
       return;
     }
 
+    if (!captchaToken) {
+      fail("Please complete the CAPTCHA verification.");
+      setIsLoading(false);
+      return;
+    }
+
     const loadingToastId = "";
 
     try {
@@ -70,6 +79,8 @@ export function LoginForm() {
         const errorMsg =
           result.error || "Login failed. Please check your credentials.";
         toast.error(errorMsg, { id: loadingToastId });
+        turnstileRef.current?.reset();
+        setCaptchaToken(null);
         setIsLoading(false);
         return;
       }
@@ -89,6 +100,8 @@ export function LoginForm() {
       const errorMsg = "An unexpected error occurred. Please try again.";
       toast.error(errorMsg, { id: loadingToastId });
       console.error("Login error:", error);
+      turnstileRef.current?.reset();
+      setCaptchaToken(null);
       setIsLoading(false);
     } finally {
       setIsLoading(false);
@@ -198,6 +211,14 @@ export function LoginForm() {
                 Remember me
               </label>
             </div>
+
+            <Turnstile
+              ref={turnstileRef}
+              siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+              onSuccess={(token) => setCaptchaToken(token)}
+              onExpire={() => setCaptchaToken(null)}
+              onError={() => setCaptchaToken(null)}
+            />
 
             {/* Submit Button */}
             <button
