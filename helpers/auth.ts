@@ -18,6 +18,7 @@ export interface RegisterData {
 export interface LoginData {
   email: string;
   password: string;
+  captchaToken?: string;
 }
 
 export interface AuthResponse {
@@ -172,6 +173,9 @@ class AuthService {
         await this.supabase.auth.signInWithPassword({
           email: data.email,
           password: data.password,
+          options: {
+            captchaToken: data.captchaToken,
+          },
         });
 
       if (error) {

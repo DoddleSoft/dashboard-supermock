@@ -73,7 +73,7 @@ export function LoginForm() {
     const loadingToastId = "";
 
     try {
-      const result = await signIn(formData.email, formData.password);
+      const result = await signIn(formData.email, formData.password, captchaToken ?? undefined);
 
       if (!result.success) {
         const errorMsg =
