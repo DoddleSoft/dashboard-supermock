@@ -152,7 +152,7 @@ export default function TestsPage() {
                   <div className="flex-1">
                     <Link
                       href={`/dashboard/${slug}/tests/${test.id}`}
-                      className="text-lg font-semibold text-slate-900 mb-2 hover:text-red-600 transition-colors block"
+                      className="group-hover:underline text-lg font-semibold text-slate-900 mb-2 hover:text-red-600 transition-colors block"
                     >
                       {test.title}
                     </Link>
@@ -178,7 +178,9 @@ export default function TestsPage() {
                   {test.paper && (
                     <div className="flex items-center gap-2 text-sm text-slate-600">
                       <FileText className="w-4 h-4" />
-                      <span>{test.paper.title}</span>
+                      <span className="decoration-slate-400 underline-offset-2">
+                        {test.paper.title}
+                      </span>
                     </div>
                   )}
 

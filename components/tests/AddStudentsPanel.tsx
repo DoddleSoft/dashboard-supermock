@@ -49,6 +49,9 @@ export default function AddStudentsPanel({
   const [showSearchResults, setShowSearchResults] = useState(false);
 
   const [students, setStudents] = useState<StudentFormData[]>([]);
+  const [existingStudentIds, setExistingStudentIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [currentStudent, setCurrentStudent] = useState<StudentFormData>({
     name: "",
     email: "",
@@ -57,6 +60,23 @@ export default function AddStudentsPanel({
     guardian: "",
     guardian_phone: "",
   });
+
+  /* ── load already-enrolled student IDs to prevent duplicates ── */
+  useEffect(() => {
+    const loadExisting = async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("mock_attempts")
+        .select("student_id")
+        .eq("scheduled_test_id", testId);
+      if (data) {
+        setExistingStudentIds(
+          new Set(data.map((r: { student_id: string }) => r.student_id)),
+        );
+      }
+    };
+    loadExisting();
+  }, [testId]);
 
   /* ── search existing regular students ── */
   const searchExistingStudents = async (query: string) => {
@@ -92,7 +112,12 @@ export default function AddStudentsPanel({
 
       if (error) throw error;
 
-      setSearchResults(data || []);
+      // Filter out students already enrolled in this test
+      const filtered = (data || []).filter(
+        (s: { student_id: string }) => !existingStudentIds.has(s.student_id),
+      );
+
+      setSearchResults(filtered);
       setShowSearchResults(true);
     } catch (error) {
       console.error("Error searching students:", error);
@@ -139,12 +164,23 @@ export default function AddStudentsPanel({
 
     const isDuplicate = students.some(
       (s: StudentFormData) =>
-        s.student_id === currentStudent.student_id ||
+        (s.student_id &&
+          currentStudent.student_id &&
+          s.student_id === currentStudent.student_id) ||
         (s.email && currentStudent.email && s.email === currentStudent.email),
     );
 
     if (isDuplicate) {
       toast.error("This student is already in the list");
+      return;
+    }
+
+    // Check against students already enrolled in this test
+    if (
+      currentStudent.student_id &&
+      existingStudentIds.has(currentStudent.student_id)
+    ) {
+      toast.error("This student is already enrolled in this test");
       return;
     }
 

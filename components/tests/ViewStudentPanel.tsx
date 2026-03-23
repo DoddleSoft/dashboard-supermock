@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Users,
   Mail,
@@ -11,9 +11,17 @@ import {
   XCircle,
   AlertCircle,
   RefreshCw,
+  MoreVertical,
+  Trash2,
 } from "lucide-react";
-import { fetchTestStudents, type TestStudent } from "@/helpers/tests";
+import {
+  fetchTestStudents,
+  removeStudentFromTest,
+  type TestStudent,
+} from "@/helpers/tests";
 import { SmallLoader } from "@/components/ui/SmallLoader";
+import { DeleteConfirmationDialog } from "@/components/ui/DeleteConfirmationDialog";
+import { toast } from "sonner";
 
 interface ViewStudentPanelProps {
   testId: string;
@@ -49,6 +57,10 @@ export default function ViewStudentPanel({ testId }: ViewStudentPanelProps) {
   const [students, setStudents] = useState<TestStudent[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TestStudent | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   const loadStudents = async () => {
     setLoading(true);
@@ -60,6 +72,35 @@ export default function ViewStudentPanel({ testId }: ViewStudentPanelProps) {
   useEffect(() => {
     loadStudents();
   }, [testId]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    const result = await removeStudentFromTest(deleteTarget.attempt_id);
+    if (result.success) {
+      setStudents((prev) =>
+        prev.filter((s) => s.attempt_id !== deleteTarget.attempt_id),
+      );
+      toast.success(
+        `${deleteTarget.student.name ?? "Student"} removed from the test`,
+      );
+    } else {
+      toast.error(result.error ?? "Failed to remove student");
+    }
+    setIsDeleting(false);
+    setDeleteTarget(null);
+  };
 
   const filtered = students.filter(
     (s) =>
@@ -120,36 +161,6 @@ export default function ViewStudentPanel({ testId }: ViewStudentPanelProps) {
         </div>
       </div>
 
-      {/* Summary badges */}
-      {students.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {(
-            ["in_progress", "completed", "evaluated", "abandoned"] as const
-          ).map((status) => {
-            const count = students.filter(
-              (s) => s.attempt_status === status,
-            ).length;
-            const cfg = attemptStatusConfig[status];
-            return (
-              <div
-                key={status}
-                className="bg-white rounded-xl border border-slate-200 p-3 flex items-center gap-3"
-              >
-                <span
-                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${cfg.className}`}
-                >
-                  {cfg.icon}
-                  {cfg.label}
-                </span>
-                <span className="text-lg font-semibold text-slate-900">
-                  {count}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
       {/* List */}
       {filtered.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
@@ -171,7 +182,7 @@ export default function ViewStudentPanel({ testId }: ViewStudentPanelProps) {
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
@@ -192,6 +203,9 @@ export default function ViewStudentPanel({ testId }: ViewStudentPanelProps) {
                 </th>
                 <th className="text-left px-5 py-3 font-medium text-slate-600">
                   Started
+                </th>
+                <th className="text-right px-5 py-3 font-medium text-slate-600">
+                  Actions
                 </th>
               </tr>
             </thead>
@@ -291,6 +305,47 @@ export default function ViewStudentPanel({ testId }: ViewStudentPanelProps) {
                     <td className="px-5 py-3 text-slate-500 whitespace-nowrap">
                       {formatDate(row.started_at)}
                     </td>
+
+                    {/* Actions */}
+                    <td className="px-5 py-3 text-right relative">
+                      <div
+                        className="relative inline-block"
+                        ref={
+                          openMenuId === row.attempt_id ? menuRef : undefined
+                        }
+                      >
+                        <button
+                          onClick={() =>
+                            setOpenMenuId(
+                              openMenuId === row.attempt_id
+                                ? null
+                                : row.attempt_id,
+                            )
+                          }
+                          className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                        >
+                          <MoreVertical className="w-4 h-4 text-slate-500" />
+                        </button>
+
+                        {openMenuId === row.attempt_id && (
+                          <div
+                            className="absolute right-0 w-40 bg-white border border-slate-200 rounded-lg shadow-xl z-50"
+                            /* Increased z-index and shadow for better visibility */
+                          >
+                            <button
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                setDeleteTarget(row);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -298,6 +353,16 @@ export default function ViewStudentPanel({ testId }: ViewStudentPanelProps) {
           </table>
         </div>
       )}
+
+      <DeleteConfirmationDialog
+        isOpen={!!deleteTarget}
+        title="Remove Student"
+        description="This will remove the student from this test and delete their attempt data."
+        itemName={deleteTarget?.student.name ?? "this student"}
+        isDeleting={isDeleting}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

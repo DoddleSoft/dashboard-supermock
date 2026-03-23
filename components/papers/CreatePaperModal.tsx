@@ -249,11 +249,6 @@ export function CreatePaperModal({
                                     <p className="text-sm font-medium text-slate-900">
                                       {module.heading}
                                     </p>
-                                    {module.subheading && (
-                                      <p className="text-xs text-slate-500">
-                                        {module.subheading}
-                                      </p>
-                                    )}
                                   </div>
                                   {selected?.id === module.id && (
                                     <Check className="w-4 h-4 text-green-600" />

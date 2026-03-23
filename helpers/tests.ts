@@ -494,6 +494,31 @@ export const fetchTestStudents = async (
   }
 };
 
+/**
+ * Remove a student's mock attempt from a scheduled test
+ */
+export const removeStudentFromTest = async (
+  attemptId: string,
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const supabase = createClient();
+
+    const { error } = await supabase
+      .from("mock_attempts")
+      .delete()
+      .eq("id", attemptId);
+
+    if (error) throw error;
+
+    return { success: true };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error?.message ?? "Failed to remove student",
+    };
+  }
+};
+
 // ----- Formatting helpers -----
 
 /**
