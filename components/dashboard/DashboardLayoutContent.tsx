@@ -132,13 +132,17 @@ export default function DashboardLayoutContent({
             const isQuestionsRoute = pathname.startsWith(
               `/dashboard/${slug}/questions`,
             );
+            const isCreateTestRoute = pathname.startsWith(
+              `/dashboard/${slug}/create/test`,
+            );
 
             const isActive =
               pathname === item.href ||
               (item.href !== `/dashboard/${slug}` &&
                 pathname.startsWith(item.href)) ||
               (item.label === "Questions" &&
-                (isQuestionsRoute || isCreateModuleRoute));
+                (isQuestionsRoute || isCreateModuleRoute)) ||
+              (item.label === "Tests" && isCreateTestRoute);
 
             return (
               <SidebarItem

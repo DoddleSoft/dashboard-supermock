@@ -53,7 +53,6 @@ export default function PreviewPage() {
   }, [attemptId, loadAttemptDetails]);
 
   const formatDate = formatReviewDate;
-  const formatDuration = formatDurationDetailed;
   const getStatusColor = getReviewStatusColor;
 
   if (loading) {

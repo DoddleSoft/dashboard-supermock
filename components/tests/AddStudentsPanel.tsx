@@ -47,6 +47,7 @@ export default function AddStudentsPanel({
   >([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [allResultsFiltered, setAllResultsFiltered] = useState(false);
 
   const [students, setStudents] = useState<StudentFormData[]>([]);
   const [existingStudentIds, setExistingStudentIds] = useState<Set<string>>(
@@ -112,11 +113,17 @@ export default function AddStudentsPanel({
 
       if (error) throw error;
 
-      // Filter out students already enrolled in this test
+      // Filter out students already enrolled in this test OR already in the pending list
+      const pendingIds = new Set(
+        students.filter((s) => s.student_id).map((s) => s.student_id),
+      );
       const filtered = (data || []).filter(
-        (s: { student_id: string }) => !existingStudentIds.has(s.student_id),
+        (s: { student_id: string }) =>
+          !existingStudentIds.has(s.student_id) &&
+          !pendingIds.has(s.student_id),
       );
 
+      setAllResultsFiltered((data || []).length > 0 && filtered.length === 0);
       setSearchResults(filtered);
       setShowSearchResults(true);
     } catch (error) {
@@ -305,7 +312,7 @@ export default function AddStudentsPanel({
   };
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-3xl">
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Student Form */}
         <div className="bg-white rounded-xl border border-slate-200 p-6">
@@ -314,7 +321,6 @@ export default function AddStudentsPanel({
           </h3>
 
           <div className="space-y-4">
-            {/* Search Existing Regular Students */}
             {!currentStudent.isExisting && (
               <div className="relative">
                 <label className="block text-sm font-medium text-slate-900 mb-2">
@@ -366,8 +372,9 @@ export default function AddStudentsPanel({
                       </div>
                     ) : (
                       <div className="p-4 text-center text-slate-500">
-                        No students found. Fill in the form below to add a new
-                        student.
+                        {allResultsFiltered
+                          ? "Student already added to this test."
+                          : "No students found."}
                       </div>
                     )}
                   </div>

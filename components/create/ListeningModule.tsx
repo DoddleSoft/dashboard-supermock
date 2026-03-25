@@ -1,4 +1,11 @@
-import { Plus, Upload, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Plus,
+  Upload,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  Notebook,
+} from "lucide-react";
 import { useRef, useEffect, useState } from "react";
 import {
   RenderBlock,
@@ -7,6 +14,7 @@ import {
 } from "../../context/ModuleContext";
 import { compressImage, compressAudio } from "../../lib/mediaCompression";
 import AnswerKeyTable from "./AnswerKeyTable";
+import InstructionTemplates from "./InstructionTemplates";
 
 interface ListeningModuleProps {
   sections: ListeningSection[];
@@ -236,10 +244,10 @@ export default function ListeningModule({
 
           {expandedSections.includes(section.id) && (
             <div className="p-6 space-y-6">
-              {/* Instruction */}
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+                <label className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
                   Instruction
+                  <InstructionTemplates />
                 </label>
                 <textarea
                   value={section.instruction || ""}
@@ -336,7 +344,7 @@ export default function ListeningModule({
                       key={`${section.id}-block-${index}`}
                       className="border border-slate-200 rounded-xl p-4 bg-white shadow-sm"
                     >
-                      <div className="flex items-center gap-3 mb-4">
+                      <div className="flex items-center gap-4 mb-4">
                         <select
                           value={block.type}
                           onChange={(e) =>
@@ -373,12 +381,18 @@ export default function ListeningModule({
                             ))}
                           </div>
                         </div>
-                        <button
-                          onClick={() => onDeleteRenderBlock(section.id, index)}
-                          className="ml-auto p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+
+                        <div className="flex item-center justify-between">
+                          <InstructionTemplates />
+                          <button
+                            onClick={() =>
+                              onDeleteRenderBlock(section.id, index)
+                            }
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                          >
+                            <Trash2 className="w-5 h-5 text-red-700" />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="flex flex-col gap-3 mb-4 md:flex-row md:items-center md:gap-4">

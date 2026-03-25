@@ -1,4 +1,4 @@
-import { Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronUp, Notebook } from "lucide-react";
 import {
   RenderBlock,
   RenderBlockType,
@@ -6,6 +6,7 @@ import {
 } from "../../context/ModuleContext";
 import { compressImage } from "../../lib/mediaCompression";
 import AnswerKeyTable from "./AnswerKeyTable";
+import InstructionTemplates from "./InstructionTemplates";
 
 interface ReadingModuleProps {
   sections: ReadingSection[];
@@ -152,15 +153,16 @@ export default function ReadingModule({
 
               {/* Instruction */}
               <div className="my-6">
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+                <label className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
                   Instruction
+                  <InstructionTemplates />
                 </label>
                 <textarea
                   value={section.instruction || ""}
                   onChange={(e) =>
                     onUpdateSectionInstruction(section.id, e.target.value)
                   }
-                  placeholder="Enter the instructions for this passage..."
+                  placeholder="Enter the instruction for this passage..."
                   className="w-full h-24 p-4 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 placeholder:text-slate-400 resize-none text-sm"
                 />
               </div>
@@ -192,7 +194,7 @@ export default function ReadingModule({
                       key={`${section.id}-block-${index}`}
                       className="border border-slate-200 rounded-xl p-4 bg-white shadow-sm"
                     >
-                      <div className="flex items-center gap-3 mb-4">
+                      <div className="flex items-center gap-4 mb-4">
                         <select
                           value={block.type}
                           onChange={(e) =>
@@ -223,26 +225,24 @@ export default function ReadingModule({
                               <button
                                 key={item}
                                 onClick={() => copyToClipboard(item)}
-                                className="
-              rounded-lg border border-slate-300 
-              bg-slate-50 px-3 py-1.5 
-              text-sm font-mono text-slate-900
-              hover:bg-slate-100 hover:border-slate-400
-              active:scale-95 transition
-            "
+                                className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-sm font-mono text-slate-900 hover:bg-slate-100 hover:border-slate-400 active:scale-95 transition"
                               >
                                 {item}
                               </button>
                             ))}
                           </div>
                         </div>
-
-                        <button
-                          onClick={() => onDeleteRenderBlock(section.id, index)}
-                          className="ml-auto p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex item-center justify-between">
+                          <InstructionTemplates />
+                          <button
+                            onClick={() =>
+                              onDeleteRenderBlock(section.id, index)
+                            }
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                          >
+                            <Trash2 className="w-5 h-5 text-red-700" />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="flex flex-col gap-3 mb-4 md:flex-row md:items-center md:gap-4">

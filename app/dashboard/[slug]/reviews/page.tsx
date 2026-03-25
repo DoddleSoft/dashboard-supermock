@@ -56,6 +56,8 @@ export default function ReviewPage() {
 
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [showStatusSubmenu, setShowStatusSubmenu] = useState(false);
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [actionMenuAttempt, setActionMenuAttempt] =
     useState<AttemptReview | null>(null);
@@ -179,8 +181,12 @@ export default function ReviewPage() {
   const handleActionClick = (attempt: AttemptReview, e: React.MouseEvent) => {
     e.stopPropagation();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const menuHeight = 160;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const top =
+      spaceBelow < menuHeight + 8 ? rect.top - menuHeight - 4 : rect.bottom + 4;
     setMenuPos({
-      top: rect.bottom + 4,
+      top,
       left: Math.min(rect.right - 140, window.innerWidth - 148),
     });
     if (actionMenuAttempt?.attemptId === attempt.attemptId) {
@@ -193,6 +199,7 @@ export default function ReviewPage() {
 
   const closeMenu = () => {
     setShowActionMenu(false);
+    setShowStatusSubmenu(false);
     setMenuPos(null);
   };
 
@@ -253,6 +260,58 @@ export default function ReviewPage() {
     setAttemptToDelete(null);
   };
 
+  const handleStatusChange = async (
+    attempt: AttemptReview,
+    newStatus: string,
+  ) => {
+    if (attempt.status === newStatus) {
+      closeMenu();
+      return;
+    }
+
+    setUpdatingStatus(true);
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          attemptId: attempt.attemptId,
+          status: newStatus,
+        }),
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        let message = "Failed to update status";
+        const contentType = res.headers.get("content-type");
+        if (contentType?.includes("application/json")) {
+          try {
+            const body = await res.json();
+            if (body.error) message = body.error;
+          } catch {
+            /* non-JSON despite header */
+          }
+        }
+        throw new Error(message);
+      }
+
+      // Optimistically update the local review entry
+      setReviews((prev) =>
+        prev.map((r) =>
+          r.attemptId === attempt.attemptId ? { ...r, status: newStatus } : r,
+        ),
+      );
+      toast.success("Status updated");
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to update status";
+      toast.error(message);
+    } finally {
+      setUpdatingStatus(false);
+      closeMenu();
+    }
+  };
+
   const handlePageChange = (newPage: number) => {
     setShowActionMenu(false);
     setPage(newPage);
@@ -310,9 +369,10 @@ export default function ReviewPage() {
                 className="px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-900 bg-white text-sm font-medium"
               >
                 <option value="all">All Status</option>
+                <option value="in_progress">In Progress</option>
                 <option value="completed">Completed</option>
-                <option value="pending">Pending</option>
-                <option value="in-progress">In Progress</option>
+                <option value="evaluated">Evaluated</option>
+                <option value="abandoned">Abandoned</option>
               </select>
             </div>
           </div>
@@ -331,11 +391,12 @@ export default function ReviewPage() {
                     <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                       Student
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Email
-                    </th>
+
                     <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                       Modules
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      Score
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                       Status
@@ -354,14 +415,15 @@ export default function ReviewPage() {
                       key={attempt.attemptId}
                       className="hover:bg-slate-50 transition-colors duration-150"
                     >
-                      <td className="px-6 py-1">
-                        <span className="font-medium text-slate-900 text-sm">
+                      <td className="flex flex-col px-6 py-1">
+                        <span className="flex flex-col font-medium text-slate-900 text-md">
                           {attempt.studentName || "N/A"}
                         </span>
+                        <span className="text-slate-600 text-xs">
+                          {attempt.studentEmail || "N/A"}
+                        </span>
                       </td>
-                      <td className="px-6 py-1 text-slate-600 text-sm">
-                        {attempt.studentEmail || "N/A"}
-                      </td>
+
                       <td className="px-6 py-1">
                         <div className="flex flex-wrap gap-1.5">
                           {attempt.modules.map((mod) => (
@@ -373,6 +435,18 @@ export default function ReviewPage() {
                             </span>
                           ))}
                         </div>
+                      </td>
+                      <td className="px-6 py-1 text-sm font-semibold text-slate-900">
+                        {(() => {
+                          const bands = attempt.modules
+                            .map((m) => m.band)
+                            .filter((b): b is number => b != null);
+                          if (bands.length === 0)
+                            return <span className="text-slate-400">—</span>;
+                          const avg =
+                            bands.reduce((a, b) => a + b, 0) / bands.length;
+                          return Math.round(avg * 2) / 2;
+                        })()}
                       </td>
                       <td className="px-6 py-1">
                         <span
@@ -417,7 +491,7 @@ export default function ReviewPage() {
                   onClick={closeMenu}
                 />
                 <div
-                  className="fixed bg-white border border-slate-200 rounded-lg shadow-xl z-50 min-w-[140px] overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right"
+                  className="fixed bg-white border border-slate-200 rounded-lg shadow-xl z-50 min-w-[160px] overflow-visible animate-in fade-in zoom-in-95 duration-100 origin-top-right"
                   style={{ top: menuPos.top, left: menuPos.left }}
                 >
                   <button
@@ -429,6 +503,77 @@ export default function ReviewPage() {
                   >
                     Preview
                   </button>
+
+                  {/* Change Status with click-toggled submenu */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowStatusSubmenu((v) => !v)}
+                      className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors font-medium border-t border-slate-100 flex items-center justify-between"
+                    >
+                      Change Status
+                      <ChevronRight
+                        className={`w-3.5 h-3.5 text-slate-400 transition-transform ${showStatusSubmenu ? "-rotate-180" : ""}`}
+                      />
+                    </button>
+
+                    {showStatusSubmenu && (
+                      <div className="absolute right-full top-0 mr-1 bg-white border border-slate-200 rounded-lg shadow-xl min-w-[150px] overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                        {(
+                          [
+                            {
+                              value: "in_progress",
+                              label: "In Progress",
+                              color: "bg-yellow-500",
+                            },
+                            {
+                              value: "completed",
+                              label: "Completed",
+                              color: "bg-green-500",
+                            },
+                            {
+                              value: "evaluated",
+                              label: "Evaluated",
+                              color: "bg-blue-500",
+                            },
+                            {
+                              value: "abandoned",
+                              label: "Abandoned",
+                              color: "bg-red-500",
+                            },
+                          ] as const
+                        ).map((opt) => {
+                          const isCurrent =
+                            actionMenuAttempt.status
+                              .toLowerCase()
+                              .replace(/[\s-]+/g, "_") === opt.value;
+                          return (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              disabled={isCurrent || updatingStatus}
+                              onClick={() =>
+                                handleStatusChange(actionMenuAttempt, opt.value)
+                              }
+                              className={`w-full text-left px-4 py-2.5 text-sm transition-colors font-medium border-b border-slate-50 last:border-0 disabled:cursor-not-allowed ${
+                                isCurrent
+                                  ? "bg-slate-50 text-slate-400"
+                                  : "text-slate-700 hover:bg-slate-50"
+                              }`}
+                            >
+                              <span className="flex items-center gap-2">
+                                <span
+                                  className={`w-2 h-2 rounded-full ${opt.color}`}
+                                />
+                                {opt.label}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
                   <button
                     onClick={() => {
                       handleActionDelete(actionMenuAttempt);

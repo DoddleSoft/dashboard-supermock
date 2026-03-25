@@ -40,7 +40,7 @@ export function EditMemberDrawer({
         onClick={onClose}
       />
 
-      <div className="fixed right-0 top-0 h-screen w-full max-w-xl bg-white shadow-xl z-50 flex flex-col overflow-hidden animate-in slide-in-from-right duration-500">
+      <div className="fixed right-2 top-2 bottom-2 rounded-xl w-full max-w-xl bg-white shadow-xl z-50 flex flex-col overflow-hidden animate-in slide-in-from-right duration-500">
         <div className="flex items-center justify-between px-6 py-2 border-b border-slate-200">
           <div>
             <p className="text-sm font-bold uppercase text-slate-800 mt-1">
@@ -54,7 +54,6 @@ export function EditMemberDrawer({
             <X className="w-5 h-5 text-slate-400" />
           </button>
         </div>
-
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -134,7 +133,6 @@ export function EditMemberDrawer({
             </div>
           </div>
         </div>
-
         <div className="border-t flex border-slate-200 p-6 space-x-3">
           <button
             onClick={onDelete}

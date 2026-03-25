@@ -297,7 +297,7 @@ function CreateModuleContent() {
         )}
 
         {/* Paper Title */}
-        <div className="mb-6 flex bg-gray-200 pl-4 rounded-lg items-center gap-4">
+        <div className="mb-6 flex bg-white border border-gray-300 pl-4 rounded-lg items-center gap-4">
           <div className="w-12 text-lg font-semibold text-slate-500 tracking-wide">
             Title:
           </div>
@@ -305,7 +305,7 @@ function CreateModuleContent() {
             type="text"
             value={moduleTitles[typeKey]}
             onChange={(e) => setModuleTitle(typeKey, e.target.value)}
-            className="text-lg px-4 py-2 my-1 font-bold text-slate-900 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-gray-300 rounded-lg w-full placeholder:text-slate-400"
+            className="text-lg px-4 py-2 my-1 font-bold text-slate-900 bg-transparent border-none focus:outline-none rounded-lg w-full placeholder:text-slate-400"
             placeholder={`Enter title for the ${typeKey} module...`}
           />
         </div>

@@ -53,7 +53,11 @@ export function CreateMemberModal({
           </button>
         </div>
 
-        <form onSubmit={onSubmit} className="px-6 py-4 space-y-4">
+        <form
+          onSubmit={onSubmit}
+          autoComplete="off"
+          className="px-6 py-4 space-y-4"
+        >
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
               Full Name *

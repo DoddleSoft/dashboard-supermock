@@ -89,7 +89,11 @@ export function CreateStudentModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-5">
+        <form
+          onSubmit={handleSubmit}
+          autoComplete="off"
+          className="px-6 py-5 space-y-5"
+        >
           <div className="grid grid-cols-2 gap-4">
             {/* Email + Password row */}
             <div className="col-span-2">

@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
 
   if (status !== "all") {
     reviews = reviews.filter((r: { status: string }) => {
-      const statusKey = r.status.toLowerCase().replace(/[\s_]+/g, "-");
+      const statusKey = r.status.toLowerCase().replace(/[\s-]+/g, "_");
       return statusKey === status;
     });
   }
@@ -171,6 +171,74 @@ export async function GET(request: NextRequest) {
     page,
     limit,
   });
+}
+
+// ── Allowed status transitions ──────────────────────────────────────────────
+const ALLOWED_STATUSES = [
+  "completed",
+  "in_progress",
+  "evaluated",
+  "abandoned",
+] as const;
+type AttemptStatus = (typeof ALLOWED_STATUSES)[number];
+
+// ── PATCH: Update mock attempt status with server-side auth ─────────────────
+export async function PATCH(request: NextRequest) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid request body" },
+      { status: 400 },
+    );
+  }
+
+  const { attemptId, status } = body;
+
+  if (!attemptId || typeof attemptId !== "string") {
+    return NextResponse.json({ error: "Missing attemptId" }, { status: 400 });
+  }
+
+  if (
+    !status ||
+    typeof status !== "string" ||
+    !(ALLOWED_STATUSES as readonly string[]).includes(status)
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "Invalid status. Allowed values: completed, in_progress, evaluated, abandoned",
+      },
+      { status: 400 },
+    );
+  }
+
+  const supabase = await createAuthenticatedClient();
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // RLS policies on mock_attempts enforce authorization at the database level
+  const { error } = await supabase
+    .from("mock_attempts")
+    .update({ status: status as AttemptStatus })
+    .eq("id", attemptId);
+
+  if (error) {
+    return NextResponse.json(
+      { error: "Failed to update status" },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({ success: true, status });
 }
 
 // ── DELETE: Delete a mock attempt with server-side auth ──────────────────────

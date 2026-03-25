@@ -58,7 +58,7 @@ export const createStudent = async (
 
     if (!res.ok) {
       toast.error(json.error ?? "Failed to create student.");
-      throw new Error(json.error ?? "api error");
+      throw new Error("api error");
     }
 
     toast.success("Student created successfully!");
