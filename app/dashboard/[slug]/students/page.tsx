@@ -268,7 +268,7 @@ export default function StudentsPage() {
 
   return (
     <>
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl p-6 mx-auto">
         {/* Page Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between">

@@ -22,6 +22,19 @@ export interface Center {
   updated_at: string;
   status: "pending" | "verified" | "rejected";
   verified_at?: string | null;
+  logo_url?: string | null;
+  about?: string | null;
+  website_url?: string | null;
+  facebook_url?: string | null;
+  instagram_url?: string | null;
+  linkedin_url?: string | null;
+  whatsapp?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  operating_hours?: Record<string, any> | null;
+  supported_test_formats?: Record<string, boolean> | null;
 }
 
 export interface DashboardStats {

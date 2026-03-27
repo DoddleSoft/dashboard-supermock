@@ -249,7 +249,7 @@ function CreateModuleContent() {
 
   return (
     <>
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl p-6 mx-auto">
         {/* Toast Notification */}
         {showToast && (
           <div

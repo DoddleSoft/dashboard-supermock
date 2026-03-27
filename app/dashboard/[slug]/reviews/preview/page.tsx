@@ -77,7 +77,7 @@ export default function PreviewPage() {
   const isWriting = selectedModule?.moduleType === "writing";
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl p-6 mx-auto space-y-6">
       {/* Student & Attempt Info */}
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

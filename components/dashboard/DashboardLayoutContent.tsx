@@ -13,6 +13,7 @@ import {
   NotepadText,
   PanelLeftClose,
   PanelLeftOpen,
+  Settings,
   UserStar,
   Users,
 } from "lucide-react";
@@ -77,6 +78,11 @@ export default function DashboardLayoutContent({
       { label: "Reviews", href: `/dashboard/${slug}/reviews`, icon: BarChart3 },
       { label: "Students", href: `/dashboard/${slug}/students`, icon: Users },
       { label: "Members", href: `/dashboard/${slug}/members`, icon: UserStar },
+      {
+        label: "Settings",
+        href: `/dashboard/${slug}/settings`,
+        icon: Settings,
+      },
     ],
     [slug],
   );
@@ -265,7 +271,7 @@ export default function DashboardLayoutContent({
         </header>
 
         <main className="flex-1 overflow-auto bg-slate-50">
-          <div className="p-8">{children}</div>
+          <div>{children}</div>
         </main>
       </div>
     </div>

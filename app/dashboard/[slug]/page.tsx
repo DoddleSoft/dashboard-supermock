@@ -51,7 +51,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="max-w-7xl flex flex-col gap-8 mx-auto">
+    <div className="max-w-7xl flex flex-col gap-6 p-6 mx-auto">
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-6">
         {stats.map((stat) => {

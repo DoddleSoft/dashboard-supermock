@@ -100,7 +100,7 @@ export default function TestsPage() {
 
   return (
     <>
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl p-6 mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           {/* Filters */}

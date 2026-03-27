@@ -11,6 +11,7 @@ export const ROLE_ALLOWED_SEGMENTS: Record<CenterRole, string[]> = {
     "/members",
     "/support",
     "/create",
+    "/settings",
   ],
   admin: [
     "",
@@ -21,6 +22,7 @@ export const ROLE_ALLOWED_SEGMENTS: Record<CenterRole, string[]> = {
     "/students",
     "/support",
     "/create",
+    "/settings",
   ],
   examiner: ["/reviews", "/questions", "/create/modules", "/support"],
 };

@@ -179,7 +179,7 @@ function CreateTestForm() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl p-6 mx-auto">
       <div className="mb-4">
         <h1 className="text-xl font-bold text-slate-900">
           {editId ? "Edit Test" : "Schedule New Test"}

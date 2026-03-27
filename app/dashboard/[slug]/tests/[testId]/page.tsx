@@ -125,11 +125,9 @@ export default function TestDetailPage() {
 
   /* ── render ── */
   return (
-    <div className="flex -m-8 h-[calc(100dvh-var(--navbar-height,57px))]">
-      {/* ── Secondary Sidebar ── */}
-      <aside className="w-56 shrink-0 bg-white border-r border-slate-200 flex flex-col min-h-0">
-        {/* Nav Items */}
-        <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+    <div className="flex bg-white shadow-sm h-[calc(100vh-3.4rem)]">
+      <aside className="flex flex-col w-60 border-r border-slate-200 bg-white">
+        <nav className="flex-1 p-2 overflow-y-auto">
           {sidebarNavItems.map((item) => {
             const isActive = activePanel === item.key;
             return (
@@ -148,9 +146,8 @@ export default function TestDetailPage() {
             );
           })}
         </nav>
-
         {/* Action Buttons */}
-        <div className="p-2 border-t border-slate-100 space-y-0.5 shrink-0">
+        <div className="p-2 border-t border-slate-200 shrink-0">
           <button
             onClick={handleGenerateOtp}
             disabled={Boolean(test.otp) || otpLoading}

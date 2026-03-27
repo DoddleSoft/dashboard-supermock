@@ -15,7 +15,7 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  // const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const turnstileRef = useRef<TurnstileInstance>(null);
 
   const [formData, setFormData] = useState({
@@ -64,11 +64,11 @@ export function LoginForm() {
       return;
     }
 
-    if (!captchaToken) {
-      fail("Please complete the CAPTCHA verification.");
-      setIsLoading(false);
-      return;
-    }
+    // if (!captchaToken) {
+    //   fail("Please complete the CAPTCHA verification.");
+    //   setIsLoading(false);
+    //   return;
+    // }
 
     const loadingToastId = "";
 
@@ -76,7 +76,7 @@ export function LoginForm() {
       const result = await signIn(
         formData.email,
         formData.password,
-        captchaToken ?? undefined,
+        // captchaToken ?? undefined,
       );
 
       if (!result.success) {
@@ -84,7 +84,7 @@ export function LoginForm() {
           result.error || "Login failed. Please check your credentials.";
         toast.error(errorMsg, { id: loadingToastId });
         turnstileRef.current?.reset();
-        setCaptchaToken(null);
+        // setCaptchaToken(null);
         setIsLoading(false);
         return;
       }
@@ -105,7 +105,7 @@ export function LoginForm() {
       toast.error(errorMsg, { id: loadingToastId });
       console.error("Login error:", error);
       turnstileRef.current?.reset();
-      setCaptchaToken(null);
+      // setCaptchaToken(null);
       setIsLoading(false);
     } finally {
       setIsLoading(false);
@@ -216,13 +216,13 @@ export function LoginForm() {
               </label>
             </div>
 
-            <Turnstile
+            {/* <Turnstile
               ref={turnstileRef}
               siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
               onSuccess={(token) => setCaptchaToken(token)}
               onExpire={() => setCaptchaToken(null)}
               onError={() => setCaptchaToken(null)}
-            />
+            /> */}
 
             {/* Submit Button */}
             <button
