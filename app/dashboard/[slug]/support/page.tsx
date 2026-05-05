@@ -90,7 +90,7 @@ export default function SupportPage() {
   };
 
   const whatsappLink =
-    "https://wa.me/8801635931004?text=Hi%20SuperMock%20Support%20Team%2C%20I%20would%20like%20to%20get%20some%20help%20with%20";
+    "https://wa.me/8801847089622?text=Hi%20SuperMock%20Support%20Team%2C%20I%20would%20like%20to%20get%20some%20help%20with%20";
 
   return (
     <div className="max-w-7xl p-6 mx-auto">
