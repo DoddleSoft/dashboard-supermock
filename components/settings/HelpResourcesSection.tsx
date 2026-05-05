@@ -3,27 +3,10 @@
 import { PlayCircle, FileText, ExternalLink } from "lucide-react";
 
 const TUTORIALS = [
-  {
-    title: "How to Create a Mock Test",
-    description:
-      "Step-by-step guide to setting up a new mock test for students.",
-    videoId: "dQw4w9WgXcQ",
-  },
-  {
-    title: "Grading Tests & Reviews",
-    description:
-      "Learn how to grade student responses and provide detailed feedback.",
-    videoId: "dQw4w9WgXcQ",
-  },
-  {
-    title: "Managing Students",
-    description: "Add, edit, and organize students in your test center.",
-    videoId: "dQw4w9WgXcQ",
-  },
-  {
-    title: "Creating Question Modules",
-    description: "Build reading, listening, and writing question modules.",
-    videoId: "dQw4w9WgXcQ",
+{
+    title: "Introducing SuperMock",
+    description: "Your all-in-one customizable platform for IELTS coaching centers with automated grading.",
+    videoId: "F04eO0IuBv0", // Real video from SuperMock channel
   },
 ];
 
